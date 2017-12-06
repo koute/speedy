@@ -1,0 +1,84 @@
+use std::slice;
+use std::io::{self, Write};
+
+use byteorder::{
+    ByteOrder,
+    LittleEndian,
+    BigEndian,
+    WriteBytesExt
+};
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Endianness {
+    LittleEndian,
+    BigEndian
+}
+
+#[inline]
+fn native_endian() -> Endianness {
+    if cfg!( target_endian = "little" ) {
+        Endianness::LittleEndian
+    } else {
+        Endianness::BigEndian
+    }
+}
+
+impl Default for Endianness {
+    #[inline]
+    fn default() -> Self {
+        native_endian()
+    }
+}
+
+impl Endianness {
+    #[inline]
+    pub fn conversion_necessary( self ) -> bool {
+        self != native_endian()
+    }
+}
+
+macro_rules! emit_wrapper {
+    ($type:ty, $reader:ident, $stream_writer:ident, $swapper:ident, $slice_swapper:ident, $from_slice:ident, $write:ident) => {
+        impl Endianness {
+            #[inline]
+            pub fn $reader( self, slice: &[u8] ) -> $type {
+                match self {
+                    Endianness::LittleEndian => LittleEndian::$reader( slice ),
+                    Endianness::BigEndian => BigEndian::$reader( slice )
+                }
+            }
+
+            #[inline]
+            pub fn $stream_writer< S: Write + ?Sized >( self, stream: &mut S, value: $type ) -> io::Result< () > {
+                match self {
+                    Endianness::LittleEndian => stream.$write::< LittleEndian >( value ),
+                    Endianness::BigEndian => stream.$write::< BigEndian >( value )
+                }
+            }
+
+            #[inline]
+            pub fn $swapper( self, value: &mut $type ) {
+                let slice = unsafe { slice::from_raw_parts_mut( value as *mut $type, 1 ) };
+                self.$slice_swapper( slice );
+            }
+
+            #[inline]
+            pub fn $slice_swapper( self, slice: &mut [$type] ) {
+                match self {
+                    Endianness::LittleEndian => LittleEndian::$from_slice( slice ),
+                    Endianness::BigEndian => BigEndian::$from_slice( slice )
+                }
+            }
+
+        }
+    }
+}
+
+emit_wrapper!( u16, read_u16, write_to_stream_u16, swap_u16, swap_slice_u16, from_slice_u16, write_u16 );
+emit_wrapper!( u32, read_u32, write_to_stream_u32, swap_u32, swap_slice_u32, from_slice_u32, write_u32 );
+emit_wrapper!( u64, read_u64, write_to_stream_u64, swap_u64, swap_slice_u64, from_slice_u64, write_u64 );
+emit_wrapper!( i16, read_i16, write_to_stream_i16, swap_i16, swap_slice_i16, from_slice_i16, write_i16 );
+emit_wrapper!( i32, read_i32, write_to_stream_i32, swap_i32, swap_slice_i32, from_slice_i32, write_i32 );
+emit_wrapper!( i64, read_i64, write_to_stream_i64, swap_i64, swap_slice_i64, from_slice_i64, write_i64 );
+emit_wrapper!( f32, read_f32, write_to_stream_f32, swap_f32, swap_slice_f32, from_slice_f32, write_f32 );
+emit_wrapper!( f64, read_f64, write_to_stream_f64, swap_f64, swap_slice_f64, from_slice_f64, write_f64 );
