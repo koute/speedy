@@ -104,6 +104,18 @@ impl< C: Context > Writable< C > for String {
     }
 }
 
+impl< C: Context > Writable< C > for str {
+    #[inline]
+    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+        self.as_bytes().write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        Writable::< C >::bytes_needed( self.as_bytes() )
+    }
+}
+
 impl< C: Context > Writable< C > for [u64] {
     #[inline]
     fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
@@ -121,6 +133,30 @@ impl< C: Context > Writable< C > for [u64] {
     #[inline]
     fn bytes_needed( &self ) -> usize {
         4 + self.len() * mem::size_of::< u64 >()
+    }
+}
+
+impl< 'r, C: Context > Writable< C > for Cow< 'r, [u64] > {
+    #[inline]
+    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+        self.as_ref().write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        Writable::< C >::bytes_needed( self.as_ref() )
+    }
+}
+
+impl< C: Context > Writable< C > for Vec< u8 > {
+    #[inline]
+    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+        self.as_slice().write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        Writable::< C >::bytes_needed( self.as_slice() )
     }
 }
 

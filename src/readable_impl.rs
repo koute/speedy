@@ -78,6 +78,19 @@ impl< 'a, C: Context > Readable< C > for Cow< 'a, [u8] > {
     }
 }
 
+impl< 'a, C: Context > Readable< C > for Cow< 'a, [u64] > {
+    #[inline]
+    fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self > {
+        let bytes: Vec< u64 > = try!( reader.read_value() );
+        Ok( bytes.into() )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <Vec< u64 > as Readable< C >>::minimum_bytes_needed()
+    }
+}
+
 impl< C: Context > Readable< C > for String {
     #[inline]
     fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self > {
