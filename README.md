@@ -4,6 +4,54 @@
 
 [![Documentation](https://docs.rs/speedy/badge.svg)](https://docs.rs/speedy/*/speedy/)
 
+The goal of this crate is to provide fast, simple and easy binary serialization.
+
+## Example
+
+```rust
+#[macro_use]
+extern crate speedy_derive;
+extern crate speedy;
+
+use std::borrow::Cow;
+use speedy::{Readable, Writable, Endianness};
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+enum Enum {
+    A,
+    B,
+    C,
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct Struct< 'a > {
+    number: u64,
+    string: String,
+    vector: Vec< u8 >,
+    cow: Cow< 'a, [i64] >,
+    float: f32,
+    enumeration: Enum
+}
+
+fn main() {
+    let original = Struct {
+        number: 0x12345678ABCDEF00,
+        string: "A totally pointless string".to_owned(),
+        vector: vec![ 1, 2, 3 ],
+        cow: Cow::Borrowed( &[ 4, 5, 6 ] ),
+        float: 3.1415,
+        enumeration: Enum::C
+    };
+
+    let endian = Endianness::LittleEndian;
+    let bytes = original.write_to_vec( endian ).unwrap();
+    let deserialized: Struct< 'static > =
+        Struct::read_from_buffer( endian, &bytes ).unwrap();
+
+    assert_eq!( original, deserialized );
+}
+```
+
 ## License
 
 Licensed under either of
