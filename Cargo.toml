@@ -16,3 +16,9 @@ byteorder = "1"
 
 [dev-dependencies]
 speedy-derive = "0.1"
+
+[profile.release]
+panic = "abort"
+
+[profile.bench]
+panic = "abort"
