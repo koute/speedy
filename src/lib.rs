@@ -91,7 +91,6 @@ mod tests {
     fn read_write_u64_vec() {
         let original: Vec< u64 > = vec![ 1, 2, 3 ];
         let serialized = original.write_to_vec( Endianness::default() ).unwrap();
-        println!( "{:?}", serialized );
         let deserialized: Vec< u64 > = Vec::< u64 >::read_from_buffer( Endianness::default(), &serialized ).unwrap();
         assert_eq!( original, deserialized );
     }
