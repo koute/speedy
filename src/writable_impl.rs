@@ -9,18 +9,6 @@ use writer::Writer;
 use context::Context;
 use utils::as_bytes;
 
-impl< C: Context > Writable< C > for u8 {
-    #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        writer.write_u8( *self )
-    }
-
-    #[inline]
-    fn bytes_needed( &self ) -> usize {
-        mem::size_of::< Self >()
-    }
-}
-
 macro_rules! impl_for_primitive {
     ($type:ty, $write_name:ident) => {
         impl< C: Context > Writable< C > for $type {
