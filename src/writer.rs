@@ -13,6 +13,28 @@ pub trait Writer< 'a, C: Context > {
     fn write_u32( &mut self, value: u32 ) -> io::Result< () >;
     fn write_u64( &mut self, value: u64 ) -> io::Result< () >;
 
+    fn context( &self ) -> &C;
+
+    #[inline]
+    fn write_i8( &mut self, value: i8 ) -> io::Result< () > {
+        self.write_u8( value as u8 )
+    }
+
+    #[inline]
+    fn write_i16( &mut self, value: i16 ) -> io::Result< () > {
+        self.write_u16( value as u16 )
+    }
+
+    #[inline]
+    fn write_i32( &mut self, value: i32 ) -> io::Result< () > {
+        self.write_u32( value as u32 )
+    }
+
+    #[inline]
+    fn write_i64( &mut self, value: i64 ) -> io::Result< () > {
+        self.write_u64( value as u64 )
+    }
+
     #[inline]
     fn write_f32( &mut self, value: f32 ) -> io::Result< () > {
         let value: u32 = unsafe { mem::transmute( value ) };
@@ -24,8 +46,6 @@ pub trait Writer< 'a, C: Context > {
         let value: u64 = unsafe { mem::transmute( value ) };
         self.write_u64( value )
     }
-
-    fn context( &self ) -> &C;
 
     #[inline]
     fn endianness( &self ) -> Endianness {

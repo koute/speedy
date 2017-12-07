@@ -2,7 +2,16 @@ use std::slice;
 use std::mem;
 
 pub unsafe trait Primitive {}
+unsafe impl Primitive for i8 {}
+unsafe impl Primitive for u8 {}
+unsafe impl Primitive for i16 {}
+unsafe impl Primitive for u16 {}
+unsafe impl Primitive for i32 {}
+unsafe impl Primitive for u32 {}
+unsafe impl Primitive for i64 {}
 unsafe impl Primitive for u64 {}
+unsafe impl Primitive for f32 {}
+unsafe impl Primitive for f64 {}
 
 #[inline]
 pub fn as_bytes< T: Primitive >( slice: &[T] ) -> &[u8] {
