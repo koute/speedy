@@ -1,7 +1,6 @@
 use std::io::{
     self,
-    Read,
-    Cursor
+    Read
 };
 
 use reader::Reader;
@@ -41,8 +40,8 @@ pub trait Readable< C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer( context: C, buffer: &[u8] ) -> io::Result< Self > {
-        DirectSyncReader::deserialize( context, Cursor::new( buffer ) )
+    fn read_from_buffer( context: C, mut buffer: &[u8] ) -> io::Result< Self > {
+        DirectSyncReader::deserialize( context, &mut buffer )
     }
 
     #[inline]

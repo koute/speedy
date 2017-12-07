@@ -46,8 +46,7 @@ impl_for_primitive!( f64, write_f64 );
 impl< C: Context > Writable< C > for bool {
     #[inline]
     fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        writer.write_u8( if *self { 1 } else { 0 } )?;
-        Ok(())
+        writer.write_u8( if *self { 1 } else { 0 } )
     }
 
     #[inline]
@@ -59,7 +58,7 @@ impl< C: Context > Writable< C > for bool {
 impl< C: Context > Writable< C > for [u8] {
     #[inline]
     fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        writer.write_u32( self.len() as _ )?;
+        try!( writer.write_u32( self.len() as _ ) );
         writer.write_bytes( self )
     }
 
@@ -108,10 +107,10 @@ impl< C: Context > Writable< C > for String {
 impl< C: Context > Writable< C > for [u64] {
     #[inline]
     fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        writer.write_u32( self.len() as _ )?;
+        try!( writer.write_u32( self.len() as _ ) );
         if writer.endianness().conversion_necessary() {
             for &value in self {
-                writer.write_u64( value )?;
+                try!( writer.write_u64( value ) );
             }
             Ok(())
         } else {

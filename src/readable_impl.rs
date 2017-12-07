@@ -6,11 +6,12 @@ use readable::Readable;
 use reader::Reader;
 
 use context::Context;
+use utils::as_bytes_mut;
 
 impl< C: Context > Readable< C > for bool {
     #[inline]
     fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self > {
-        let value = reader.read_u8()?;
+        let value = try!( reader.read_u8() );
         if value == 0 {
             Ok( false )
         } else {
@@ -50,10 +51,10 @@ impl_for_primitive!( f64, read_f64 );
 impl< C: Context > Readable< C > for Vec< u8 > {
     #[inline]
     fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
+        let length = try!( reader.read_u32() ) as usize;
         let mut vec = Vec::with_capacity( length );
         unsafe { vec.set_len( length ); }
-        reader.read_bytes( &mut vec[..] )?;
+        try!( reader.read_bytes( &mut vec[..] ) );
 
         Ok( vec )
     }
@@ -67,7 +68,7 @@ impl< C: Context > Readable< C > for Vec< u8 > {
 impl< 'a, C: Context > Readable< C > for Cow< 'a, [u8] > {
     #[inline]
     fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self > {
-        let bytes: Vec< u8 > = reader.read_value()?;
+        let bytes: Vec< u8 > = try!( reader.read_value() );
         Ok( bytes.into() )
     }
 
@@ -80,7 +81,7 @@ impl< 'a, C: Context > Readable< C > for Cow< 'a, [u8] > {
 impl< C: Context > Readable< C > for String {
     #[inline]
     fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self > {
-        let bytes: Vec< u8 > = reader.read_value()?;
+        let bytes: Vec< u8 > = try!( reader.read_value() );
         match String::from_utf8( bytes ) {
             Err( error ) => Err( io::Error::new( io::ErrorKind::InvalidData, error ) ),
             Ok( string ) => Ok( string )
@@ -96,20 +97,10 @@ impl< C: Context > Readable< C > for String {
 impl< C: Context > Readable< C > for Vec< u64 > {
     #[inline]
     fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
-        let byte_length = length * mem::size_of::< u64 >();
-
-        let mut vec = Vec::with_capacity( byte_length );
-        debug_assert_eq!( vec.capacity(), byte_length );
-
-        unsafe { vec.set_len( byte_length ); }
-        reader.read_bytes( &mut vec[..] )?;
-
-        let ptr = vec.as_mut_ptr();
-        mem::forget( vec );
-
-        let mut vec = unsafe { Vec::from_raw_parts( ptr as *mut u64, length, length ) };
-        reader.endianness().swap_slice_u64( &mut vec );
+        let length = try!( reader.read_u32() ) as usize;
+        let mut vec = Vec::with_capacity( length );
+        unsafe { vec.set_len( length ); }
+        try!( reader.read_bytes( as_bytes_mut( &mut vec ) ) );
 
         Ok( vec )
     }

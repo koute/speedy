@@ -116,7 +116,7 @@ pub trait Writable< C: Context > {
     #[inline]
     fn write_to_vec( &self, context: C ) -> io::Result< Vec< u8 > > {
         let mut vec = Vec::new();
-        self.write_to_stream( context, &mut vec )?;
+        try!( self.write_to_stream( context, &mut vec ) );
         Ok( vec )
     }
 

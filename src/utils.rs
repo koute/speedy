@@ -4,8 +4,16 @@ use std::mem;
 pub unsafe trait Primitive {}
 unsafe impl Primitive for u64 {}
 
+#[inline]
 pub fn as_bytes< T: Primitive >( slice: &[T] ) -> &[u8] {
     unsafe {
         slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * mem::size_of::< T >() )
+    }
+}
+
+#[inline]
+pub fn as_bytes_mut< T: Primitive >( slice: &mut [T] ) -> &mut [u8] {
+    unsafe {
+        slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut u8, slice.len() * mem::size_of::< T >() )
     }
 }
