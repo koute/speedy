@@ -1,6 +1,6 @@
 [package]
 name = "speedy"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Jan Bujak <j@exia.io>"]
 repository = "https://github.com/koute/speedy"
 homepage = "https://github.com/koute/speedy"
@@ -15,7 +15,7 @@ description = "A fast binary serialization framework"
 byteorder = "1"
 
 [dev-dependencies]
-speedy-derive = "0.1"
+speedy-derive = "0.3"
 
 [profile.release]
 panic = "abort"
