@@ -45,7 +45,7 @@ fn main() {
 
     let endian = Endianness::LittleEndian;
     let bytes = original.write_to_vec( endian ).unwrap();
-    let deserialized: Struct< 'static > =
+    let deserialized: Struct =
         Struct::read_from_buffer( endian, &bytes ).unwrap();
 
     assert_eq!( original, deserialized );
