@@ -35,6 +35,12 @@ impl Endianness {
     pub fn conversion_necessary( self ) -> bool {
         self != native_endian()
     }
+
+    #[inline]
+    pub fn swap_slice_u8( self, _: &mut [u8] ) {}
+
+    #[inline]
+    pub fn swap_slice_i8( self, _: &mut [i8] ) {}
 }
 
 macro_rules! emit_wrapper {

@@ -5,13 +5,14 @@ use std::io::{
 
 use reader::Reader;
 use context::Context;
+use endianness::Endianness;
 
-struct DirectSyncReader< C: Context, S: Read > {
+struct StreamReader< C: Context, S: Read > {
     context: C,
     reader: S
 }
 
-impl< C: Context, S: Read > Reader< C > for DirectSyncReader< C, S > {
+impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
     #[inline]
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
         self.reader.read_exact( output )
@@ -21,18 +22,23 @@ impl< C: Context, S: Read > Reader< C > for DirectSyncReader< C, S > {
     fn context( &self ) -> &C {
         &self.context
     }
+
+    #[inline]
+    fn context_mut( &mut self ) -> &mut C {
+        &mut self.context
+    }
 }
 
-impl< C: Context, S: Read > DirectSyncReader< C, S > {
+impl< C: Context, S: Read > StreamReader< C, S > {
     #[inline]
-    fn deserialize< T: Readable< C > >( context: C, reader: S ) -> io::Result< T > {
-        let mut reader = DirectSyncReader { context, reader };
+    fn deserialize< 'a, T: Readable< 'a, C > >( context: C, reader: S ) -> io::Result< T > {
+        let mut reader = StreamReader { context, reader };
         T::read_from( &mut reader )
     }
 }
 
-pub trait Readable< C: Context >: Sized {
-    fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self >;
+pub trait Readable< 'a, C: Context >: Sized {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self >;
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
@@ -40,12 +46,36 @@ pub trait Readable< C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer( context: C, mut buffer: &[u8] ) -> io::Result< Self > {
-        DirectSyncReader::deserialize( context, &mut buffer )
+    fn read_from_buffer( context: C, mut buffer: &'a [u8] ) -> io::Result< Self > {
+        StreamReader::deserialize( context, &mut buffer )
+    }
+
+    #[inline]
+    fn read_from_buffer_owned( context: C, mut buffer: &[u8] ) -> io::Result< Self > {
+        StreamReader::deserialize( context, &mut buffer )
     }
 
     #[inline]
     fn read_from_stream< S: Read >( context: C, stream: S ) -> io::Result< Self > {
-        DirectSyncReader::deserialize( context, stream )
+        StreamReader::deserialize( context, stream )
+    }
+
+    // Since specialization is not stable yet we do it this way.
+    #[doc(hidden)]
+    #[inline]
+    fn speedy_is_primitive() -> bool {
+        false
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    unsafe fn speedy_slice_as_bytes_mut( _: &mut [Self] ) -> &mut [u8] {
+        panic!();
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    fn speedy_convert_slice_endianness( _: Endianness, _: &mut [Self] ) {
+        panic!()
     }
 }

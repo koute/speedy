@@ -1,7 +1,8 @@
 use std::io;
 
 use std::mem;
-use std::borrow::Cow;
+use std::borrow::{Cow, ToOwned};
+use std::ops::Range;
 
 use writable::Writable;
 use writer::Writer;
@@ -20,6 +21,18 @@ macro_rules! impl_for_primitive {
             #[inline]
             fn bytes_needed( &self ) -> usize {
                 mem::size_of::< Self >()
+            }
+
+            #[doc(hidden)]
+            #[inline]
+            fn speedy_is_primitive() -> bool {
+                true
+            }
+
+            #[doc(hidden)]
+            #[inline]
+            unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
+                as_bytes( slice )
             }
         }
     }
@@ -48,79 +61,6 @@ impl< C: Context > Writable< C > for bool {
     }
 }
 
-impl< C: Context > Writable< C > for [u8] {
-    #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        try!( writer.write_u32( self.len() as _ ) );
-        writer.write_bytes( self )
-    }
-
-    #[inline]
-    fn bytes_needed( &self ) -> usize {
-        4 + self.len()
-    }
-}
-
-impl< 'r, C: Context > Writable< C > for Cow< 'r, [u8] > {
-    #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        self.as_ref().write_to( writer )
-    }
-
-    #[inline]
-    fn bytes_needed( &self ) -> usize {
-        Writable::< C >::bytes_needed( self.as_ref() )
-    }
-}
-
-impl< C: Context > Writable< C > for Vec< u8 > {
-    #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        self.as_slice().write_to( writer )
-    }
-
-    #[inline]
-    fn bytes_needed( &self ) -> usize {
-        Writable::< C >::bytes_needed( self.as_slice() )
-    }
-}
-
-impl< C: Context > Writable< C > for [i8] {
-    #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        as_bytes( self ).write_to( writer )
-    }
-
-    #[inline]
-    fn bytes_needed( &self ) -> usize {
-        Writable::< C >::bytes_needed( as_bytes( self ) )
-    }
-}
-
-impl< 'r, C: Context > Writable< C > for Cow< 'r, [i8] > {
-    #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        self.as_ref().write_to( writer )
-    }
-
-    #[inline]
-    fn bytes_needed( &self ) -> usize {
-        Writable::< C >::bytes_needed( self.as_ref() )
-    }
-}
-
-impl< C: Context > Writable< C > for Vec< i8 > {
-    #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-        self.as_slice().write_to( writer )
-    }
-
-    #[inline]
-    fn bytes_needed( &self ) -> usize {
-        Writable::< C >::bytes_needed( self.as_slice() )
-    }
-}
-
 impl< C: Context > Writable< C > for String {
     #[inline]
     fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
@@ -145,59 +85,132 @@ impl< C: Context > Writable< C > for str {
     }
 }
 
-macro_rules! impl_for_primitive_slice {
-    ($type:ty, $writer:ident) => {
-        impl< C: Context > Writable< C > for [$type] {
-            #[inline]
-            fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-                try!( writer.write_u32( self.len() as _ ) );
-                if writer.endianness().conversion_necessary() {
-                    for &value in self {
-                        try!( writer.$writer( value ) );
-                    }
-                    Ok(())
-                } else {
-                    writer.write_bytes( as_bytes( self ) )
-                }
-            }
+impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
+    #[inline]
+    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+        self.as_bytes().write_to( writer )
+    }
 
-            #[inline]
-            fn bytes_needed( &self ) -> usize {
-                4 + self.len() * mem::size_of::< $type >()
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        Writable::< C >::bytes_needed( self.as_bytes() )
+    }
+}
+
+impl< C: Context, T: Writable< C > > Writable< C > for [T] {
+    #[inline]
+    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+        try!( writer.write_u32( self.len() as _ ) );
+        if T::speedy_is_primitive() && !writer.endianness().conversion_necessary() {
+            let bytes = unsafe { T::speedy_slice_as_bytes( self ) };
+            writer.write_bytes( bytes )
+        } else {
+            for value in self {
+                try!( writer.write_value( value ) );
             }
+            Ok(())
+        }
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        if T::speedy_is_primitive() {
+            return 4 + self.len() * mem::size_of::< T >();
         }
 
-        impl< 'r, C: Context > Writable< C > for Cow< 'r, [$type] > {
-            #[inline]
-            fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-                self.as_ref().write_to( writer )
-            }
-
-            #[inline]
-            fn bytes_needed( &self ) -> usize {
-                Writable::< C >::bytes_needed( self.as_ref() )
-            }
+        let mut sum = 4;
+        for element in self {
+            sum += element.bytes_needed();
         }
 
-        impl< C: Context > Writable< C > for Vec< $type > {
+        sum
+    }
+}
+
+impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where [T]: ToOwned {
+    #[inline]
+    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+        self.as_ref().write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        Writable::< C >::bytes_needed( self.as_ref() )
+    }
+}
+
+impl< C: Context, T: Writable< C > > Writable< C > for Vec< T > {
+    #[inline]
+    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+        self.as_slice().write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        Writable::< C >::bytes_needed( self.as_slice() )
+    }
+}
+
+impl< C: Context, T: Writable< C > > Writable< C > for Range< T > {
+    #[inline]
+    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+        try!( self.start.write_to( writer ) );
+        self.end.write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        Writable::< C >::bytes_needed( &self.start ) + Writable::< C >::bytes_needed( &self.end )
+    }
+}
+
+impl< C: Context > Writable< C > for () {
+    #[inline]
+    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, _: &mut W ) -> io::Result< () > {
+        Ok(())
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        0
+    }
+}
+
+macro_rules! impl_for_tuple {
+    ($($name:ident),+) => {
+        impl< C: Context, $($name: Writable< C >),+ > Writable< C > for ($($name,)+) {
             #[inline]
-            fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
-                self.as_slice().write_to( writer )
+            fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+                #[allow(non_snake_case)]
+                let &($(ref $name,)+) = self;
+                $(
+                    try!( $name.write_to( writer ) );
+                )+
+                Ok(())
             }
 
             #[inline]
             fn bytes_needed( &self ) -> usize {
-                Writable::< C >::bytes_needed( self.as_slice() )
+                #[allow(non_snake_case)]
+                let &($(ref $name,)+) = self;
+                let mut size = 0;
+                $(
+                    size += Writable::< C >::bytes_needed( $name );
+                )+
+                size
             }
         }
     }
 }
 
-impl_for_primitive_slice!( i16, write_i16 );
-impl_for_primitive_slice!( i32, write_i32 );
-impl_for_primitive_slice!( i64, write_i64 );
-impl_for_primitive_slice!( u16, write_u16 );
-impl_for_primitive_slice!( u32, write_u32 );
-impl_for_primitive_slice!( u64, write_u64 );
-impl_for_primitive_slice!( f32, write_f32 );
-impl_for_primitive_slice!( f64, write_f64 );
+impl_for_tuple!( A0 );
+impl_for_tuple!( A0, A1 );
+impl_for_tuple!( A0, A1, A2 );
+impl_for_tuple!( A0, A1, A2, A3 );
+impl_for_tuple!( A0, A1, A2, A3, A4 );
+impl_for_tuple!( A0, A1, A2, A3, A4, A5 );
+impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6 );
+impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7 );
+impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8 );
+impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9 );
+impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 );

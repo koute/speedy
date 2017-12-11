@@ -1,13 +1,23 @@
 use std::io;
 use std::mem;
+use std::borrow::Cow;
 
 use endianness::Endianness;
 use readable::Readable;
 use context::Context;
 
-pub trait Reader< C: Context >: Sized {
+pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () >;
     fn context( &self ) -> &C;
+    fn context_mut( &mut self ) -> &mut C;
+
+    #[inline]
+    fn read_bytes_cow( &mut self, length: usize ) -> io::Result< Cow< 'a, [u8] > > {
+        let mut buffer = Vec::with_capacity( length );
+        unsafe { buffer.set_len( length ) };
+        try!( self.read_bytes( &mut buffer ) );
+        Ok( Cow::Owned( buffer ) )
+    }
 
     #[inline]
     fn read_u8( &mut self ) -> io::Result< u8 > {
@@ -78,7 +88,7 @@ pub trait Reader< C: Context >: Sized {
     }
 
     #[inline]
-    fn read_value< T: Readable< C > >( &mut self ) -> io::Result< T > {
+    fn read_value< T: Readable< 'a, C > >( &mut self ) -> io::Result< T > {
         T::read_from( self )
     }
 

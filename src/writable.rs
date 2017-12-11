@@ -50,6 +50,11 @@ impl< 'a, C: Context, T: Write > Writer< 'a, C > for WritingCollector< C, T > {
     fn context( &self ) -> &C {
         &self.context
     }
+
+    #[inline]
+    fn context_mut( &mut self ) -> &mut C {
+        &mut self.context
+    }
 }
 
 struct SizeCalculatorCollector {
@@ -102,6 +107,11 @@ impl< 'a, C: Context > Writer< 'a, C > for SizeCalculatorCollector {
     fn context( &self ) -> &C {
         panic!();
     }
+
+    #[inline]
+    fn context_mut( &mut self ) -> &mut C {
+        panic!();
+    }
 }
 
 pub trait Writable< C: Context > {
@@ -138,5 +148,18 @@ pub trait Writable< C: Context > {
 
         self.write_to( &mut writer ).unwrap();
         writer.size
+    }
+
+    // Since specialization is not stable yet we do it this way.
+    #[doc(hidden)]
+    #[inline]
+    fn speedy_is_primitive() -> bool {
+        false
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    unsafe fn speedy_slice_as_bytes( _: &[Self] ) -> &[u8] where Self: Sized {
+        panic!();
     }
 }

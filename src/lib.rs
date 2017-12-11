@@ -38,7 +38,7 @@
 //!     };
 //!     let endian = Endianness::LittleEndian;
 //!     let bytes = original.write_to_vec( endian ).unwrap();
-//!     let deserialized: Struct< 'static > =
+//!     let deserialized: Struct =
 //!         Struct::read_from_buffer( endian, &bytes ).unwrap();
 //!
 //!     assert_eq!( original, deserialized );
@@ -95,8 +95,8 @@ mod tests {
         }
     }
 
-    impl< C: Context > Readable< C > for SimpleStruct {
-        fn read_from< R: Reader< C > >( reader: &mut R ) -> io::Result< Self > {
+    impl< 'a, C: Context > Readable< 'a, C > for SimpleStruct {
+        fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
             let a = reader.read_u8()?;
             let b = reader.read_u8()?;
             let c = reader.read_u8()?;

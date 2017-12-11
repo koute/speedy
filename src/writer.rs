@@ -14,6 +14,7 @@ pub trait Writer< 'a, C: Context > {
     fn write_u64( &mut self, value: u64 ) -> io::Result< () >;
 
     fn context( &self ) -> &C;
+    fn context_mut( &mut self ) -> &mut C;
 
     #[inline]
     fn write_i8( &mut self, value: i8 ) -> io::Result< () > {

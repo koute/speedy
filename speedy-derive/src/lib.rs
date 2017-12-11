@@ -64,7 +64,7 @@ fn common_tokens( ast: &syn::MacroInput, types: &[&syn::Ty], variant: Variant ) 
     let where_clause = {
         let constraints = types.iter().map( |&ty| {
             match variant {
-                Variant::Readable => quote! { #ty: ::speedy::Readable< C_ > },
+                Variant::Readable => quote! { #ty: ::speedy::Readable< 'a_, C_ > },
                 Variant::Writable => quote! { #ty: ::speedy::Writable< C_ > }
             }
         });
@@ -283,9 +283,9 @@ fn impl_readable( ast: &syn::MacroInput ) -> quote::Tokens {
 
     let (impl_params, ty_params, where_clause) = common_tokens( ast, &types, Variant::Readable );
     quote! {
-        impl< #impl_params C_: ::speedy::Context > ::speedy::Readable< C_ > for #name #ty_params #where_clause {
+        impl< 'a_, #impl_params C_: ::speedy::Context > ::speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
             #[inline]
-            fn read_from< R_: ::speedy::Reader< C_ > >( _reader_: &mut R_ ) -> ::std::io::Result< Self > {
+            fn read_from< R_: ::speedy::Reader< 'a_, C_ > >( _reader_: &mut R_ ) -> ::std::io::Result< Self > {
                 #reader_body
             }
         }

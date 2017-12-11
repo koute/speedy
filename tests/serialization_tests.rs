@@ -1,6 +1,10 @@
+#[macro_use]
+extern crate speedy_derive;
 extern crate speedy;
 
 use std::borrow::Cow;
+use std::ops::Range;
+
 #[allow(unused_imports)]
 use speedy::{Readable, Writable, Endianness};
 
@@ -48,6 +52,9 @@ macro_rules! symmetric_tests {
     )* }
 }
 
+#[derive(Clone, PartialEq, Debug, Readable, Writable)]
+struct Newtype( u16 );
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -62,7 +69,7 @@ symmetric_tests! {
             11
         ]
     }
-    cow_u8 for Cow< 'static, [u8] > {
+    cow_u8 for Cow< [u8] > {
         in = Cow::Owned( vec![ 10, 11 ] ),
         le = [
             2, 0, 0, 0,
@@ -88,7 +95,7 @@ symmetric_tests! {
             0, 11
         ]
     }
-    cow_u16 for Cow< 'static, [u16] > {
+    cow_u16 for Cow< [u16] > {
         in = Cow::Owned( vec![ 10, 11 ] ),
         le = [
             2, 0, 0, 0,
@@ -114,7 +121,7 @@ symmetric_tests! {
             0, 0, 0, 11
         ]
     }
-    cow_u32 for Cow< 'static, [u32] > {
+    cow_u32 for Cow< [u32] > {
         in = Cow::Owned( vec![ 10, 11 ] ),
         le = [
             2, 0, 0, 0,
@@ -140,7 +147,7 @@ symmetric_tests! {
             0, 0, 0, 0, 0, 0, 0, 11
         ]
     }
-    cow_u64 for Cow< 'static, [u64] > {
+    cow_u64 for Cow< [u64] > {
         in = Cow::Owned( vec![ 10, 11 ] ),
         le = [
             2, 0, 0, 0,
@@ -151,6 +158,32 @@ symmetric_tests! {
             0, 0, 0, 2,
             0, 0, 0, 0, 0, 0, 0, 10,
             0, 0, 0, 0, 0, 0, 0, 11
+        ]
+    }
+    vec_newtype for Vec< Newtype > {
+        in = vec![ Newtype( 10 ), Newtype( 11 ) ],
+        le = [
+            2, 0, 0, 0,
+            10, 0,
+            11, 0
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 10,
+            0, 11
+        ]
+    }
+    cow_newtype for Cow< [Newtype] > {
+        in = Cow::Owned( vec![ Newtype( 10 ), Newtype( 11 ) ] ),
+        le = [
+            2, 0, 0, 0,
+            10, 0,
+            11, 0
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 10,
+            0, 11
         ]
     }
     bool_false for bool {
@@ -207,5 +240,25 @@ symmetric_tests! {
         in = "Hello".to_owned(),
         le = [5, 0, 0, 0, 72, 101, 108, 108, 111],
         be = [0, 0, 0, 5, 72, 101, 108, 108, 111]
+    }
+    range_u16 for Range< u16 > {
+        in = 10..11,
+        le = [10, 0, 11, 0],
+        be = [0, 10, 0, 11]
+    }
+    unit for () {
+        in = (),
+        le = [],
+        be = []
+    }
+    tuple_u16 for (u16,) {
+        in = (10,),
+        le = [10, 0],
+        be = [0, 10]
+    }
+    tuple_u16_u16 for (u16, u16) {
+        in = (10, 11),
+        le = [10, 0, 11, 0],
+        be = [0, 10, 0, 11]
     }
 }
