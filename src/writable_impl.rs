@@ -4,6 +4,7 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 
+use endianness::Endianness;
 use writable::Writable;
 use writer::Writer;
 
@@ -214,3 +215,20 @@ impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7 );
 impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8 );
 impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9 );
 impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 );
+
+impl< C: Context > Writable< C > for Endianness {
+    #[inline]
+    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+        let value = match *self {
+            Endianness::LittleEndian => 0,
+            Endianness::BigEndian => 1
+        };
+
+        writer.write_u8( value )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        1
+    }
+}

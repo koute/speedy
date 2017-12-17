@@ -202,3 +202,20 @@ impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7 );
 impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8 );
 impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9 );
 impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 );
+
+impl< 'a, C: Context > Readable< 'a, C > for Endianness {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+        let value = try!( reader.read_u8() );
+        match value {
+            0 => Ok( Endianness::LittleEndian ),
+            1 => Ok( Endianness::BigEndian ),
+            _ => Err( io::Error::new( io::ErrorKind::InvalidData, "invalid enum variant" ) )
+        }
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        1
+    }
+}
