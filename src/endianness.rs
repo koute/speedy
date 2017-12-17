@@ -14,26 +14,18 @@ pub enum Endianness {
     BigEndian
 }
 
-#[inline]
-fn native_endian() -> Endianness {
-    if cfg!( target_endian = "little" ) {
-        Endianness::LittleEndian
-    } else {
-        Endianness::BigEndian
-    }
-}
+impl Endianness {
+    #[cfg( target_endian = "little" )]
+    pub const NATIVE: Endianness = Endianness::LittleEndian;
 
-impl Default for Endianness {
-    #[inline]
-    fn default() -> Self {
-        native_endian()
-    }
+    #[cfg( target_endian = "big" )]
+    pub const NATIVE: Endianness = Endianness::BigEndian;
 }
 
 impl Endianness {
     #[inline]
     pub fn conversion_necessary( self ) -> bool {
-        self != native_endian()
+        self != Endianness::NATIVE
     }
 
     #[inline]

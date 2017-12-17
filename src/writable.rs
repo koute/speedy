@@ -100,7 +100,7 @@ impl< 'a, C: Context > Writer< 'a, C > for SizeCalculatorCollector {
 
     #[inline]
     fn endianness( &self ) -> Endianness {
-        Endianness::default()
+        Endianness::NATIVE
     }
 
     #[inline]

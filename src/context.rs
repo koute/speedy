@@ -29,10 +29,3 @@ impl Context for BigEndian {
         Endianness::BigEndian
     }
 }
-
-impl Context for () {
-    #[inline]
-    fn endianness( &self ) -> Endianness {
-        Endianness::default()
-    }
-}
