@@ -101,7 +101,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for [T] {
     #[inline]
     fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
         try!( writer.write_u32( self.len() as _ ) );
-        if T::speedy_is_primitive() && !writer.endianness().conversion_necessary() {
+        if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !writer.endianness().conversion_necessary()) {
             let bytes = unsafe { T::speedy_slice_as_bytes( self ) };
             writer.write_bytes( bytes )
         } else {
