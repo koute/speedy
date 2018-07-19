@@ -53,6 +53,15 @@ struct DerivedStructWithGeneric< T > {
     inner: T
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithDefaultOnEof {
+    a: u8,
+    #[speedy(default_on_eof)]
+    b: u16,
+    #[speedy(default_on_eof)]
+    c: u32
+}
+
 macro_rules! define_test {
     ($($name:ident: $value:expr, $serialized:expr)*) => { $(
         #[test]
@@ -122,3 +131,20 @@ define_test!(
         DerivedStructWithGeneric { inner: Cow::Borrowed( &[1_u8, 2_u8, 3_u8][..] ) },
         &[3, 0, 0, 0, 1, 2, 3]
 );
+
+#[test]
+fn test_derived_struct_with_default_on_eof() {
+    use speedy::{
+       Readable,
+       Endianness
+    };
+
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0, c: 0 } );
+
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA, 0xBB] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0, c: 0 } );
+
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA, 0xBB, 0xCC] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0xCCBB, c: 0 } );
+}

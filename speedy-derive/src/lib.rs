@@ -19,7 +19,7 @@ trait IterExt: Iterator + Sized {
 
 impl< T > IterExt for T where T: Iterator + Sized {}
 
-#[proc_macro_derive(Readable)]
+#[proc_macro_derive(Readable, attributes(speedy))]
 pub fn readable( input: TokenStream ) -> TokenStream {
     let src = input.to_string();
     let ast = syn::parse_macro_input( &src ).unwrap();
@@ -27,7 +27,7 @@ pub fn readable( input: TokenStream ) -> TokenStream {
     tokens.parse().unwrap()
 }
 
-#[proc_macro_derive(Writable)]
+#[proc_macro_derive(Writable, attributes(speedy))]
 pub fn writable( input: TokenStream ) -> TokenStream {
     let src = input.to_string();
     let ast = syn::parse_macro_input( &src ).unwrap();
@@ -84,7 +84,8 @@ fn common_tokens( ast: &syn::MacroInput, types: &[&syn::Ty], variant: Variant ) 
 struct Field< 'a > {
     index: usize,
     name: Option< &'a syn::Ident >,
-    ty: &'a syn::Ty
+    ty: &'a syn::Ty,
+    default_on_eof: bool
 }
 
 impl< 'a > Field< 'a > {
@@ -109,10 +110,26 @@ fn get_fields< 'a >( fields: &'a [syn::Field] ) -> Box< Iterator< Item = Field< 
     let iter = fields.iter()
         .enumerate()
         .map( |(index, field)| {
+            let mut default_on_eof = false;
+            for attr in &field.attrs {
+                match attr.value {
+                    syn::MetaItem::List( ref ident, ref nested ) if ident == "speedy" => {
+                        match &nested[..] {
+                            [syn::NestedMetaItem::MetaItem( syn::MetaItem::Word( ident ) )] if ident == "default_on_eof" => {
+                                default_on_eof = true;
+                            },
+                            _ => panic!( "Unrecognized attribute: {:?}", attr.value )
+                        }
+                    },
+                    _ => panic!( "Unrecognized attribute: {:?}", attr.value )
+                }
+            }
+
             Field {
                 index,
                 name: field.ident.as_ref(),
-                ty: &field.ty
+                ty: &field.ty,
+                default_on_eof
             }
         });
 
@@ -128,7 +145,17 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Ty >, fields: &'a [syn::Field]
 
         let name = quote! { #ident };
         field_names.push( name );
-        field_readers.push( quote! { let #ident = _reader_.read_value()?; } )
+        if field.default_on_eof {
+            field_readers.push( quote! {
+                let #ident = match _reader_.read_value() {
+                    Ok( value ) => value,
+                    Err( ref error ) if error.kind() == ::std::io::ErrorKind::UnexpectedEof => ::std::default::Default::default(),
+                    Err( error ) => return Err( error )
+                };
+            });
+        } else {
+            field_readers.push( quote! { let #ident = _reader_.read_value()?; } );
+        }
     }
 
     let body = quote! { #(#field_readers)* };
