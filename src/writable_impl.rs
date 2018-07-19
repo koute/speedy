@@ -165,6 +165,27 @@ impl< C: Context, T: Writable< C > > Writable< C > for Range< T > {
     }
 }
 
+impl< C: Context, T: Writable< C > > Writable< C > for Option< T > {
+    #[inline]
+    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+        if let Some( ref value ) = *self {
+            try!( writer.write_u8( 1 ) );
+            value.write_to( writer )
+        } else {
+            writer.write_u8( 0 )
+        }
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        if let Some( ref value ) = *self {
+            1 + Writable::< C >::bytes_needed( value )
+        } else {
+            1
+        }
+    }
+}
+
 impl< C: Context > Writable< C > for () {
     #[inline]
     fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, _: &mut W ) -> io::Result< () > {
