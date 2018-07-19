@@ -15,7 +15,7 @@ description = "A fast binary serialization framework"
 byteorder = "1"
 
 [dev-dependencies]
-speedy-derive = "0.3"
+speedy-derive = { version = "0.3", path = "speedy-derive" }
 
 [profile.release]
 panic = "abort"
