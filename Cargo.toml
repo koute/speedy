@@ -19,3 +19,6 @@ speedy-derive = { version = "0.3", path = "speedy-derive" }
 
 [profile.release]
 panic = "abort"
+
+[workspace]
+members = [".", "speedy-derive"]
