@@ -14,5 +14,6 @@ description = "A fast binary serialization framework, #[derive(Readable, Writabl
 proc-macro = true
 
 [dependencies]
-syn = "0.11"
-quote = "0.3"
+syn = { version = "0.15", features = ["extra-traits"] }
+quote = "0.6"
+proc-macro2 = "0.4"

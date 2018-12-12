@@ -4,12 +4,15 @@ use std::collections::HashMap;
 use std::u32;
 
 extern crate proc_macro;
+extern crate proc_macro2;
+
+#[macro_use]
 extern crate syn;
 
 #[macro_use]
 extern crate quote;
 
-use proc_macro::TokenStream;
+use proc_macro2::{Span, TokenStream};
 
 trait IterExt: Iterator + Sized {
     fn collect_vec( self ) -> Vec< Self::Item > {
@@ -20,19 +23,17 @@ trait IterExt: Iterator + Sized {
 impl< T > IterExt for T where T: Iterator + Sized {}
 
 #[proc_macro_derive(Readable, attributes(speedy))]
-pub fn readable( input: TokenStream ) -> TokenStream {
-    let src = input.to_string();
-    let ast = syn::parse_macro_input( &src ).unwrap();
-    let tokens = impl_readable( &ast );
-    tokens.parse().unwrap()
+pub fn readable( input: proc_macro::TokenStream ) -> proc_macro::TokenStream {
+    let input = parse_macro_input!( input as syn::DeriveInput );
+    let tokens = impl_readable( input );
+    proc_macro::TokenStream::from( tokens )
 }
 
 #[proc_macro_derive(Writable, attributes(speedy))]
-pub fn writable( input: TokenStream ) -> TokenStream {
-    let src = input.to_string();
-    let ast = syn::parse_macro_input( &src ).unwrap();
-    let tokens = impl_writable( &ast );
-    tokens.parse().unwrap()
+pub fn writable( input: proc_macro::TokenStream ) -> proc_macro::TokenStream {
+    let input = parse_macro_input!( input as syn::DeriveInput );
+    let tokens = impl_writable( input );
+    proc_macro::TokenStream::from( tokens )
 }
 
 enum Variant {
@@ -40,10 +41,10 @@ enum Variant {
     Writable
 }
 
-fn common_tokens( ast: &syn::MacroInput, types: &[&syn::Ty], variant: Variant ) -> (quote::Tokens, quote::Tokens, quote::Tokens) {
+fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant ) -> (TokenStream, TokenStream, TokenStream) {
     let impl_params = {
-        let lifetime_params = ast.generics.lifetimes.iter().map( |alpha| quote! { #alpha } );
-        let type_params = ast.generics.ty_params.iter().map( |ty| quote! { #ty } );
+        let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
+        let type_params = ast.generics.type_params().map( |ty| quote! { #ty } );
         let params = lifetime_params.chain( type_params ).collect_vec();
         quote! {
             #(#params,)*
@@ -51,8 +52,8 @@ fn common_tokens( ast: &syn::MacroInput, types: &[&syn::Ty], variant: Variant ) 
     };
 
     let ty_params = {
-        let lifetime_params = ast.generics.lifetimes.iter().map( |alpha| quote! { #alpha } );
-        let type_params = ast.generics.ty_params.iter().map( |ty| { let ident = &ty.ident; quote! { #ident } } );
+        let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
+        let type_params = ast.generics.type_params().map( |ty| { let ident = &ty.ident; quote! { #ident } } );
         let params = lifetime_params.chain( type_params ).collect_vec();
         if params.is_empty() {
             quote! {}
@@ -69,8 +70,12 @@ fn common_tokens( ast: &syn::MacroInput, types: &[&syn::Ty], variant: Variant ) 
             }
         });
 
-        let predicates = ast.generics.where_clause.predicates.iter().map( |pred| quote! { #pred } );
-        let items = constraints.chain( predicates ).collect_vec();
+        let mut predicates = Vec::new();
+        if let Some( where_clause ) = ast.generics.where_clause.as_ref() {
+            predicates = where_clause.predicates.iter().map( |pred| quote! { #pred } ).collect();
+        }
+
+        let items = constraints.chain( predicates.into_iter() ).collect_vec();
         if items.is_empty() {
             quote! {}
         } else {
@@ -84,7 +89,7 @@ fn common_tokens( ast: &syn::MacroInput, types: &[&syn::Ty], variant: Variant ) 
 struct Field< 'a > {
     index: usize,
     name: Option< &'a syn::Ident >,
-    ty: &'a syn::Ty,
+    ty: &'a syn::Type,
     default_on_eof: bool
 }
 
@@ -93,35 +98,36 @@ impl< 'a > Field< 'a > {
         if let Some( name ) = self.name {
             name.clone()
         } else {
-            syn::Ident::from( format!( "v{}_", self.index ) )
+            syn::Ident::new( &format!( "v{}_", self.index ), Span::call_site() )
         }
     }
 
-    fn name( &self ) -> syn::Ident {
+    fn name( &self ) -> syn::Member {
         if let Some( name ) = self.name {
-            name.clone()
+            syn::Member::Named( name.clone() )
         } else {
-            syn::Ident::from( format!( "{}", self.index ) )
+            syn::Member::Unnamed( syn::Index { index: self.index as u32, span: Span::call_site() } )
         }
     }
 }
 
-fn get_fields< 'a >( fields: &'a [syn::Field] ) -> Box< Iterator< Item = Field< 'a > > + 'a > {
-    let iter = fields.iter()
+fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) -> Box< Iterator< Item = Field< 'a > > + 'a > {
+    let iter = fields.into_iter()
         .enumerate()
         .map( |(index, field)| {
             let mut default_on_eof = false;
             for attr in &field.attrs {
-                match attr.value {
-                    syn::MetaItem::List( ref ident, ref nested ) if ident == "speedy" => {
+                match attr.parse_meta().expect( "unable to parse attribute" ) {
+                    syn::Meta::List( syn::MetaList { ref ident, ref nested, .. } ) if ident == "speedy" => {
+                        let nested: Vec< _ > = nested.iter().collect();
                         match &nested[..] {
-                            [syn::NestedMetaItem::MetaItem( syn::MetaItem::Word( ident ) )] if ident == "default_on_eof" => {
+                            [syn::NestedMeta::Meta( syn::Meta::Word( ident ) )] if ident == "default_on_eof" => {
                                 default_on_eof = true;
                             },
-                            _ => panic!( "Unrecognized attribute: {:?}", attr.value )
+                            _ => panic!( "Unrecognized attribute: {:?}", attr )
                         }
                     },
-                    _ => panic!( "Unrecognized attribute: {:?}", attr.value )
+                    _ => panic!( "Unrecognized attribute: {:?}", attr )
                 }
             }
 
@@ -136,10 +142,13 @@ fn get_fields< 'a >( fields: &'a [syn::Field] ) -> Box< Iterator< Item = Field< 
     Box::new( iter )
 }
 
-fn readable_body< 'a >( types: &mut Vec< &'a syn::Ty >, fields: &'a [syn::Field] ) -> (quote::Tokens, quote::Tokens) {
+fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (TokenStream, TokenStream)
+    where I: IntoIterator< Item = &'a syn::Field > + 'a
+{
+    let fields = fields.into_iter();
     let mut field_names = Vec::new();
     let mut field_readers = Vec::new();
-    for field in get_fields( &fields ) {
+    for field in get_fields( fields ) {
         let ident = field.var_name();
         types.push( field.ty );
 
@@ -163,10 +172,13 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Ty >, fields: &'a [syn::Field]
     (body, initializer)
 }
 
-fn writable_body< 'a >( types: &mut Vec< &'a syn::Ty >, fields: &'a [syn::Field], is_unpacked: bool ) -> (quote::Tokens, quote::Tokens) {
+fn writable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I, is_unpacked: bool ) -> (TokenStream, TokenStream)
+    where I: IntoIterator< Item = &'a syn::Field > + 'a
+{
+    let fields = fields.into_iter();
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
-    for field in get_fields( &fields ) {
+    for field in get_fields( fields ) {
         types.push( field.ty );
 
         let reference = if is_unpacked {
@@ -219,7 +231,8 @@ impl EnumCtx {
                 self.previous_kind = Some( kind );
                 kind
             },
-            Some( syn::ConstExpr::Lit( syn::Lit::Int( value, _ ) ) ) => {
+            Some( (_, syn::Expr::Lit( syn::ExprLit { lit: syn::Lit::Int( ref value ), .. } )) ) => {
+                let value = value.value();
                 if value > u32::MAX as u64 {
                     panic!( "Enum discriminant `{}` is too big!", full_name );
                 }
@@ -240,34 +253,34 @@ impl EnumCtx {
     }
 }
 
-fn impl_readable( ast: &syn::MacroInput ) -> quote::Tokens {
-    let name = &ast.ident;
+fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
+    let name = &input.ident;
     let mut types = Vec::new();
-    let reader_body = match ast.body {
-        syn::Body::Struct( syn::VariantData::Struct( ref fields ) ) => {
-            let (body, initializer) = readable_body( &mut types, fields );
+    let reader_body = match &input.data {
+        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { named, .. } ), .. } ) => {
+            let (body, initializer) = readable_body( &mut types, named );
             quote! {
                 #body
                 Ok( #name { #initializer } )
             }
         },
-        syn::Body::Struct( syn::VariantData::Tuple( ref fields ) ) => {
-            let (body, initializer) = readable_body( &mut types, fields );
+        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { unnamed, .. } ), .. } ) => {
+            let (body, initializer) = readable_body( &mut types, unnamed );
             quote! {
                 #body
                 Ok( #name( #initializer ) )
             }
         },
-        syn::Body::Enum( ref body ) => {
+        syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
             let mut ctx = EnumCtx::new( &name );
-            let variants = body.iter()
+            let variants = variants.iter()
                 .map( |variant| {
                     let kind = ctx.next( &variant );
                     let unqualified_ident = &variant.ident;
                     let variant_path = quote! { #name::#unqualified_ident };
-                    match variant.data {
-                        syn::VariantData::Struct( ref fields ) => {
-                            let (body, initializer) = readable_body( &mut types, fields );
+                    match variant.fields {
+                        syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
+                            let (body, initializer) = readable_body( &mut types, named );
                             quote! {
                                 #kind => {
                                     #body
@@ -275,8 +288,8 @@ fn impl_readable( ast: &syn::MacroInput ) -> quote::Tokens {
                                 }
                             }
                         },
-                        syn::VariantData::Tuple( ref fields ) => {
-                            let (body, initializer) = readable_body( &mut types, fields );
+                        syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
+                            let (body, initializer) = readable_body( &mut types, unnamed );
                             quote! {
                                 #kind => {
                                     #body
@@ -284,7 +297,7 @@ fn impl_readable( ast: &syn::MacroInput ) -> quote::Tokens {
                                 }
                             }
                         },
-                        syn::VariantData::Unit => {
+                        syn::Fields::Unit => {
                             quote! { #kind => {
                                 Ok( #variant_path )
                             }}
@@ -301,14 +314,15 @@ fn impl_readable( ast: &syn::MacroInput ) -> quote::Tokens {
                 }
             }
         },
-        syn::Body::Struct( syn::VariantData::Unit ) => {
+        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unit, .. } ) => {
             quote! {
                 Ok( #name )
             }
-        }
+        },
+        syn::Data::Union( .. ) => panic!( "Unions are not supported!" )
     };
 
-    let (impl_params, ty_params, where_clause) = common_tokens( ast, &types, Variant::Readable );
+    let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Variant::Readable );
     quote! {
         impl< 'a_, #impl_params C_: ::speedy::Context > ::speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
             #[inline]
@@ -319,31 +333,31 @@ fn impl_readable( ast: &syn::MacroInput ) -> quote::Tokens {
     }
 }
 
-fn impl_writable( ast: &syn::MacroInput ) -> quote::Tokens {
-    let name = &ast.ident;
+fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
+    let name = &input.ident;
     let mut types = Vec::new();
-    let writer_body = match ast.body {
-        syn::Body::Struct( syn::VariantData::Unit ) => {
+    let writer_body = match input.data {
+        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unit, .. } ) => {
             quote! {}
         },
-        syn::Body::Struct( syn::VariantData::Struct( ref fields ) ) => {
-            let (body, _) = writable_body( &mut types, fields, false );
+        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { ref named, .. } ), .. } ) => {
+            let (body, _) = writable_body( &mut types, named, false );
             quote! { #body }
         },
-        syn::Body::Struct( syn::VariantData::Tuple( ref fields ) ) => {
-            let (body, _) = writable_body( &mut types, fields, false );
+        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ), .. } ) => {
+            let (body, _) = writable_body( &mut types, unnamed, false );
             quote! { #body }
         },
-        syn::Body::Enum( ref variants ) => {
+        syn::Data::Enum( syn::DataEnum { ref variants, .. } ) => {
             let mut ctx = EnumCtx::new( &name );
             let variants = variants.iter()
                 .map( |variant| {
                     let kind = ctx.next( &variant );
                     let unqualified_ident = &variant.ident;
                     let variant_path = quote! { #name::#unqualified_ident };
-                    match variant.data {
-                        syn::VariantData::Struct( ref fields ) => {
-                            let (body, identifiers) = writable_body( &mut types, fields, true );
+                    match variant.fields {
+                        syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
+                            let (body, identifiers) = writable_body( &mut types, named, true );
                             quote! {
                                 #variant_path { #identifiers } => {
                                     _writer_.write_value( &#kind )?;
@@ -351,8 +365,8 @@ fn impl_writable( ast: &syn::MacroInput ) -> quote::Tokens {
                                 }
                             }
                         },
-                        syn::VariantData::Tuple( ref fields ) => {
-                            let (body, identifiers) = writable_body( &mut types, fields, true );
+                        syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
+                            let (body, identifiers) = writable_body( &mut types, unnamed, true );
                             quote! {
                                 #variant_path( #identifiers ) => {
                                     _writer_.write_value( &#kind )?;
@@ -360,7 +374,7 @@ fn impl_writable( ast: &syn::MacroInput ) -> quote::Tokens {
                                 }
                             }
                         },
-                        syn::VariantData::Unit => {
+                        syn::Fields::Unit => {
                             quote! { #variant_path => {
                                 _writer_.write_value( &#kind )?;
                             }}
@@ -369,10 +383,11 @@ fn impl_writable( ast: &syn::MacroInput ) -> quote::Tokens {
                 })
                 .collect_vec();
             quote! { match *self { #(#variants),* } }
-        }
+        },
+        syn::Data::Union( .. ) => panic!( "Unions are not supported!" )
     };
 
-    let (impl_params, ty_params, where_clause) = common_tokens( ast, &types, Variant::Writable );
+    let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Variant::Writable );
     quote! {
         impl< #impl_params C_: ::speedy::Context > ::speedy::Writable< C_ > for #name #ty_params #where_clause {
             #[inline]
