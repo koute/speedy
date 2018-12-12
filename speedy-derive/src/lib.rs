@@ -127,7 +127,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                             _ => panic!( "Unrecognized attribute: {:?}", attr )
                         }
                     },
-                    _ => panic!( "Unrecognized attribute: {:?}", attr )
+                    _ => {}
                 }
             }
 

@@ -6,6 +6,7 @@ extern crate speedy;
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStruct {
+    /// A doc comment.
     a: u8,
     b: u16,
     c: u32
@@ -22,6 +23,7 @@ struct DerivedEmptyStruct {}
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 enum DerivedSimpleEnum {
+    /// A doc comment.
     A,
     B = 10,
     C
@@ -32,6 +34,7 @@ enum DerivedEnum {
     A,
     B( u8, u16, u32 ),
     C {
+        /// A doc comment.
         a: u8,
         b: u16,
         c: u32
