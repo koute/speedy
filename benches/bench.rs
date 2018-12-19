@@ -12,7 +12,7 @@ use speedy::{Readable, Writable, Endianness};
 #[bench]
 fn deserialization_manual_bytes( b: &mut Bencher ) {
     let original: &[u8] = black_box( &[1, 2, 3, 4] );
-    let data = original.write_to_vec(()).unwrap();
+    let data = original.write_to_vec( Endianness::NATIVE ).unwrap();
     b.iter( || {
         let mut buffer = &data[..];
 
@@ -28,9 +28,9 @@ fn deserialization_manual_bytes( b: &mut Bencher ) {
 #[bench]
 fn deserialization_speedy_bytes( b: &mut Bencher ) {
     let original: &[u8] = black_box( &[1, 2, 3, 4] );
-    let data = original.write_to_vec(()).unwrap();
+    let data = original.write_to_vec( Endianness::NATIVE ).unwrap();
     b.iter( || {
-        let deserialized: Vec< u8 > = Readable::read_from_buffer( (), &data ).unwrap();
+        let deserialized: Vec< u8 > = Readable::read_from_buffer( Endianness::NATIVE, &data ).unwrap();
         deserialized
     })
 }
@@ -38,7 +38,7 @@ fn deserialization_speedy_bytes( b: &mut Bencher ) {
 #[bench]
 fn deserialization_manual_string( b: &mut Bencher ) {
     let original: &str = black_box( "Hello world!" );
-    let data = original.write_to_vec(()).unwrap();
+    let data = original.write_to_vec( Endianness::NATIVE ).unwrap();
     b.iter( || {
         let mut buffer = &data[..];
 
@@ -53,9 +53,9 @@ fn deserialization_manual_string( b: &mut Bencher ) {
 #[bench]
 fn deserialization_speedy_string( b: &mut Bencher ) {
     let original: &str = black_box( "Hello world!" );
-    let data = original.write_to_vec(()).unwrap();
+    let data = original.write_to_vec( Endianness::NATIVE ).unwrap();
     b.iter( || {
-        let deserialized: String = Readable::read_from_buffer( (), &data ).unwrap();
+        let deserialized: String = Readable::read_from_buffer( Endianness::NATIVE, &data ).unwrap();
         deserialized
     })
 }
@@ -63,7 +63,7 @@ fn deserialization_speedy_string( b: &mut Bencher ) {
 #[bench]
 fn deserialization_manual_u8( b: &mut Bencher ) {
     let original: u8 = black_box( 12 );
-    let data = original.write_to_vec(()).unwrap();
+    let data = original.write_to_vec( Endianness::NATIVE ).unwrap();
     b.iter( || {
         let mut buffer = &data[..];
         buffer.read_u8().unwrap()
@@ -73,9 +73,9 @@ fn deserialization_manual_u8( b: &mut Bencher ) {
 #[bench]
 fn deserialization_speedy_u8( b: &mut Bencher ) {
     let original: u8 = black_box( 12 );
-    let data = original.write_to_vec(()).unwrap();
+    let data = original.write_to_vec( Endianness::NATIVE ).unwrap();
     b.iter( || {
-        let deserialized: u8 = Readable::read_from_buffer( (), &data ).unwrap();
+        let deserialized: u8 = Readable::read_from_buffer( Endianness::NATIVE, &data ).unwrap();
         deserialized
     })
 }
@@ -83,7 +83,7 @@ fn deserialization_speedy_u8( b: &mut Bencher ) {
 #[bench]
 fn deserialization_manual_u64( b: &mut Bencher ) {
     let original: u64 = black_box( 1234 );
-    let data = original.write_to_vec(()).unwrap();
+    let data = original.write_to_vec( Endianness::NATIVE ).unwrap();
     b.iter( || {
         let mut buffer = &data[..];
         buffer.read_u64::< NativeEndian >().unwrap()
@@ -93,9 +93,9 @@ fn deserialization_manual_u64( b: &mut Bencher ) {
 #[bench]
 fn deserialization_speedy_u64( b: &mut Bencher ) {
     let original: u64 = black_box( 1234 );
-    let data = original.write_to_vec(()).unwrap();
+    let data = original.write_to_vec( Endianness::NATIVE ).unwrap();
     b.iter( || {
-        let deserialized: u64 = Readable::read_from_buffer( (), &data ).unwrap();
+        let deserialized: u64 = Readable::read_from_buffer( Endianness::NATIVE, &data ).unwrap();
         deserialized
     })
 }
