@@ -111,7 +111,7 @@ impl< 'a > Field< 'a > {
     }
 }
 
-fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) -> Box< Iterator< Item = Field< 'a > > + 'a > {
+fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) -> impl Iterator< Item = Field< 'a > > {
     let iter = fields.into_iter()
         .enumerate()
         .map( |(index, field)| {
@@ -139,7 +139,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             }
         });
 
-    Box::new( iter )
+    iter
 }
 
 fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (TokenStream, TokenStream)
