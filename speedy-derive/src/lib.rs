@@ -281,14 +281,14 @@ fn sum< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     }
 }
 
-fn max< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStream >, <I as IntoIterator>::IntoIter: ExactSizeIterator {
+fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStream >, <I as IntoIterator>::IntoIter: ExactSizeIterator {
     let iter = values.into_iter();
     if iter.len() == 0 {
         quote! { 0 }
     } else {
         quote! {{
             let mut out = 0;
-            #(out = ::std::cmp::max( out, #iter );)*
+            #(out = ::std::cmp::min( out, #iter );)*
             out
         }}
     }
@@ -362,7 +362,7 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
                     _ => Err( ::std::io::Error::new( ::std::io::ErrorKind::InvalidData, "invalid enum variant" ) )
                 }
             };
-            let minimum_bytes_needed_body = max( variant_minimum_sizes.into_iter() );
+            let minimum_bytes_needed_body = min( variant_minimum_sizes.into_iter() );
             let minimum_bytes_needed_body = quote! { (#minimum_bytes_needed_body) + 4 }; // For the tag.
             (reader_body, minimum_bytes_needed_body)
         },

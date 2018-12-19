@@ -164,7 +164,7 @@ fn test_minimum_bytes_needed() {
     assert_eq!( <DerivedUnitStruct as Readable< Endianness >>::minimum_bytes_needed(), 0 );
     assert_eq!( <DerivedEmptyStruct as Readable< Endianness >>::minimum_bytes_needed(), 0 );
     assert_eq!( <DerivedSimpleEnum as Readable< Endianness >>::minimum_bytes_needed(), 4 );
-    assert_eq!( <DerivedEnum as Readable< Endianness >>::minimum_bytes_needed(), 11 );
+    assert_eq!( <DerivedEnum as Readable< Endianness >>::minimum_bytes_needed(), 4 );
     assert_eq!( <DerivedStructWithLifetime as Readable< Endianness >>::minimum_bytes_needed(), 4 );
     assert_eq!( <DerivedStructWithDefaultOnEof as Readable< Endianness >>::minimum_bytes_needed(), 1 );
 }
