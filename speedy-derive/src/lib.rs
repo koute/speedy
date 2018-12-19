@@ -142,12 +142,13 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
     iter
 }
 
-fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (TokenStream, TokenStream)
+fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (TokenStream, TokenStream, TokenStream)
     where I: IntoIterator< Item = &'a syn::Field > + 'a
 {
     let fields = fields.into_iter();
     let mut field_names = Vec::new();
     let mut field_readers = Vec::new();
+    let mut minimum_bytes_needed = Vec::new();
     for field in get_fields( fields ) {
         let ident = field.var_name();
         types.push( field.ty );
@@ -165,11 +166,16 @@ fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
         } else {
             field_readers.push( quote! { let #ident = _reader_.read_value()?; } );
         }
+
+        if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
+            minimum_bytes_needed.push( minimum_bytes );
+        }
     }
 
     let body = quote! { #(#field_readers)* };
     let initializer = quote! { #(#field_names),* };
-    (body, initializer)
+    let minimum_bytes_needed = sum( minimum_bytes_needed );
+    (body, initializer, minimum_bytes_needed)
 }
 
 fn writable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I, is_unpacked: bool ) -> (TokenStream, TokenStream)
@@ -253,71 +259,120 @@ impl EnumCtx {
     }
 }
 
+fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
+    if field.default_on_eof {
+        None
+    } else {
+        let ty = &field.ty;
+        Some( quote! { <#ty as ::speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() } )
+    }
+}
+
+fn sum< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStream >, <I as IntoIterator>::IntoIter: ExactSizeIterator {
+    let iter = values.into_iter();
+    if iter.len() == 0 {
+        quote! { 0 }
+    } else {
+        quote! {{
+            let mut out = 0;
+            #(out += #iter;)*
+            out
+        }}
+    }
+}
+
+fn max< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStream >, <I as IntoIterator>::IntoIter: ExactSizeIterator {
+    let iter = values.into_iter();
+    if iter.len() == 0 {
+        quote! { 0 }
+    } else {
+        quote! {{
+            let mut out = 0;
+            #(out = ::std::cmp::max( out, #iter );)*
+            out
+        }}
+    }
+}
+
 fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
     let name = &input.ident;
     let mut types = Vec::new();
-    let reader_body = match &input.data {
+    let (reader_body, minimum_bytes_needed_body) = match &input.data {
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { named, .. } ), .. } ) => {
-            let (body, initializer) = readable_body( &mut types, named );
-            quote! {
+            let (body, initializer, minimum_bytes) = readable_body( &mut types, named );
+            let reader_body = quote! {
                 #body
                 Ok( #name { #initializer } )
-            }
+            };
+            (reader_body, minimum_bytes)
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { unnamed, .. } ), .. } ) => {
-            let (body, initializer) = readable_body( &mut types, unnamed );
-            quote! {
+            let (body, initializer, minimum_bytes) = readable_body( &mut types, unnamed );
+            let reader_body = quote! {
                 #body
                 Ok( #name( #initializer ) )
-            }
+            };
+            (reader_body, minimum_bytes)
         },
         syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
             let mut ctx = EnumCtx::new( &name );
-            let variants = variants.iter()
-                .map( |variant| {
+            let mut variant_matches = Vec::with_capacity( variants.len() );
+            let mut variant_minimum_sizes = Vec::with_capacity( variants.len() );
+            variants.iter()
+                .for_each( |variant| {
                     let kind = ctx.next( &variant );
                     let unqualified_ident = &variant.ident;
                     let variant_path = quote! { #name::#unqualified_ident };
+
                     match variant.fields {
                         syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
-                            let (body, initializer) = readable_body( &mut types, named );
-                            quote! {
+                            let (body, initializer, minimum_bytes) = readable_body( &mut types, named );
+                            variant_matches.push( quote! {
                                 #kind => {
                                     #body
                                     Ok( #variant_path { #initializer } )
                                 }
-                            }
+                            });
+                            variant_minimum_sizes.push( minimum_bytes );
                         },
                         syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
-                            let (body, initializer) = readable_body( &mut types, unnamed );
-                            quote! {
+                            let (body, initializer, minimum_bytes) = readable_body( &mut types, unnamed );
+                            variant_matches.push( quote! {
                                 #kind => {
                                     #body
                                     Ok( #variant_path( #initializer ) )
                                 }
-                            }
+                            });
+                            variant_minimum_sizes.push( minimum_bytes );
                         },
                         syn::Fields::Unit => {
-                            quote! { #kind => {
-                                Ok( #variant_path )
-                            }}
+                            variant_matches.push( quote! {
+                                #kind => {
+                                    Ok( #variant_path )
+                                }
+                            });
                         }
                     }
-                })
-                .collect_vec();
+                });
 
-            quote! {
+            let reader_body = quote! {
                 let kind_: u32 = _reader_.read_value()?;
                 match kind_ {
-                    #(#variants),*
+                    #(#variant_matches),*
                     _ => Err( ::std::io::Error::new( ::std::io::ErrorKind::InvalidData, "invalid enum variant" ) )
                 }
-            }
+            };
+            let minimum_bytes_needed_body = max( variant_minimum_sizes.into_iter() );
+            let minimum_bytes_needed_body = quote! { (#minimum_bytes_needed_body) + 4 }; // For the tag.
+            (reader_body, minimum_bytes_needed_body)
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unit, .. } ) => {
-            quote! {
+            let reader_body = quote! {
                 Ok( #name )
-            }
+            };
+
+            let minimum_bytes_needed_body = quote! { 0 };
+            (reader_body, minimum_bytes_needed_body)
         },
         syn::Data::Union( .. ) => panic!( "Unions are not supported!" )
     };
@@ -328,6 +383,11 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
             #[inline]
             fn read_from< R_: ::speedy::Reader< 'a_, C_ > >( _reader_: &mut R_ ) -> ::std::io::Result< Self > {
                 #reader_body
+            }
+
+            #[inline]
+            fn minimum_bytes_needed() -> usize {
+                #minimum_bytes_needed_body
             }
         }
     }

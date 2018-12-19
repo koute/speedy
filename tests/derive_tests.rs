@@ -151,3 +151,20 @@ fn test_derived_struct_with_default_on_eof() {
     let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA, 0xBB, 0xCC] ).unwrap();
     assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0xCCBB, c: 0 } );
 }
+
+#[test]
+fn test_minimum_bytes_needed() {
+    use speedy::{
+        Readable,
+        Endianness
+    };
+
+    assert_eq!( <DerivedStruct as Readable< Endianness >>::minimum_bytes_needed(), 7 );
+    assert_eq!( <DerivedTupleStruct as Readable< Endianness >>::minimum_bytes_needed(), 7 );
+    assert_eq!( <DerivedUnitStruct as Readable< Endianness >>::minimum_bytes_needed(), 0 );
+    assert_eq!( <DerivedEmptyStruct as Readable< Endianness >>::minimum_bytes_needed(), 0 );
+    assert_eq!( <DerivedSimpleEnum as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedEnum as Readable< Endianness >>::minimum_bytes_needed(), 11 );
+    assert_eq!( <DerivedStructWithLifetime as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedStructWithDefaultOnEof as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+}
