@@ -56,6 +56,35 @@ fn main() {
 }
 ```
 
+## Supported types
+
+Out-of-box the following types are supported:
+
+|           Type |                Serialized as |
+| -------------- | ---------------------------- |
+|           `u8` |                        as-is |
+|          `u16` |                        as-is |
+|          `u32` |                        as-is |
+|          `u64` |                        as-is |
+|           `i8` |                        as-is |
+|          `i16` |                        as-is |
+|          `i32` |                        as-is |
+|          `i64` |                        as-is |
+|          `f32` |                        as-is |
+|          `f64` |                        as-is |
+|         `bool` |      `u8`, either `0` or `1` |
+|       `String` | `{length: u32, bytes: [u8]}` |
+| `Cow<'a, str>` | `{length: u32, bytes: [u8]}` |
+|       `Vec<T>` | `{length: u32, values: [T]}` |
+| `Cow<'a, [T]>` | `{length: u32, values: [T]}` |
+|     `Range<T>` |                     `(T, T)` |
+|    `Option<T>` |        `(1_u8, T)` or `0_u8` |
+|           `()` |                      nothing |
+|          `(T)` |                        as-is |
+|       `(T, T)` |                        as-is |
+|   `(T, .., T)` |                        as-is |
+|        `enum`s |     `{tag: u32, variant: T}` |
+
 ## License
 
 Licensed under either of
