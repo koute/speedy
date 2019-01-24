@@ -41,6 +41,36 @@ enum Variant {
     Writable
 }
 
+fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> bool {
+    match ty {
+        syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
+            segments.iter().any( |segment| {
+                if generic_types.iter().any( |&ident| ident == &segments[ 0 ].ident ) {
+                    return true;
+                }
+
+                match segment.arguments {
+                    syn::PathArguments::None => false,
+                    syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { ref args, .. } ) => {
+                        args.iter().any( |arg| {
+                            match arg {
+                                syn::GenericArgument::Lifetime( .. ) => false,
+                                syn::GenericArgument::Type( inner_ty ) => possibly_uses_generic_ty( generic_types, inner_ty ),
+                                // TODO: How to handle these?
+                                syn::GenericArgument::Binding( .. ) => true,
+                                syn::GenericArgument::Constraint( .. ) => true,
+                                syn::GenericArgument::Const( .. ) => true
+                            }
+                        })
+                    },
+                    _ => true
+                }
+            })
+        },
+        _ => true
+    }
+}
+
 fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant ) -> (TokenStream, TokenStream, TokenStream) {
     let impl_params = {
         let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
@@ -62,8 +92,9 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
         }
     };
 
+    let generics: Vec< _ > = ast.generics.type_params().map( |ty| &ty.ident ).collect();
     let where_clause = {
-        let constraints = types.iter().map( |&ty| {
+        let constraints = types.iter().filter( |&ty| possibly_uses_generic_ty( &generics, ty ) ).map( |&ty| {
             match variant {
                 Variant::Readable => quote! { #ty: ::speedy::Readable< 'a_, C_ > },
                 Variant::Writable => quote! { #ty: ::speedy::Writable< C_ > }

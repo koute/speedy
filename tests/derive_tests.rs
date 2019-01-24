@@ -65,6 +65,11 @@ struct DerivedStructWithDefaultOnEof {
     c: u32
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedRecursiveStruct {
+    inner: Vec< DerivedRecursiveStruct >
+}
+
 macro_rules! define_test {
     ($($name:ident: $value:expr, $serialized:expr)*) => { $(
         #[test]
@@ -133,6 +138,14 @@ define_test!(
     test_derived_struct_with_generic:
         DerivedStructWithGeneric { inner: Cow::Borrowed( &[1_u8, 2_u8, 3_u8][..] ) },
         &[3, 0, 0, 0, 1, 2, 3]
+
+    test_derived_recursive_struct_empty:
+        DerivedRecursiveStruct { inner: Vec::new() },
+        &[0, 0, 0, 0]
+
+    test_derived_recursive_struct_one_element:
+        DerivedRecursiveStruct { inner: vec![ DerivedRecursiveStruct { inner: Vec::new() } ] },
+        &[1, 0, 0, 0, 0, 0, 0, 0]
 );
 
 #[test]
