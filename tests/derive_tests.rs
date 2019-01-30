@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Debug;
 
 #[macro_use]
 extern crate speedy_derive;
@@ -42,8 +43,18 @@ enum DerivedEnum {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithLifetime< 'a > {
+struct DerivedStructWithLifetimeBytes< 'a > {
     bytes: Cow< 'a, [u8] >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithLifetimeStr< 'a > {
+    inner: Cow< 'a, str >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithGenericCow< 'a, T: 'a + ToOwned + ?Sized > where <T as ToOwned>::Owned: Debug {
+    inner: Cow< 'a, T >
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -131,9 +142,17 @@ define_test!(
         DerivedEnum::C { a: 100, b: 200, c: 300 },
         &[2, 0, 0, 0, 100, 200, 0, 44, 1, 0, 0]
 
-    test_derived_struct_with_lifetime:
-        DerivedStructWithLifetime { bytes: Cow::Borrowed( &[2, 4, 8] ) },
+    test_derived_struct_with_lifetime_bytes:
+        DerivedStructWithLifetimeBytes { bytes: Cow::Borrowed( &[2, 4, 8] ) },
         &[3, 0, 0, 0, 2, 4, 8]
+
+    test_derived_struct_with_lifetime_str:
+        DerivedStructWithLifetimeStr { inner: Cow::Borrowed( "ABC" ) },
+        &[3, 0, 0, 0, 0x41, 0x42, 0x43]
+
+    test_derived_struct_with_generic_cow:
+        DerivedStructWithGenericCow { inner: Cow::Borrowed( "ABC" ) },
+        &[3, 0, 0, 0, 0x41, 0x42, 0x43]
 
     test_derived_struct_with_generic:
         DerivedStructWithGeneric { inner: Cow::Borrowed( &[1_u8, 2_u8, 3_u8][..] ) },
@@ -178,6 +197,7 @@ fn test_minimum_bytes_needed() {
     assert_eq!( <DerivedEmptyStruct as Readable< Endianness >>::minimum_bytes_needed(), 0 );
     assert_eq!( <DerivedSimpleEnum as Readable< Endianness >>::minimum_bytes_needed(), 4 );
     assert_eq!( <DerivedEnum as Readable< Endianness >>::minimum_bytes_needed(), 4 );
-    assert_eq!( <DerivedStructWithLifetime as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedStructWithLifetimeBytes as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedStructWithLifetimeStr as Readable< Endianness >>::minimum_bytes_needed(), 4 );
     assert_eq!( <DerivedStructWithDefaultOnEof as Readable< Endianness >>::minimum_bytes_needed(), 1 );
 }

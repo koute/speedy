@@ -36,6 +36,7 @@ pub fn writable( input: proc_macro::TokenStream ) -> proc_macro::TokenStream {
     proc_macro::TokenStream::from( tokens )
 }
 
+#[derive(Copy, Clone, PartialEq)]
 enum Variant {
     Readable,
     Writable
@@ -94,16 +95,27 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
 
     let generics: Vec< _ > = ast.generics.type_params().map( |ty| &ty.ident ).collect();
     let where_clause = {
-        let constraints = types.iter().filter( |&ty| possibly_uses_generic_ty( &generics, ty ) ).map( |&ty| {
-            match variant {
-                Variant::Readable => quote! { #ty: ::speedy::Readable< 'a_, C_ > },
-                Variant::Writable => quote! { #ty: ::speedy::Writable< C_ > }
+        let constraints = types.iter().filter_map( |&ty| {
+            let possibly_generic = possibly_uses_generic_ty( &generics, ty );
+            match (variant, possibly_generic) {
+                (Variant::Readable, true) => Some( quote! { #ty: ::speedy::Readable< 'a_, C_ > } ),
+                (Variant::Readable, false) => Some( quote! { #ty: 'a_ } ),
+                (Variant::Writable, true) => Some( quote! { #ty: ::speedy::Writable< C_ > } ),
+                (Variant::Writable, false) => None
             }
         });
 
         let mut predicates = Vec::new();
         if let Some( where_clause ) = ast.generics.where_clause.as_ref() {
             predicates = where_clause.predicates.iter().map( |pred| quote! { #pred } ).collect();
+        }
+
+        if variant == Variant::Readable {
+            for lifetime in ast.generics.lifetimes() {
+                predicates.push(
+                    quote! { 'a_: #lifetime }
+                );
+            }
         }
 
         let items = constraints.chain( predicates.into_iter() ).collect_vec();
