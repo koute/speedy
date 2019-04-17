@@ -13,17 +13,17 @@ struct StreamReader< C: Context, S: Read > {
 }
 
 impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
-    #[inline]
+    #[inline(always)]
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
         self.reader.read_exact( output )
     }
 
-    #[inline]
+    #[inline(always)]
     fn context( &self ) -> &C {
         &self.context
     }
 
-    #[inline]
+    #[inline(always)]
     fn context_mut( &mut self ) -> &mut C {
         &mut self.context
     }
@@ -62,7 +62,7 @@ pub trait Readable< 'a, C: Context >: Sized {
 
     // Since specialization is not stable yet we do it this way.
     #[doc(hidden)]
-    #[inline]
+    #[inline(always)]
     fn speedy_is_primitive() -> bool {
         false
     }

@@ -16,44 +16,44 @@ pub trait Writer< 'a, C: Context > {
     fn context( &self ) -> &C;
     fn context_mut( &mut self ) -> &mut C;
 
-    #[inline]
+    #[inline(always)]
     fn write_i8( &mut self, value: i8 ) -> io::Result< () > {
         self.write_u8( value as u8 )
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_i16( &mut self, value: i16 ) -> io::Result< () > {
         self.write_u16( value as u16 )
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_i32( &mut self, value: i32 ) -> io::Result< () > {
         self.write_u32( value as u32 )
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_i64( &mut self, value: i64 ) -> io::Result< () > {
         self.write_u64( value as u64 )
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_f32( &mut self, value: f32 ) -> io::Result< () > {
         let value: u32 = unsafe { mem::transmute( value ) };
         self.write_u32( value )
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_f64( &mut self, value: f64 ) -> io::Result< () > {
         let value: u64 = unsafe { mem::transmute( value ) };
         self.write_u64( value )
     }
 
-    #[inline]
+    #[inline(always)]
     fn endianness( &self ) -> Endianness {
         self.context().endianness()
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_value< T: Writable< C > >( &mut self, item: &'a T ) -> io::Result< () > {
         item.write_to( self )
     }

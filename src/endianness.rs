@@ -23,15 +23,15 @@ impl Endianness {
 }
 
 impl Endianness {
-    #[inline]
+    #[inline(always)]
     pub fn conversion_necessary( self ) -> bool {
         self != Endianness::NATIVE
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn swap_slice_u8( self, _: &mut [u8] ) {}
 
-    #[inline]
+    #[inline(always)]
     pub fn swap_slice_i8( self, _: &mut [i8] ) {}
 }
 

@@ -30,7 +30,7 @@ impl< 'a, C: Context > Readable< 'a, C > for bool {
 macro_rules! impl_for_primitive {
     ($type:ty, $getter:ident, $endianness_swap:ident) => {
         impl< 'a, C: Context > Readable< 'a, C > for $type {
-            #[inline]
+            #[inline(always)]
             fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
                 reader.$getter()
             }
@@ -41,19 +41,19 @@ macro_rules! impl_for_primitive {
             }
 
             #[doc(hidden)]
-            #[inline]
+            #[inline(always)]
             fn speedy_is_primitive() -> bool {
                 true
             }
 
             #[doc(hidden)]
-            #[inline]
+            #[inline(always)]
             unsafe fn speedy_slice_as_bytes_mut( slice: &mut [Self] ) -> &mut [u8] {
                 as_bytes_mut( slice )
             }
 
             #[doc(hidden)]
-            #[inline]
+            #[inline(always)]
             fn speedy_convert_slice_endianness( endianness: Endianness, slice: &mut [$type] ) {
                 endianness.$endianness_swap( slice );
             }

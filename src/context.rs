@@ -10,21 +10,21 @@ pub trait Context {
 }
 
 impl Context for Endianness {
-    #[inline]
+    #[inline(always)]
     fn endianness( &self ) -> Endianness {
         *self
     }
 }
 
 impl Context for LittleEndian {
-    #[inline]
+    #[inline(always)]
     fn endianness( &self ) -> Endianness {
         Endianness::LittleEndian
     }
 }
 
 impl Context for BigEndian {
-    #[inline]
+    #[inline(always)]
     fn endianness( &self ) -> Endianness {
         Endianness::BigEndian
     }

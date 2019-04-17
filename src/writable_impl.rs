@@ -14,7 +14,7 @@ use utils::as_bytes;
 macro_rules! impl_for_primitive {
     ($type:ty, $write_name:ident) => {
         impl< C: Context > Writable< C > for $type {
-            #[inline]
+            #[inline(always)]
             fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
                 writer.$write_name( *self )
             }
@@ -25,13 +25,13 @@ macro_rules! impl_for_primitive {
             }
 
             #[doc(hidden)]
-            #[inline]
+            #[inline(always)]
             fn speedy_is_primitive() -> bool {
                 true
             }
 
             #[doc(hidden)]
-            #[inline]
+            #[inline(always)]
             unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
                 as_bytes( slice )
             }
