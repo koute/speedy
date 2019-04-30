@@ -1,7 +1,3 @@
-#[macro_use]
-extern crate speedy_derive;
-extern crate speedy;
-
 use std::borrow::Cow;
 use std::ops::Range;
 

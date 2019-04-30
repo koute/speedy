@@ -14,8 +14,6 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1"
-
-[dev-dependencies]
 speedy-derive = { version = "0.3", path = "speedy-derive" }
 
 [profile.release]

@@ -1,9 +1,7 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 
-#[macro_use]
-extern crate speedy_derive;
-extern crate speedy;
+use speedy::{Readable, Writable};
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStruct {

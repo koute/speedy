@@ -55,6 +55,8 @@ mod writer;
 mod context;
 mod endianness;
 
+pub use speedy_derive::{Readable, Writable};
+
 pub use crate::readable::Readable;
 pub use crate::reader::Reader;
 
