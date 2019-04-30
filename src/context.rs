@@ -3,7 +3,7 @@ use byteorder::{
     BigEndian
 };
 
-use endianness::Endianness;
+use crate::endianness::Endianness;
 
 pub trait Context {
     fn endianness( &self ) -> Endianness;

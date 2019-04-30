@@ -1,9 +1,9 @@
 use std::io;
 use std::mem;
 
-use context::Context;
-use endianness::Endianness;
-use writable::Writable;
+use crate::context::Context;
+use crate::endianness::Endianness;
+use crate::writable::Writable;
 
 pub trait Writer< 'a, C: Context > {
     fn write_bytes( &mut self, slice: &'a [u8] ) -> io::Result< () >;

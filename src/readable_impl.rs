@@ -3,17 +3,17 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 
-use readable::Readable;
-use reader::Reader;
+use crate::readable::Readable;
+use crate::reader::Reader;
 
-use context::Context;
-use utils::as_bytes_mut;
-use endianness::Endianness;
+use crate::context::Context;
+use crate::utils::as_bytes_mut;
+use crate::endianness::Endianness;
 
 impl< 'a, C: Context > Readable< 'a, C > for bool {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let value = try!( reader.read_u8() );
+        let value = reader.read_u8()?;
         if value == 0 {
             Ok( false )
         } else {
@@ -75,7 +75,7 @@ impl_for_primitive!( f64, read_f64, swap_slice_f64 );
 impl< 'a, C: Context > Readable< 'a, C > for String {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let bytes: Vec< u8 > = try!( reader.read_value() );
+        let bytes: Vec< u8 > = reader.read_value()?;
         match String::from_utf8( bytes ) {
             Err( error ) => Err( io::Error::new( io::ErrorKind::InvalidData, error ) ),
             Ok( string ) => Ok( string )
@@ -91,7 +91,7 @@ impl< 'a, C: Context > Readable< 'a, C > for String {
 impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let bytes: String = try!( reader.read_value() );
+        let bytes: String = reader.read_value()?;
         Ok( bytes.into() )
     }
 
@@ -104,17 +104,17 @@ impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = try!( reader.read_u32() ) as usize;
+        let length = reader.read_u32()? as usize;
         let mut vec = Vec::with_capacity( length );
         if T::speedy_is_primitive() {
             unsafe {
                 vec.set_len( length );
-                try!( reader.read_bytes( T::speedy_slice_as_bytes_mut( &mut vec ) ) );
+                reader.read_bytes( T::speedy_slice_as_bytes_mut( &mut vec ) )?;
             }
             T::speedy_convert_slice_endianness( reader.endianness(), &mut vec );
         } else {
             for _ in 0..length {
-                vec.push( try!( reader.read_value() ) );
+                vec.push( reader.read_value()? );
             }
         }
 
@@ -130,7 +130,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] > where [T]: ToOwned< Owned = Vec< T > > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let bytes: Vec< T > = try!( reader.read_value() );
+        let bytes: Vec< T > = reader.read_value()?;
         Ok( Cow::Owned( bytes ) )
     }
 
@@ -143,8 +143,8 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] 
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Range< T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let start = try!( reader.read_value() );
-        let end = try!( reader.read_value() );
+        let start = reader.read_value()?;
+        let end = reader.read_value()?;
         Ok( start..end )
     }
 
@@ -157,9 +157,9 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Range< T > {
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Option< T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let flag = try!( reader.read_value() );
+        let flag = reader.read_value()?;
         let value = if flag {
-            Some( try!( reader.read_value() ) )
+            Some( reader.read_value()? )
         } else {
             None
         };
@@ -192,7 +192,7 @@ macro_rules! impl_for_tuple {
             fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
                 $(
                     #[allow(non_snake_case)]
-                    let $name = try!( reader.read_value() );
+                    let $name = reader.read_value()?;
                 )+
 
                 Ok( ($($name,)+) )
@@ -225,7 +225,7 @@ impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 );
 impl< 'a, C: Context > Readable< 'a, C > for Endianness {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let value = try!( reader.read_u8() );
+        let value = reader.read_u8()?;
         match value {
             0 => Ok( Endianness::LittleEndian ),
             1 => Ok( Endianness::BigEndian ),

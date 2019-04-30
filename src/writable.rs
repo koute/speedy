@@ -6,9 +6,9 @@ use std::io::{
 
 use byteorder::WriteBytesExt;
 
-use writer::Writer;
-use context::Context;
-use endianness::Endianness;
+use crate::writer::Writer;
+use crate::context::Context;
+use crate::endianness::Endianness;
 
 struct WritingCollector< C: Context, T: Write > {
     context: C,
@@ -126,7 +126,7 @@ pub trait Writable< C: Context > {
     #[inline]
     fn write_to_vec( &self, context: C ) -> io::Result< Vec< u8 > > {
         let mut vec = Vec::with_capacity( self.bytes_needed() );
-        try!( self.write_to_stream( context, &mut vec ) );
+        self.write_to_stream( context, &mut vec )?;
         Ok( vec )
     }
 

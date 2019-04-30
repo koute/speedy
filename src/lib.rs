@@ -45,8 +45,6 @@
 //! }
 //! ```
 
-extern crate byteorder;
-
 mod utils;
 mod readable;
 mod readable_impl;
@@ -57,14 +55,14 @@ mod writer;
 mod context;
 mod endianness;
 
-pub use readable::Readable;
-pub use reader::Reader;
+pub use crate::readable::Readable;
+pub use crate::reader::Reader;
 
-pub use writable::Writable;
-pub use writer::Writer;
+pub use crate::writable::Writable;
+pub use crate::writer::Writer;
 
-pub use endianness::Endianness;
-pub use context::Context;
+pub use crate::endianness::Endianness;
+pub use crate::context::Context;
 
 #[cfg(test)]
 mod tests {

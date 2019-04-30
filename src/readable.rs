@@ -3,9 +3,9 @@ use std::io::{
     Read
 };
 
-use reader::Reader;
-use context::Context;
-use endianness::Endianness;
+use crate::reader::Reader;
+use crate::context::Context;
+use crate::endianness::Endianness;
 
 struct StreamReader< C: Context, S: Read > {
     context: C,

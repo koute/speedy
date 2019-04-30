@@ -4,12 +4,12 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 
-use endianness::Endianness;
-use writable::Writable;
-use writer::Writer;
+use crate::endianness::Endianness;
+use crate::writable::Writable;
+use crate::writer::Writer;
 
-use context::Context;
-use utils::as_bytes;
+use crate::context::Context;
+use crate::utils::as_bytes;
 
 macro_rules! impl_for_primitive {
     ($type:ty, $write_name:ident) => {
@@ -101,13 +101,13 @@ impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
 impl< C: Context, T: Writable< C > > Writable< C > for [T] {
     #[inline]
     fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
-        try!( writer.write_u32( self.len() as _ ) );
+        writer.write_u32( self.len() as _ )?;
         if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !writer.endianness().conversion_necessary()) {
             let bytes = unsafe { T::speedy_slice_as_bytes( self ) };
             writer.write_bytes( bytes )
         } else {
             for value in self {
-                try!( writer.write_value( value ) );
+                writer.write_value( value )?;
             }
             Ok(())
         }
@@ -155,7 +155,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for Vec< T > {
 impl< C: Context, T: Writable< C > > Writable< C > for Range< T > {
     #[inline]
     fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
-        try!( self.start.write_to( writer ) );
+        self.start.write_to( writer )?;
         self.end.write_to( writer )
     }
 
@@ -169,7 +169,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for Option< T > {
     #[inline]
     fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
         if let Some( ref value ) = *self {
-            try!( writer.write_u8( 1 ) );
+            writer.write_u8( 1 )?;
             value.write_to( writer )
         } else {
             writer.write_u8( 0 )
@@ -206,7 +206,7 @@ macro_rules! impl_for_tuple {
                 #[allow(non_snake_case)]
                 let &($(ref $name,)+) = self;
                 $(
-                    try!( $name.write_to( writer ) );
+                    $name.write_to( writer )?;
                 )+
                 Ok(())
             }

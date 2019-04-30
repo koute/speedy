@@ -10,6 +10,7 @@ readme = "README.md"
 keywords = ["serialization"]
 categories = ["encoding"]
 description = "A fast binary serialization framework"
+edition = "2018"
 
 [dependencies]
 byteorder = "1"
