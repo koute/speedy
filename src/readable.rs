@@ -3,6 +3,9 @@ use std::io::{
     Read
 };
 
+use std::fs::File;
+use std::path::Path;
+
 use crate::reader::Reader;
 use crate::context::Context;
 use crate::endianness::Endianness;
@@ -58,6 +61,12 @@ pub trait Readable< 'a, C: Context >: Sized {
     #[inline]
     fn read_from_stream< S: Read >( context: C, stream: S ) -> io::Result< Self > {
         StreamReader::deserialize( context, stream )
+    }
+
+    #[inline]
+    fn read_from_file( context: C, path: impl AsRef< Path > ) -> io::Result< Self > {
+        let stream = io::BufReader::new( File::open( path )? );
+        Self::read_from_stream( context, stream )
     }
 
     // Since specialization is not stable yet we do it this way.
