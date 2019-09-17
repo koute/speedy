@@ -222,23 +222,20 @@ fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
     (body, initializer, minimum_bytes_needed)
 }
 
-fn writable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I, is_unpacked: bool ) -> (TokenStream, TokenStream)
-    where I: IntoIterator< Item = &'a syn::Field > + 'a
+fn writable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (TokenStream, TokenStream)
+    where I: IntoIterator< Item = Field< 'a > > + 'a
 {
     let fields = fields.into_iter();
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
-    for field in get_fields( fields ) {
+    for field in fields {
         types.push( field.ty );
 
-        let reference = if is_unpacked {
+        let reference = {
             let name = field.var_name();
             field_names.push( name.clone() );
 
             quote! { #name }
-        } else {
-            let name = field.name();
-            quote! { &self.#name }
         };
 
         field_writers.push( quote! { _writer_.write_value( #reference )?; } );
@@ -437,6 +434,21 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
     }
 }
 
+fn assign_to_variables< 'a >( fields: impl IntoIterator< Item = &'a Field< 'a > > ) -> TokenStream {
+    let fields: Vec< _ > = fields.into_iter().map( |field| {
+        let var_name = field.var_name();
+        let name = field.name();
+
+        quote! {
+            let #var_name = &self.#name;
+        }
+    }).collect();
+
+    quote! {
+        #(#fields)*
+    }
+}
+
 fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
     let name = &input.ident;
     let mut types = Vec::new();
@@ -445,12 +457,22 @@ fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
             quote! {}
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { ref named, .. } ), .. } ) => {
-            let (body, _) = writable_body( &mut types, named, false );
-            quote! { #body }
+            let fields: Vec< _ > = get_fields( named ).collect();
+            let assignments = assign_to_variables( &fields );
+            let (body, _) = writable_body( &mut types, fields );
+            quote! {
+                #assignments
+                #body
+            }
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ), .. } ) => {
-            let (body, _) = writable_body( &mut types, unnamed, false );
-            quote! { #body }
+            let fields: Vec< _ > = get_fields( unnamed ).collect();
+            let assignments = assign_to_variables( &fields );
+            let (body, _) = writable_body( &mut types, fields );
+            quote! {
+                #assignments
+                #body
+            }
         },
         syn::Data::Enum( syn::DataEnum { ref variants, .. } ) => {
             let mut ctx = EnumCtx::new( &name );
@@ -461,7 +483,7 @@ fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
                     let variant_path = quote! { #name::#unqualified_ident };
                     match variant.fields {
                         syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
-                            let (body, identifiers) = writable_body( &mut types, named, true );
+                            let (body, identifiers) = writable_body( &mut types, get_fields( named ) );
                             quote! {
                                 #variant_path { #identifiers } => {
                                     _writer_.write_value( &#kind )?;
@@ -470,7 +492,7 @@ fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
                             }
                         },
                         syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
-                            let (body, identifiers) = writable_body( &mut types, unnamed, true );
+                            let (body, identifiers) = writable_body( &mut types, get_fields( unnamed ) );
                             quote! {
                                 #variant_path( #identifiers ) => {
                                     _writer_.write_value( &#kind )?;
