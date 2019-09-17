@@ -142,7 +142,7 @@ impl< 'a > Field< 'a > {
         if let Some( name ) = self.name {
             name.clone()
         } else {
-            syn::Ident::new( &format!( "v{}_", self.index ), Span::call_site() )
+            syn::Ident::new( &format!( "t{}", self.index ), Span::call_site() )
         }
     }
 
