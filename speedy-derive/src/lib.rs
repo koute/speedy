@@ -13,6 +13,7 @@ extern crate syn;
 extern crate quote;
 
 use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
 
 trait IterExt: Iterator + Sized {
     fn collect_vec( self ) -> Vec< Self::Item > {
@@ -161,10 +162,10 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             let mut default_on_eof = false;
             for attr in &field.attrs {
                 match attr.parse_meta().expect( "unable to parse attribute" ) {
-                    syn::Meta::List( syn::MetaList { ref ident, ref nested, .. } ) if ident == "speedy" => {
+                    syn::Meta::List( syn::MetaList { ref path, ref nested, .. } ) if path.to_token_stream().to_string() == "speedy" => {
                         let nested: Vec< _ > = nested.iter().collect();
                         match &nested[..] {
-                            [syn::NestedMeta::Meta( syn::Meta::Word( ident ) )] if ident == "default_on_eof" => {
+                            [syn::NestedMeta::Meta( syn::Meta::Path( path ) )] if path.to_token_stream().to_string() == "default_on_eof" => {
                                 default_on_eof = true;
                             },
                             _ => panic!( "Unrecognized attribute: {:?}", attr )
@@ -281,7 +282,7 @@ impl EnumCtx {
                 kind
             },
             Some( (_, syn::Expr::Lit( syn::ExprLit { lit: syn::Lit::Int( ref value ), .. } )) ) => {
-                let value = value.value();
+                let value = value.base10_parse::< u64 >().unwrap();
                 if value > u32::MAX as u64 {
                     panic!( "Enum discriminant `{}` is too big!", full_name );
                 }
