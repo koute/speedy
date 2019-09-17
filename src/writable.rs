@@ -4,6 +4,9 @@ use std::io::{
     Cursor
 };
 
+use std::fs::File;
+use std::path::Path;
+
 use byteorder::WriteBytesExt;
 
 use crate::writer::Writer;
@@ -138,6 +141,12 @@ pub trait Writable< C: Context > {
         };
 
         self.write_to( &mut writer )
+    }
+
+    #[inline]
+    fn write_to_file( &self, context: C, path: impl AsRef< Path > ) -> io::Result< () > {
+        let stream = io::BufWriter::new( File::create( path )? );
+        self.write_to_stream( context, stream )
     }
 
     #[inline]
