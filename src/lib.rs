@@ -11,6 +11,7 @@ mod writer;
 mod context;
 mod endianness;
 
+#[cfg(feature = "speedy-derive")]
 pub use speedy_derive::{Readable, Writable};
 
 pub use crate::readable::Readable;

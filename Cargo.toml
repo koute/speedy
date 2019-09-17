@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1"
-speedy-derive = { version = "0.5", path = "speedy-derive" }
+speedy-derive = { version = "0.5", path = "speedy-derive", optional = true }
 
 [profile.release]
 panic = "abort"
@@ -23,6 +23,7 @@ panic = "abort"
 members = [".", "speedy-derive"]
 
 [features]
+default = ["speedy-derive"]
 external_doc = []
 
 [package.metadata.docs.rs]
