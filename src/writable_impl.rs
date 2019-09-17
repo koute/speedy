@@ -11,6 +11,23 @@ use crate::writer::Writer;
 use crate::context::Context;
 use crate::utils::as_bytes;
 
+#[inline]
+pub fn write_slice< 'a, C, W, T >( slice: &'a [T], writer: &mut W ) -> io::Result< () >
+    where C: Context,
+          W: ?Sized + Writer< 'a, C >,
+          T: Writable< C >
+{
+    if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !writer.endianness().conversion_necessary()) {
+        let bytes = unsafe { T::speedy_slice_as_bytes( slice ) };
+        writer.write_bytes( bytes )
+    } else {
+        for value in slice {
+            writer.write_value( value )?;
+        }
+        Ok(())
+    }
+}
+
 macro_rules! impl_for_primitive {
     ($type:ty, $write_name:ident) => {
         impl< C: Context > Writable< C > for $type {
@@ -102,15 +119,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for [T] {
     #[inline]
     fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
         writer.write_u32( self.len() as _ )?;
-        if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !writer.endianness().conversion_necessary()) {
-            let bytes = unsafe { T::speedy_slice_as_bytes( self ) };
-            writer.write_bytes( bytes )
-        } else {
-            for value in self {
-                writer.write_value( value )?;
-            }
-            Ok(())
-        }
+        write_slice( self, writer )
     }
 
     #[inline]

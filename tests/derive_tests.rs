@@ -79,6 +79,27 @@ struct DerivedRecursiveStruct {
     inner: Vec< DerivedRecursiveStruct >
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithCount {
+    length: u8,
+    #[speedy(count = length * 2)]
+    data: Vec< bool >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithCowWithCount< 'a > {
+    length: u8,
+    #[speedy(count = length * 2)]
+    data: Cow< 'a, [bool] >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedTupleStructWithVecWithCount(
+    u8,
+    #[speedy(count = t0 * 2)]
+    Vec< bool >
+);
+
 macro_rules! define_test {
     ($($name:ident: $value:expr, $serialized:expr)*) => { $(
         #[test]
@@ -163,6 +184,18 @@ define_test!(
     test_derived_recursive_struct_one_element:
         DerivedRecursiveStruct { inner: vec![ DerivedRecursiveStruct { inner: Vec::new() } ] },
         &[1, 0, 0, 0, 0, 0, 0, 0]
+
+    test_derived_struct_with_vec_with_count:
+        DerivedStructWithVecWithCount { length: 2, data: vec![ true, false, false, true ] },
+        &[2, 1, 0, 0, 1]
+
+    test_derived_struct_with_cow_with_count:
+        DerivedStructWithCowWithCount { length: 2, data: vec![ true, false, false, true ].into() },
+        &[2, 1, 0, 0, 1]
+
+    test_derived_tuple_struct_with_vec_with_count:
+        DerivedTupleStructWithVecWithCount( 2, vec![ true, false, false, true ] ),
+        &[2, 1, 0, 0, 1]
 );
 
 #[test]

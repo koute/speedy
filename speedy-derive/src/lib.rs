@@ -134,7 +134,8 @@ struct Field< 'a > {
     index: usize,
     name: Option< &'a syn::Ident >,
     ty: &'a syn::Type,
-    default_on_eof: bool
+    default_on_eof: bool,
+    count: Option< syn::Expr >
 }
 
 impl< 'a > Field< 'a > {
@@ -155,23 +156,63 @@ impl< 'a > Field< 'a > {
     }
 }
 
+enum Attribute {
+    DefaultOnEof,
+    Count( syn::Expr )
+}
+
+impl syn::parse::Parse for Attribute {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let key: syn::Ident = input.parse()?;
+        let value = match key.to_string().as_str() {
+            "default_on_eof" => Attribute::DefaultOnEof,
+            "count" => {
+                let _: Token![=] = input.parse()?;
+                let expr: syn::Expr = input.parse()?;
+                Attribute::Count( expr )
+            },
+            key => panic!( "Unrecognized attribute: '{}'", key )
+        };
+
+        Ok( value )
+    }
+}
+
+struct Attributes( syn::punctuated::Punctuated< Attribute, Token![,] > );
+
+impl syn::parse::Parse for Attributes {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let content;
+        parenthesized!( content in input );
+        Ok( Attributes( content.parse_terminated( Attribute::parse )? ) )
+    }
+}
+
 fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) -> impl Iterator< Item = Field< 'a > > {
     let iter = fields.into_iter()
         .enumerate()
         .map( |(index, field)| {
             let mut default_on_eof = false;
+            let mut count = None;
             for attr in &field.attrs {
-                match attr.parse_meta().expect( "unable to parse attribute" ) {
-                    syn::Meta::List( syn::MetaList { ref path, ref nested, .. } ) if path.to_token_stream().to_string() == "speedy" => {
-                        let nested: Vec< _ > = nested.iter().collect();
-                        match &nested[..] {
-                            [syn::NestedMeta::Meta( syn::Meta::Path( path ) )] if path.to_token_stream().to_string() == "default_on_eof" => {
-                                default_on_eof = true;
-                            },
-                            _ => panic!( "Unrecognized attribute: {:?}", attr )
+                let path = attr.path.clone().into_token_stream().to_string();
+                if path == "speedy" {
+                    let parsed_attrs: Attributes = syn::parse2( attr.tokens.clone() ).unwrap();
+                    for attr in parsed_attrs.0 {
+                        match attr {
+                            Attribute::DefaultOnEof => default_on_eof = true,
+                            Attribute::Count( expr ) => count = Some( expr )
                         }
-                    },
-                    _ => {}
+                    }
+                }
+            }
+
+            if count.is_some() {
+                let type_name = field.ty.clone().into_token_stream().to_string().replace( " ", "" );
+                let is_vec = type_name.starts_with( "Vec<" );
+                let is_cow_slice = type_name.starts_with( "Cow<" ) && type_name.ends_with( "]>" ) && type_name.contains( ",[" );
+                if !is_vec && !is_cow_slice {
+                    panic!( "The 'count' attribute is only supported for `Vec` or for `Cow<[_]>`" );
                 }
             }
 
@@ -179,7 +220,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 index,
                 name: field.ident.as_ref(),
                 ty: &field.ty,
-                default_on_eof
+                default_on_eof,
+                count
             }
         });
 
@@ -197,18 +239,24 @@ fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
         let ident = field.var_name();
         types.push( field.ty );
 
+        let body = if let Some( ref count ) = field.count {
+            quote! { speedy::private::read_vec( _reader_, (#count) as usize ).map( |_value_| _value_.into() ) }
+        } else {
+            quote! { _reader_.read_value() }
+        };
+
         let name = quote! { #ident };
         field_names.push( name );
         if field.default_on_eof {
             field_readers.push( quote! {
-                let #ident = match _reader_.read_value() {
+                let #ident = match #body {
                     Ok( value ) => value,
                     Err( ref error ) if error.kind() == std::io::ErrorKind::UnexpectedEof => std::default::Default::default(),
                     Err( error ) => return Err( error )
                 };
             });
         } else {
-            field_readers.push( quote! { let #ident = _reader_.read_value()?; } );
+            field_readers.push( quote! { let #ident = #body?; } );
         }
 
         if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
@@ -238,7 +286,14 @@ fn writable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
             quote! { #name }
         };
 
-        field_writers.push( quote! { _writer_.write_value( #reference )?; } );
+        let body = if let Some( _ ) = field.count {
+            // TODO: Verify somehow that the length of the vector is correct.
+            quote! { speedy::private::write_slice( &#reference, _writer_ )?; }
+        } else {
+            quote! { _writer_.write_value( #reference )?; }
+        };
+
+        field_writers.push( body );
     }
 
     let body = quote! { #(#field_writers)* };

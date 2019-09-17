@@ -10,6 +10,28 @@ use crate::context::Context;
 use crate::utils::as_bytes_mut;
 use crate::endianness::Endianness;
 
+#[inline]
+pub fn read_vec< 'a, C, R, T >( reader: &mut R, length: usize ) -> io::Result< Vec< T > >
+    where C: Context,
+          R: Reader< 'a, C >,
+          T: Readable< 'a, C >
+{
+    let mut vec = Vec::with_capacity( length );
+    if T::speedy_is_primitive() {
+        unsafe {
+            vec.set_len( length );
+            reader.read_bytes( T::speedy_slice_as_bytes_mut( &mut vec ) )?;
+        }
+        T::speedy_convert_slice_endianness( reader.endianness(), &mut vec );
+    } else {
+        for _ in 0..length {
+            vec.push( reader.read_value()? );
+        }
+    }
+
+    Ok( vec )
+}
+
 impl< 'a, C: Context > Readable< 'a, C > for bool {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
@@ -105,20 +127,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
         let length = reader.read_u32()? as usize;
-        let mut vec = Vec::with_capacity( length );
-        if T::speedy_is_primitive() {
-            unsafe {
-                vec.set_len( length );
-                reader.read_bytes( T::speedy_slice_as_bytes_mut( &mut vec ) )?;
-            }
-            T::speedy_convert_slice_endianness( reader.endianness(), &mut vec );
-        } else {
-            for _ in 0..length {
-                vec.push( reader.read_value()? );
-            }
-        }
-
-        Ok( vec )
+        read_vec( reader, length )
     }
 
     #[inline]
