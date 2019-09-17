@@ -98,9 +98,9 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
         let constraints = types.iter().filter_map( |&ty| {
             let possibly_generic = possibly_uses_generic_ty( &generics, ty );
             match (variant, possibly_generic) {
-                (Variant::Readable, true) => Some( quote! { #ty: ::speedy::Readable< 'a_, C_ > } ),
+                (Variant::Readable, true) => Some( quote! { #ty: speedy::Readable< 'a_, C_ > } ),
                 (Variant::Readable, false) => Some( quote! { #ty: 'a_ } ),
-                (Variant::Writable, true) => Some( quote! { #ty: ::speedy::Writable< C_ > } ),
+                (Variant::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
                 (Variant::Writable, false) => None
             }
         });
@@ -202,7 +202,7 @@ fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
             field_readers.push( quote! {
                 let #ident = match _reader_.read_value() {
                     Ok( value ) => value,
-                    Err( ref error ) if error.kind() == ::std::io::ErrorKind::UnexpectedEof => ::std::default::Default::default(),
+                    Err( ref error ) if error.kind() == std::io::ErrorKind::UnexpectedEof => std::default::Default::default(),
                     Err( error ) => return Err( error )
                 };
             });
@@ -307,7 +307,7 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
         None
     } else {
         let ty = &field.ty;
-        Some( quote! { <#ty as ::speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() } )
+        Some( quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() } )
     }
 }
 
@@ -331,7 +331,7 @@ fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     } else {
         quote! {{
             let mut out = 0;
-            #(out = ::std::cmp::min( out, #iter );)*
+            #(out = std::cmp::min( out, #iter );)*
             out
         }}
     }
@@ -402,7 +402,7 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
                 let kind_: u32 = _reader_.read_value()?;
                 match kind_ {
                     #(#variant_matches),*
-                    _ => Err( ::std::io::Error::new( ::std::io::ErrorKind::InvalidData, "invalid enum variant" ) )
+                    _ => Err( std::io::Error::new( std::io::ErrorKind::InvalidData, "invalid enum variant" ) )
                 }
             };
             let minimum_bytes_needed_body = min( variant_minimum_sizes.into_iter() );
@@ -422,9 +422,9 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
 
     let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Variant::Readable );
     quote! {
-        impl< 'a_, #impl_params C_: ::speedy::Context > ::speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
+        impl< 'a_, #impl_params C_: speedy::Context > speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
             #[inline]
-            fn read_from< R_: ::speedy::Reader< 'a_, C_ > >( _reader_: &mut R_ ) -> ::std::io::Result< Self > {
+            fn read_from< R_: speedy::Reader< 'a_, C_ > >( _reader_: &mut R_ ) -> std::io::Result< Self > {
                 #reader_body
             }
 
@@ -492,9 +492,9 @@ fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
 
     let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Variant::Writable );
     quote! {
-        impl< #impl_params C_: ::speedy::Context > ::speedy::Writable< C_ > for #name #ty_params #where_clause {
+        impl< #impl_params C_: speedy::Context > speedy::Writable< C_ > for #name #ty_params #where_clause {
             #[inline]
-            fn write_to< 'a_, T_: ?Sized + ::speedy::Writer< 'a_, C_ > >( &'a_ self, _writer_: &mut T_ ) -> ::std::io::Result< () > {
+            fn write_to< 'a_, T_: ?Sized + speedy::Writer< 'a_, C_ > >( &'a_ self, _writer_: &mut T_ ) -> std::io::Result< () > {
                 #writer_body
                 Ok(())
             }

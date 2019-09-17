@@ -9,6 +9,7 @@ license = "MIT/Apache-2.0"
 keywords = ["serialization"]
 categories = ["encoding"]
 description = "A fast binary serialization framework, #[derive(Readable, Writable)] support"
+edition = "2018"
 
 [lib]
 proc-macro = true
