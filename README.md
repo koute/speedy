@@ -13,10 +13,6 @@ See [serde-bench](https://github.com/koute/serde-bench) for benchmarks.
 ## Example
 
 ```rust
-#[macro_use]
-extern crate speedy_derive;
-extern crate speedy;
-
 use std::borrow::Cow;
 use speedy::{Readable, Writable, Endianness};
 
