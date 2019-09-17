@@ -16,6 +16,7 @@ set -e
 
 echo "Is Rust from nightly: $IS_NIGHTLY"
 
+cargo check --no-default-features
 cargo build
 
 if [ "$IS_NIGHTLY" = "1" ]; then
