@@ -21,3 +21,9 @@ panic = "abort"
 
 [workspace]
 members = [".", "speedy-derive"]
+
+[features]
+external_doc = []
+
+[package.metadata.docs.rs]
+features = ["external_doc"]
