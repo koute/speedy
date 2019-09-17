@@ -5,12 +5,12 @@ sudo: false
 
 rust:
   - stable
-  - beta
   - nightly
+  - beta
 
 matrix:
   allow_failures:
     - rust: nightly
 
 script:
-  - cargo test
+  - ./ci/run_tests.sh
