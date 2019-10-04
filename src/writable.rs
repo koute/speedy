@@ -155,8 +155,11 @@ pub trait Writable< C: Context > {
             size: 0
         };
 
-        self.write_to( &mut writer ).unwrap();
-        writer.size
+        if let Err( _ ) = self.write_to( &mut writer ) {
+            0
+        } else {
+            writer.size
+        }
     }
 
     // Since specialization is not stable yet we do it this way.
