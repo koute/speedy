@@ -31,6 +31,8 @@ pub mod private {
 #[cfg(test)]
 mod tests {
     use std::io;
+    use std::borrow::Cow;
+
     use super::{
         Reader,
         Readable,
@@ -86,6 +88,22 @@ mod tests {
         let data = vec![ 1, 2, 3 ];
         let value = SimpleStruct::read_from_buffer( Endianness::NATIVE, &data ).unwrap();
         assert_eq!( value, SimpleStruct { a: 1, b: 2, c: 3 } );
+    }
+
+    #[test]
+    fn simple_read_bytes_from_buffer_owned() {
+        let data = vec![ 2, 0, 0, 0, 12, 34 ];
+        let value: Cow< [u8] > = Readable::read_from_buffer_owned( Endianness::LittleEndian, &data ).unwrap();
+        assert_eq!( &*value, &[12, 34] );
+        assert_ne!( value.as_ptr(), data[ 4.. ].as_ptr() );
+    }
+
+    #[test]
+    fn simple_read_bytes_from_buffer_borrowed() {
+        let data = vec![ 2, 0, 0, 0, 12, 34 ];
+        let value: Cow< [u8] > = Readable::read_from_buffer( Endianness::LittleEndian, &data ).unwrap();
+        assert_eq!( &*value, &[12, 34] );
+        assert_eq!( value.as_ptr(), data[ 4.. ].as_ptr() );
     }
 
     #[test]

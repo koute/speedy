@@ -53,6 +53,12 @@ macro_rules! impl_for_primitive {
             }
 
             #[doc(hidden)]
+            #[inline]
+            unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
+                std::slice::from_raw_parts( slice.as_ptr() as *const $type, slice.len() / mem::size_of::< Self >() )
+            }
+
+            #[doc(hidden)]
             #[inline(always)]
             fn speedy_convert_slice_endianness( endianness: Endianness, slice: &mut [$type] ) {
                 endianness.$endianness_swap( slice );
@@ -107,8 +113,20 @@ impl< 'a, C: Context > Readable< 'a, C > for String {
 impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let bytes: String = reader.read_value()?;
-        Ok( bytes.into() )
+        let length = reader.read_u32()? as usize;
+        let bytes: Cow< 'a, [u8] > = reader.read_cow( length )?;
+        match bytes {
+            Cow::Borrowed( bytes ) => {
+                std::str::from_utf8( bytes )
+                    .map( Cow::Borrowed )
+                    .map_err( |error| io::Error::new( io::ErrorKind::InvalidData, error ) )
+            },
+            Cow::Owned( bytes ) => {
+                String::from_utf8( bytes )
+                    .map( Cow::Owned )
+                    .map_err( |error| io::Error::new( io::ErrorKind::InvalidData, error ) )
+            }
+        }
     }
 
     #[inline]
@@ -133,8 +151,8 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] > where [T]: ToOwned< Owned = Vec< T > > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let bytes: Vec< T > = reader.read_value()?;
-        Ok( Cow::Owned( bytes ) )
+        let length = reader.read_u32()? as usize;
+        reader.read_cow( length )
     }
 
     #[inline]

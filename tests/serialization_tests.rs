@@ -16,7 +16,7 @@ macro_rules! symmetric_tests {
             use super::*;
 
             #[test]
-            fn round_trip_le() {
+            fn round_trip_le_borrowed_aligned() {
                 let original: $type = $value;
                 let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
                 let deserialized: $type = Readable::read_from_buffer( Endianness::LittleEndian, &serialized ).unwrap();
@@ -24,10 +24,42 @@ macro_rules! symmetric_tests {
             }
 
             #[test]
-            fn round_trip_be() {
+            fn round_trip_le_borrowed_unaligned() {
+                let original: (u8, $type) = (1, $value);
+                let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
+                let deserialized: (u8, $type) = Readable::read_from_buffer( Endianness::LittleEndian, &serialized ).unwrap();
+                assert_eq!( original, deserialized );
+            }
+
+            #[test]
+            fn round_trip_le_owned() {
+                let original: $type = $value;
+                let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_owned( Endianness::LittleEndian, &serialized ).unwrap();
+                assert_eq!( original, deserialized );
+            }
+
+            #[test]
+            fn round_trip_be_borrowed_aligned() {
                 let original: $type = $value;
                 let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
                 let deserialized: $type = Readable::read_from_buffer( Endianness::BigEndian, &serialized ).unwrap();
+                assert_eq!( original, deserialized );
+            }
+
+            #[test]
+            fn round_trip_be_borrowed_unaligned() {
+                let original: (u8, $type) = (1, $value);
+                let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
+                let deserialized: (u8, $type) = Readable::read_from_buffer( Endianness::BigEndian, &serialized ).unwrap();
+                assert_eq!( original, deserialized );
+            }
+
+            #[test]
+            fn round_trip_be_owned() {
+                let original: $type = $value;
+                let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_owned( Endianness::BigEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 

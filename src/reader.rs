@@ -11,12 +11,9 @@ pub trait Reader< 'a, C: Context >: Sized {
     fn context( &self ) -> &C;
     fn context_mut( &mut self ) -> &mut C;
 
-    #[inline]
-    fn read_bytes_cow( &mut self, length: usize ) -> io::Result< Cow< 'a, [u8] > > {
-        let mut buffer = Vec::with_capacity( length );
-        unsafe { buffer.set_len( length ) };
-        self.read_bytes( &mut buffer )?;
-        Ok( Cow::Owned( buffer ) )
+    #[inline(always)]
+    fn read_bytes_borrowed( &mut self, _length: usize ) -> Option< io::Result< &'a [u8] > > {
+        None
     }
 
     #[inline(always)]
@@ -98,6 +95,11 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline]
+    fn read_bytes_cow( &mut self, length: usize ) -> io::Result< Cow< 'a, [u8] > > {
+        self.read_cow( length )
+    }
+
+    #[inline]
     fn read_vec< T >( &mut self, length: usize ) -> io::Result< Vec< T > >
         where T: Readable< 'a, C >
     {
@@ -115,5 +117,32 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         Ok( vec )
+    }
+
+    #[inline]
+    fn read_cow< T >( &mut self, length: usize ) -> io::Result< Cow< 'a, [T] > >
+        where T: Readable< 'a, C >,
+              [T]: ToOwned< Owned = Vec< T > >
+    {
+        if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !self.endianness().conversion_necessary()) {
+            if let Some( bytes ) = self.read_bytes_borrowed( length * mem::size_of::< T >() ) {
+                let bytes = bytes?;
+                assert_eq!( bytes.len(), length * mem::size_of::< T >() );
+
+                if mem::align_of::< T >() == 1 || bytes.as_ptr() as usize % mem::align_of::< T >() == 0 {
+                    let slice = unsafe { T::speedy_slice_from_bytes( bytes ) };
+                    return Ok( Cow::Borrowed( slice ) );
+                } else {
+                    let mut vec: Vec< T > = Vec::with_capacity( length );
+                    unsafe {
+                        vec.set_len( length );
+                        std::ptr::copy_nonoverlapping( bytes.as_ptr(), vec.as_mut_ptr() as *mut u8, bytes.len() );
+                    }
+                    return Ok( Cow::Owned( vec ) );
+                }
+            }
+        }
+
+        Ok( Cow::Owned( self.read_vec( length )? ) )
     }
 }
