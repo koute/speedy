@@ -12,9 +12,9 @@ use crate::context::Context;
 use crate::utils::as_bytes;
 
 #[inline]
-pub fn write_slice< 'a, C, W, T >( slice: &'a [T], writer: &mut W ) -> io::Result< () >
+pub fn write_slice< C, W, T >( slice: &[T], writer: &mut W ) -> io::Result< () >
     where C: Context,
-          W: ?Sized + Writer< 'a, C >,
+          W: ?Sized + Writer< C >,
           T: Writable< C >
 {
     if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !writer.endianness().conversion_necessary()) {
@@ -32,7 +32,7 @@ macro_rules! impl_for_primitive {
     ($type:ty, $write_name:ident) => {
         impl< C: Context > Writable< C > for $type {
             #[inline(always)]
-            fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+            fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
                 writer.$write_name( *self )
             }
 
@@ -69,7 +69,7 @@ impl_for_primitive!( f64, write_f64 );
 
 impl< C: Context > Writable< C > for usize {
     #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
         writer.write_u64( *self as u64 )
     }
 
@@ -81,7 +81,7 @@ impl< C: Context > Writable< C > for usize {
 
 impl< C: Context > Writable< C > for bool {
     #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
         writer.write_u8( if *self { 1 } else { 0 } )
     }
 
@@ -93,7 +93,7 @@ impl< C: Context > Writable< C > for bool {
 
 impl< C: Context > Writable< C > for String {
     #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
         self.as_bytes().write_to( writer )
     }
 
@@ -105,7 +105,7 @@ impl< C: Context > Writable< C > for String {
 
 impl< C: Context > Writable< C > for str {
     #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
         self.as_bytes().write_to( writer )
     }
 
@@ -117,7 +117,7 @@ impl< C: Context > Writable< C > for str {
 
 impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
     #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
         self.as_bytes().write_to( writer )
     }
 
@@ -129,7 +129,7 @@ impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
 
 impl< C: Context, T: Writable< C > > Writable< C > for [T] {
     #[inline]
-    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
         writer.write_u32( self.len() as _ )?;
         write_slice( self, writer )
     }
@@ -151,7 +151,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for [T] {
 
 impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where [T]: ToOwned {
     #[inline]
-    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
         self.as_ref().write_to( writer )
     }
 
@@ -163,7 +163,7 @@ impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where 
 
 impl< C: Context, T: Writable< C > > Writable< C > for Vec< T > {
     #[inline]
-    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
         self.as_slice().write_to( writer )
     }
 
@@ -175,7 +175,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for Vec< T > {
 
 impl< C: Context, T: Writable< C > > Writable< C > for Range< T > {
     #[inline]
-    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
         self.start.write_to( writer )?;
         self.end.write_to( writer )
     }
@@ -188,7 +188,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for Range< T > {
 
 impl< C: Context, T: Writable< C > > Writable< C > for Option< T > {
     #[inline]
-    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
         if let Some( ref value ) = *self {
             writer.write_u8( 1 )?;
             value.write_to( writer )
@@ -209,7 +209,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for Option< T > {
 
 impl< C: Context > Writable< C > for () {
     #[inline]
-    fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, _: &mut W ) -> io::Result< () > {
+    fn write_to< W: ?Sized + Writer< C > >( &self, _: &mut W ) -> io::Result< () > {
         Ok(())
     }
 
@@ -223,7 +223,7 @@ macro_rules! impl_for_tuple {
     ($($name:ident),+) => {
         impl< C: Context, $($name: Writable< C >),+ > Writable< C > for ($($name,)+) {
             #[inline]
-            fn write_to< 'a, W: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut W ) -> io::Result< () > {
+            fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
                 #[allow(non_snake_case)]
                 let &($(ref $name,)+) = self;
                 $(
@@ -260,7 +260,7 @@ impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 );
 
 impl< C: Context > Writable< C > for Endianness {
     #[inline]
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
         let value = match *self {
             Endianness::LittleEndian => 0,
             Endianness::BigEndian => 1

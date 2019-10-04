@@ -49,7 +49,7 @@ mod tests {
     }
 
     impl< C: Context > Writable< C > for SimpleStruct {
-        fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+        fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
             writer.write_value( &self.a )?;
             writer.write_value( &self.b )?;
             writer.write_value( &self.c )?;

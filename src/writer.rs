@@ -5,9 +5,8 @@ use crate::context::Context;
 use crate::endianness::Endianness;
 use crate::writable::Writable;
 
-pub trait Writer< 'a, C: Context > {
-    fn write_bytes( &mut self, slice: &'a [u8] ) -> io::Result< () >;
-    fn write_owned_bytes( &mut self, vec: Vec< u8 > ) -> io::Result< () >;
+pub trait Writer< C: Context > {
+    fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () >;
     fn write_u8( &mut self, value: u8 ) -> io::Result< () >;
     fn write_u16( &mut self, value: u16 ) -> io::Result< () >;
     fn write_u32( &mut self, value: u32 ) -> io::Result< () >;
@@ -54,7 +53,7 @@ pub trait Writer< 'a, C: Context > {
     }
 
     #[inline(always)]
-    fn write_value< T: Writable< C > >( &mut self, item: &'a T ) -> io::Result< () > {
+    fn write_value< T: Writable< C > >( &mut self, item: &T ) -> io::Result< () > {
         item.write_to( self )
     }
 }

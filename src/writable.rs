@@ -18,15 +18,10 @@ struct WritingCollector< C: Context, T: Write > {
     writer: T
 }
 
-impl< 'a, C: Context, T: Write > Writer< 'a, C > for WritingCollector< C, T > {
+impl< C: Context, T: Write > Writer< C > for WritingCollector< C, T > {
     #[inline]
-    fn write_bytes( &mut self, slice: &'a [u8] ) -> io::Result< () > {
+    fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () > {
         self.writer.write_all( slice )
-    }
-
-    #[inline]
-    fn write_owned_bytes( &mut self, vec: Vec< u8 > ) -> io::Result< () > {
-        self.writer.write_all( &vec )
     }
 
     #[inline]
@@ -64,16 +59,10 @@ struct SizeCalculatorCollector {
     size: usize
 }
 
-impl< 'a, C: Context > Writer< 'a, C > for SizeCalculatorCollector {
+impl< C: Context > Writer< C > for SizeCalculatorCollector {
     #[inline]
-    fn write_bytes( &mut self, slice: &'a [u8] ) -> io::Result< () > {
+    fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () > {
         self.size += slice.len();
-        Ok(())
-    }
-
-    #[inline]
-    fn write_owned_bytes( &mut self, vec: Vec< u8 > ) -> io::Result< () > {
-        self.size += vec.len();
         Ok(())
     }
 
@@ -118,7 +107,7 @@ impl< 'a, C: Context > Writer< 'a, C > for SizeCalculatorCollector {
 }
 
 pub trait Writable< C: Context > {
-    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () >;
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () >;
 
     #[inline]
     fn write_to_buffer( &self, context: C, buffer: &mut [u8] ) -> io::Result< () > {

@@ -575,7 +575,7 @@ fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
     quote! {
         impl< #impl_params C_: speedy::Context > speedy::Writable< C_ > for #name #ty_params #where_clause {
             #[inline]
-            fn write_to< 'a_, T_: ?Sized + speedy::Writer< 'a_, C_ > >( &'a_ self, _writer_: &mut T_ ) -> std::io::Result< () > {
+            fn write_to< T_: ?Sized + speedy::Writer< C_ > >( &self, _writer_: &mut T_ ) -> std::io::Result< () > {
                 #writer_body
                 Ok(())
             }
