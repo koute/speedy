@@ -62,6 +62,7 @@ Out-of-box the following types are supported:
 |          `u16` |                        as-is |
 |          `u32` |                        as-is |
 |          `u64` |                        as-is |
+|        `usize` |                        `u64` |
 |           `i8` |                        as-is |
 |          `i16` |                        as-is |
 |          `i32` |                        as-is |
@@ -80,6 +81,40 @@ Out-of-box the following types are supported:
 |       `(T, T)` |                        as-is |
 |   `(T, .., T)` |                        as-is |
 |        `enum`s |     `{tag: u32, variant: T}` |
+
+These are stable and will not change in the future.
+
+## Attributes
+
+### `#[speedy(count = ...)]`
+
+Can be used on a `Vec<T>` or on a `Cow<'a, [T]>` to specify
+the field's length. Can refer to any of the previous fields.
+
+For example:
+
+```rust
+use speedy::{Readable, Writable};
+
+#[derive(Readable, Writable)]
+struct Struct {
+    byte_count: u8,
+    #[speedy(count = byte_count / 4)]
+    data: Vec< u32 >
+}
+```
+
+Before serializing you need to make sure that whatever is set as `count`
+is equal to the `.len()` of the field; if it's not then you will get
+an error when trying to serialize it.
+
+Setting this attribute changes the serialization format as follows:
+
+
+|           Type |                Serialized as |
+| -------------- | ---------------------------- |
+|       `Vec<T>` |                        `[T]` |
+| `Cow<'a, [T]>` |                        `[T]` |
 
 ## License
 
