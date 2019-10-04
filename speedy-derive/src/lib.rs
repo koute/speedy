@@ -279,18 +279,21 @@ fn writable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
     for field in fields {
         types.push( field.ty );
 
-        let reference = {
-            let name = field.var_name();
-            field_names.push( name.clone() );
+        let var_name = field.var_name();
+        field_names.push( var_name.clone() );
+        let expr = quote! { #var_name };
 
-            quote! { #name }
-        };
-
-        let body = if let Some( _ ) = field.count {
-            // TODO: Verify somehow that the length of the vector is correct.
-            quote! { speedy::private::write_slice( &#reference, _writer_ )?; }
+        let body = if let Some( count ) = field.count {
+            let error_message = format!( "the length of '{}' is not the same as its 'count' attribute", var_name );
+            quote! {
+                let __expected = #count;
+                if #expr.len() != __expected as usize {
+                    return Err( std::io::Error::new( std::io::ErrorKind::InvalidData, #error_message ) );
+                }
+                speedy::private::write_slice( &#expr, _writer_ )?;
+            }
         } else {
-            quote! { _writer_.write_value( #reference )?; }
+            quote! { _writer_.write_value( #expr )?; }
         };
 
         field_writers.push( body );

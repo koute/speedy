@@ -216,6 +216,24 @@ fn test_derived_struct_with_default_on_eof() {
 }
 
 #[test]
+fn test_length_mismatch_with_count_attribute() {
+    use speedy::{
+        Endianness,
+        Writable
+    };
+
+    let err = DerivedStructWithVecWithCount {
+        length: 0,
+        data: vec![ true ]
+    }.write_to_vec( Endianness::LittleEndian ).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "the length of 'data' is not the same as its 'count' attribute"
+    );
+}
+
+#[test]
 fn test_minimum_bytes_needed() {
     use speedy::{
         Readable,
