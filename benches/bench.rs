@@ -5,6 +5,7 @@ extern crate byteorder;
 extern crate speedy;
 
 use std::io::{Read, Write};
+use std::borrow::Cow;
 use test::{Bencher, black_box};
 use byteorder::{ReadBytesExt, NativeEndian};
 use speedy::{Readable, Writable, Endianness};
@@ -109,6 +110,32 @@ fn serialization_manual_megabyte_buffer( b: &mut Bencher ) {
         let mut output = Vec::new();
         Write::write_all( &mut output, &buffer ).unwrap();
         output
+    })
+}
+
+#[bench]
+fn deserialization_speedy_megabyte_buffer_cow_borrowed( b: &mut Bencher ) {
+    let mut buffer: Vec< u8 > = Vec::new();
+    buffer.resize( 1024 * 1024, 1 );
+    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        let deserialized: Cow< [u8] > = Readable::read_from_buffer( Endianness::NATIVE, &buffer ).unwrap();
+        deserialized
+    })
+}
+
+#[bench]
+fn deserialization_speedy_megabyte_buffer_cow_owned( b: &mut Bencher ) {
+    let mut buffer: Vec< u8 > = Vec::new();
+    buffer.resize( 1024 * 1024, 1 );
+    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        let deserialized: Cow< [u8] > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        deserialized
     })
 }
 
