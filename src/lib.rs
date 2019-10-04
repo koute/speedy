@@ -25,7 +25,6 @@ pub use crate::context::Context;
 
 #[doc(hidden)]
 pub mod private {
-    pub use crate::readable_impl::read_vec;
     pub use crate::writable_impl::write_slice;
 }
 

@@ -96,4 +96,24 @@ pub trait Reader< 'a, C: Context >: Sized {
     fn endianness( &self ) -> Endianness {
         self.context().endianness()
     }
+
+    #[inline]
+    fn read_vec< T >( &mut self, length: usize ) -> io::Result< Vec< T > >
+        where T: Readable< 'a, C >
+    {
+        let mut vec = Vec::with_capacity( length );
+        if T::speedy_is_primitive() {
+            unsafe {
+                vec.set_len( length );
+                self.read_bytes( T::speedy_slice_as_bytes_mut( &mut vec ) )?;
+            }
+            T::speedy_convert_slice_endianness( self.endianness(), &mut vec );
+        } else {
+            for _ in 0..length {
+                vec.push( self.read_value()? );
+            }
+        }
+
+        Ok( vec )
+    }
 }

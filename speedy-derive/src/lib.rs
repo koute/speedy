@@ -240,7 +240,7 @@ fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
         types.push( field.ty );
 
         let body = if let Some( ref count ) = field.count {
-            quote! { speedy::private::read_vec( _reader_, (#count) as usize ).map( |_value_| _value_.into() ) }
+            quote! { _reader_.read_vec( (#count) as usize ).map( |_value_| _value_.into() ) }
         } else {
             quote! { _reader_.read_value() }
         };
