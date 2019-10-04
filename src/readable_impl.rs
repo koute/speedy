@@ -94,6 +94,22 @@ impl_for_primitive!( u64, read_u64, swap_slice_u64 );
 impl_for_primitive!( f32, read_f32, swap_slice_f32 );
 impl_for_primitive!( f64, read_f64, swap_slice_f64 );
 
+impl< 'a, C: Context > Readable< 'a, C > for usize {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+        let value = u64::read_from( reader )?;
+        if value > std::usize::MAX as u64 {
+            return Err( io::Error::new( io::ErrorKind::InvalidData, "out of range usize" ) );
+        }
+        Ok( value as usize )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <u64 as Readable< 'a, C >>::minimum_bytes_needed()
+    }
+}
+
 impl< 'a, C: Context > Readable< 'a, C > for String {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {

@@ -67,6 +67,18 @@ impl_for_primitive!( u64, write_u64 );
 impl_for_primitive!( f32, write_f32 );
 impl_for_primitive!( f64, write_f64 );
 
+impl< C: Context > Writable< C > for usize {
+    #[inline]
+    fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
+        writer.write_u64( *self as u64 )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        mem::size_of::< u64 >()
+    }
+}
+
 impl< C: Context > Writable< C > for bool {
     #[inline]
     fn write_to< 'a, T: ?Sized + Writer< 'a, C > >( &'a self, writer: &mut T ) -> io::Result< () > {
