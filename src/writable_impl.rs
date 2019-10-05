@@ -269,3 +269,27 @@ impl< C: Context > Writable< C > for Endianness {
         1
     }
 }
+
+impl< 'a, C, T > Writable< C > for &'a T where C: Context, T: Writable< C > {
+    #[inline(always)]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
+        (**self).write_to( writer )
+    }
+
+    #[inline(always)]
+    fn bytes_needed( &self ) -> usize {
+        (**self).bytes_needed()
+    }
+}
+
+impl< 'a, C, T > Writable< C > for &'a mut T where C: Context, T: Writable< C > {
+    #[inline(always)]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
+        (**self).write_to( writer )
+    }
+
+    #[inline(always)]
+    fn bytes_needed( &self ) -> usize {
+        (**self).bytes_needed()
+    }
+}
