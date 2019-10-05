@@ -3,6 +3,7 @@ use std::io;
 use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::endianness::Endianness;
 use crate::writable::Writable;
@@ -21,6 +22,92 @@ fn write_length< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
     }
 
     writer.write_u32( length as u32 )
+}
+
+impl< C, K, V > Writable< C > for BTreeMap< K, V >
+    where C: Context,
+          K: Writable< C >,
+          V: Writable< C >
+{
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
+        write_length( self.len(), writer )?;
+        writer.write_collection( self.iter() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        let mut count = mem::size_of::< u32 >();
+        for (key, value) in self {
+            count += key.bytes_needed() + value.bytes_needed();
+        }
+
+        count
+    }
+}
+
+impl< C, T > Writable< C > for BTreeSet< T >
+    where C: Context,
+          T: Writable< C >
+{
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
+        write_length( self.len(), writer )?;
+        writer.write_collection( self.iter() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        let mut count = mem::size_of::< u32 >();
+        for value in self {
+            count += value.bytes_needed();
+        }
+
+        count
+    }
+}
+
+impl< C, K, V, S > Writable< C > for HashMap< K, V, S >
+    where C: Context,
+          K: Writable< C >,
+          V: Writable< C >
+{
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
+        write_length( self.len(), writer )?;
+        writer.write_collection( self.iter() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        let mut count = mem::size_of::< u32 >();
+        for (key, value) in self {
+            count += key.bytes_needed() + value.bytes_needed();
+        }
+
+        count
+    }
+}
+
+impl< C, T, S > Writable< C > for HashSet< T, S >
+    where C: Context,
+          T: Writable< C >
+{
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
+        write_length( self.len(), writer )?;
+        writer.write_collection( self.iter() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        let mut count = mem::size_of::< u32 >();
+        for value in self {
+            count += value.bytes_needed();
+        }
+
+        count
+    }
 }
 
 macro_rules! impl_for_primitive {

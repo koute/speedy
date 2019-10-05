@@ -2,6 +2,8 @@ use std::io;
 use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::hash::{BuildHasher, Hash};
 
 use crate::readable::Readable;
 use crate::reader::Reader;
@@ -9,6 +11,74 @@ use crate::reader::Reader;
 use crate::context::Context;
 use crate::utils::as_bytes_mut;
 use crate::endianness::Endianness;
+
+impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
+    where C: Context,
+          K: Readable< 'a, C > + Ord,
+          V: Readable< 'a, C >,
+{
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+        let length = reader.read_u32()? as usize;
+        reader.read_collection( length )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        4
+    }
+}
+
+impl< 'a, C, T > Readable< 'a, C > for BTreeSet< T >
+    where C: Context,
+          T: Readable< 'a, C > + Ord
+{
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+        let length = reader.read_u32()? as usize;
+        reader.read_collection( length )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        4
+    }
+}
+
+impl< 'a, C, K, V, S > Readable< 'a, C > for HashMap< K, V, S >
+    where C: Context,
+          K: Readable< 'a, C > + Eq + Hash,
+          V: Readable< 'a, C >,
+          S: BuildHasher + Default
+{
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+        let length = reader.read_u32()? as usize;
+        reader.read_collection( length )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        4
+    }
+}
+
+impl< 'a, C, T, S > Readable< 'a, C > for HashSet< T, S >
+    where C: Context,
+          T: Readable< 'a, C > + Eq + Hash,
+          S: BuildHasher + Default
+{
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+        let length = reader.read_u32()? as usize;
+        reader.read_collection( length )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        4
+    }
+}
 
 impl< 'a, C: Context > Readable< 'a, C > for bool {
     #[inline]

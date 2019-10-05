@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::ops::Range;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 #[allow(unused_imports)]
 use speedy::{Readable, Writable, Endianness};
@@ -308,5 +309,25 @@ symmetric_tests! {
         in = None,
         le = [0],
         be = [0]
+    }
+    hashmap for HashMap< u16, bool > {
+        in = vec![ (10, true) ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1]
+    }
+    hashset for HashSet< u16 > {
+        in = vec![ 10 ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0],
+        be = [0, 0, 0, 1, 0, 10]
+    }
+    btreemap for BTreeMap< u16, bool > {
+        in = vec![ (10, true), (20, false) ].into_iter().collect(),
+        le = [2, 0, 0, 0, 10, 0, 1, 20, 0, 0],
+        be = [0, 0, 0, 2, 0, 10, 1, 0, 20, 0]
+    }
+    btreeset for BTreeSet< u16 > {
+        in = vec![ 10, 20 ].into_iter().collect(),
+        le = [2, 0, 0, 0, 10, 0, 20, 0],
+        be = [0, 0, 0, 2, 0, 10, 0, 20]
     }
 }
