@@ -23,11 +23,6 @@ pub use crate::writer::Writer;
 pub use crate::endianness::Endianness;
 pub use crate::context::Context;
 
-#[doc(hidden)]
-pub mod private {
-    pub use crate::writable_impl::write_slice;
-}
-
 #[cfg(test)]
 mod tests {
     use std::io;

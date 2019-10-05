@@ -290,7 +290,7 @@ fn writable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
                 if #expr.len() != __expected as usize {
                     return Err( std::io::Error::new( std::io::ErrorKind::InvalidData, #error_message ) );
                 }
-                speedy::private::write_slice( &#expr, _writer_ )?;
+                _writer_.write_slice( &#expr )?;
             }
         } else {
             quote! { _writer_.write_value( #expr )?; }

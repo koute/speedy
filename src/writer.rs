@@ -56,4 +56,19 @@ pub trait Writer< C: Context > {
     fn write_value< T: Writable< C > >( &mut self, item: &T ) -> io::Result< () > {
         item.write_to( self )
     }
+
+    #[inline]
+    fn write_slice< T >( &mut self, slice: &[T] ) -> io::Result< () >
+        where T: Writable< C >
+    {
+        if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !self.endianness().conversion_necessary()) {
+            let bytes = unsafe { T::speedy_slice_as_bytes( slice ) };
+            self.write_bytes( bytes )
+        } else {
+            for value in slice {
+                self.write_value( value )?;
+            }
+            Ok(())
+        }
+    }
 }
