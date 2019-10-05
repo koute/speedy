@@ -1,6 +1,7 @@
 use std::io;
 use std::mem;
 use std::borrow::Cow;
+use std::iter::FromIterator;
 
 use crate::endianness::Endianness;
 use crate::readable::Readable;
@@ -144,5 +145,13 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         Ok( Cow::Owned( self.read_vec( length )? ) )
+    }
+
+    #[inline]
+    fn read_collection< T, U >( &mut self, length: usize ) -> io::Result< U >
+        where U: FromIterator< T >,
+              T: Readable< 'a, C >
+    {
+        (0..length).into_iter().map( |_| self.read_value::< T >() ).collect()
     }
 }
