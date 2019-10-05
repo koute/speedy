@@ -71,4 +71,15 @@ pub trait Writer< C: Context > {
             Ok(())
         }
     }
+
+    #[inline]
+    fn write_collection< T >( &mut self, collection: impl IntoIterator< Item = T > ) -> io::Result< () >
+        where T: Writable< C >
+    {
+        for item in collection {
+            item.write_to( self )?;
+        }
+
+        Ok(())
+    }
 }
