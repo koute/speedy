@@ -97,6 +97,19 @@ impl< 'a, C: Context > Readable< 'a, C > for bool {
     }
 }
 
+impl< 'a, C: Context > Readable< 'a, C > for char {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+        let value = reader.read_u32()?;
+        std::char::from_u32( value ).ok_or_else( || io::Error::new( io::ErrorKind::InvalidData, "out of range char" ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        4
+    }
+}
+
 macro_rules! impl_for_primitive {
     ($type:ty, $getter:ident, $endianness_swap:ident) => {
         impl< 'a, C: Context > Readable< 'a, C > for $type {

@@ -173,6 +173,18 @@ impl< C: Context > Writable< C > for bool {
     }
 }
 
+impl< C: Context > Writable< C > for char {
+    #[inline]
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
+        writer.write_u32( *self as u32 )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> usize {
+        mem::size_of::< u32 >()
+    }
+}
+
 impl< C: Context > Writable< C > for String {
     #[inline]
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
