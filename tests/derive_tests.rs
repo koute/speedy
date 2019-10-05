@@ -100,6 +100,20 @@ struct DerivedTupleStructWithVecWithCount(
     Vec< bool >
 );
 
+mod inner {
+    use speedy::{Readable, Writable};
+
+    #[derive(Readable, Writable)]
+    struct Private {
+    }
+
+    // This is here only to make sure it compiles.
+    #[derive(Readable, Writable)]
+    pub struct Public {
+        field: Vec< Private >
+    }
+}
+
 macro_rules! define_test {
     ($($name:ident: $value:expr, $serialized:expr)*) => { $(
         #[test]

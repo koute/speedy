@@ -100,7 +100,7 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
             let possibly_generic = possibly_uses_generic_ty( &generics, ty );
             match (variant, possibly_generic) {
                 (Variant::Readable, true) => Some( quote! { #ty: speedy::Readable< 'a_, C_ > } ),
-                (Variant::Readable, false) => Some( quote! { #ty: 'a_ } ),
+                (Variant::Readable, false) => None,
                 (Variant::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
                 (Variant::Writable, false) => None
             }
@@ -113,9 +113,8 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
 
         if variant == Variant::Readable {
             for lifetime in ast.generics.lifetimes() {
-                predicates.push(
-                    quote! { 'a_: #lifetime }
-                );
+                predicates.push( quote! { 'a_: #lifetime } );
+                predicates.push( quote! { #lifetime: 'a_ } );
             }
         }
 
