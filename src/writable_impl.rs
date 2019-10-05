@@ -11,6 +11,18 @@ use crate::writer::Writer;
 use crate::context::Context;
 use crate::utils::as_bytes;
 
+#[inline]
+fn write_length< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+    where C: Context,
+          W: ?Sized + Writer< C >
+{
+    if length as u64 > std::u32::MAX as u64 {
+         return Err( io::Error::new( io::ErrorKind::InvalidData, "out of range length" ) );
+    }
+
+    writer.write_u32( length as u32 )
+}
+
 macro_rules! impl_for_primitive {
     ($type:ty, $write_name:ident) => {
         impl< C: Context > Writable< C > for $type {
@@ -113,7 +125,7 @@ impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
 impl< C: Context, T: Writable< C > > Writable< C > for [T] {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> io::Result< () > {
-        writer.write_u32( self.len() as _ )?;
+        write_length( self.len(), writer )?;
         writer.write_slice( self )
     }
 
