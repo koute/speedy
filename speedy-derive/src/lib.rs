@@ -358,7 +358,7 @@ impl EnumCtx {
 }
 
 fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
-    if field.default_on_eof {
+    if field.default_on_eof || field.count.is_some() {
         None
     } else {
         let ty = &field.ty;

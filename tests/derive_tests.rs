@@ -263,4 +263,7 @@ fn test_minimum_bytes_needed() {
     assert_eq!( <DerivedStructWithLifetimeBytes as Readable< Endianness >>::minimum_bytes_needed(), 4 );
     assert_eq!( <DerivedStructWithLifetimeStr as Readable< Endianness >>::minimum_bytes_needed(), 4 );
     assert_eq!( <DerivedStructWithDefaultOnEof as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedStructWithVecWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedStructWithCowWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedTupleStructWithVecWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
 }
