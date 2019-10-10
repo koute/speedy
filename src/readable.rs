@@ -92,6 +92,10 @@ pub trait Readable< 'a, C: Context >: Sized {
 
     #[inline]
     fn read_from_buffer( context: C, buffer: &'a [u8] ) -> io::Result< Self > {
+        if buffer.len() < Self::minimum_bytes_needed() {
+            return Err( eof() );
+        }
+
         let mut reader = BufferReader { context, position: 0, slice: buffer };
         Self::read_from( &mut reader )
     }
