@@ -7,10 +7,21 @@ use crate::endianness::Endianness;
 use crate::readable::Readable;
 use crate::context::Context;
 
+#[inline(never)]
+#[cold]
+fn eof() -> io::Error {
+    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input" )
+}
+
 pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () >;
     fn context( &self ) -> &C;
     fn context_mut( &mut self ) -> &mut C;
+
+    #[inline(always)]
+    fn remaining_bytes( &self ) -> Option< usize > {
+        None
+    }
 
     #[inline(always)]
     fn read_bytes_borrowed( &mut self, _length: usize ) -> Option< io::Result< &'a [u8] > > {
@@ -104,20 +115,37 @@ pub trait Reader< 'a, C: Context >: Sized {
     fn read_vec< T >( &mut self, length: usize ) -> io::Result< Vec< T > >
         where T: Readable< 'a, C >
     {
-        let mut vec = Vec::with_capacity( length );
         if T::speedy_is_primitive() {
+            let mut vec = Vec::with_capacity( length );
             unsafe {
                 vec.set_len( length );
                 self.read_bytes( T::speedy_slice_as_bytes_mut( &mut vec ) )?;
             }
             T::speedy_convert_slice_endianness( self.endianness(), &mut vec );
+            Ok( vec )
         } else {
-            for _ in 0..length {
-                vec.push( self.read_value()? );
+            if let Some( remaining ) = self.remaining_bytes() {
+                let (required, overflow) = T::minimum_bytes_needed().overflowing_mul( length );
+                if overflow || remaining < required {
+                    return Err( eof() );
+                }
             }
-        }
 
-        Ok( vec )
+            let mut vec: Vec< T > = Vec::with_capacity( length );
+            for _ in 0..length {
+                let value = self.read_value()?;
+
+                // If we don't do this then for some reason LLVM has trouble
+                // eliding the Vec's realloc.
+                let length = vec.len();
+                unsafe {
+                    vec.set_len( length + 1 );
+                    std::ptr::write( vec.as_mut_ptr().offset( length as isize ), value );
+                }
+            }
+
+            Ok( vec )
+        }
     }
 
     #[inline]

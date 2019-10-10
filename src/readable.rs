@@ -42,6 +42,11 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
+    fn remaining_bytes( &self ) -> Option< usize > {
+        Some( self.slice.len() - self.position )
+    }
+
+    #[inline(always)]
     fn context( &self ) -> &C {
         &self.context
     }
@@ -69,6 +74,11 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
         output.copy_from_slice( bytes );
 
         Ok(())
+    }
+
+    #[inline(always)]
+    fn remaining_bytes( &self ) -> Option< usize > {
+        Some( self.slice.len() - self.position )
     }
 
     #[inline(always)]
