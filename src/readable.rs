@@ -52,6 +52,36 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 }
 
+struct CopyingBufferReader< 'a, C > where C: Context {
+    context: C,
+    position: usize,
+    slice: &'a [u8]
+}
+
+impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
+    #[inline(always)]
+    fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
+        let length = output.len();
+        let position = self.position;
+        self.position += length;
+
+        let bytes = self.slice.get( position..position + length ).ok_or_else( eof )?;
+        output.copy_from_slice( bytes );
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn context( &self ) -> &C {
+        &self.context
+    }
+
+    #[inline(always)]
+    fn context_mut( &mut self ) -> &mut C {
+        &mut self.context
+    }
+}
+
 struct StreamReader< C: Context, S: Read > {
     context: C,
     reader: S
@@ -101,8 +131,13 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer_owned( context: C, mut buffer: &[u8] ) -> io::Result< Self > {
-        StreamReader::deserialize( context, &mut buffer )
+    fn read_from_buffer_owned( context: C, buffer: &[u8] ) -> io::Result< Self > {
+        if buffer.len() < Self::minimum_bytes_needed() {
+            return Err( eof() );
+        }
+
+        let mut reader = CopyingBufferReader { context, position: 0, slice: buffer };
+        Self::read_from( &mut reader )
     }
 
     #[inline]
