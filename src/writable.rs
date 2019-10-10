@@ -184,6 +184,7 @@ pub trait Writable< C: Context > {
 
     #[inline]
     fn write_to_buffer( &self, context: C, buffer: &mut [u8] ) -> io::Result< () > {
+        let buffer = buffer.get_mut( 0..self.bytes_needed() ).ok_or_else( eof )?;
         let mut writer = BufferCollector {
             context,
             buffer,
