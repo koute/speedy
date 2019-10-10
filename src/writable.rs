@@ -13,6 +13,79 @@ use crate::writer::Writer;
 use crate::context::Context;
 use crate::endianness::Endianness;
 
+#[inline(never)]
+#[cold]
+fn eof() -> io::Error {
+    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of output buffer" )
+}
+
+struct BufferCollector< 'a, C: Context > {
+    context: C,
+    buffer: &'a mut [u8],
+    position: usize
+}
+
+impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
+    #[inline]
+    fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () > {
+        let buffer = self.buffer.get_mut( self.position..self.position + slice.len() ).ok_or_else( eof )?;
+        buffer.copy_from_slice( slice );
+        self.position += slice.len();
+        Ok(())
+    }
+
+    #[inline]
+    fn write_u8( &mut self, value: u8 ) -> io::Result< () > {
+        if self.position >= self.buffer.len() {
+            return Err( eof() );
+        }
+
+        self.buffer[ self.position ] = value;
+        self.position += 1;
+        Ok(())
+    }
+
+    #[inline]
+    fn write_u16( &mut self, mut value: u16 ) -> io::Result< () > {
+        let buffer = self.buffer.get_mut( self.position..self.position + 2 ).ok_or_else( eof )?;
+        self.context.endianness().swap_u16( &mut value );
+        let value = unsafe { std::slice::from_raw_parts( &value as *const u16 as *const u8, 2 ) };
+        buffer.copy_from_slice( value );
+        self.position += 2;
+        Ok(())
+    }
+
+    #[inline]
+    fn write_u32( &mut self, mut value: u32 ) -> io::Result< () > {
+        let buffer = self.buffer.get_mut( self.position..self.position + 4 ).ok_or_else( eof )?;
+        self.context.endianness().swap_u32( &mut value );
+        let value = unsafe { std::slice::from_raw_parts( &value as *const u32 as *const u8, 4 ) };
+        buffer.copy_from_slice( value );
+        self.position += 4;
+        Ok(())
+    }
+
+    #[inline]
+    fn write_u64( &mut self, mut value: u64 ) -> io::Result< () > {
+        let buffer = self.buffer.get_mut( self.position..self.position + 8 ).ok_or_else( eof )?;
+        self.context.endianness().swap_u64( &mut value );
+        let value = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 8 ) };
+        buffer.copy_from_slice( value );
+        self.position += 8;
+        Ok(())
+    }
+
+    #[inline]
+    fn context( &self ) -> &C {
+        &self.context
+    }
+
+    #[inline]
+    fn context_mut( &mut self ) -> &mut C {
+        &mut self.context
+    }
+}
+
 struct WritingCollector< C: Context, T: Write > {
     context: C,
     writer: T
@@ -111,8 +184,14 @@ pub trait Writable< C: Context > {
 
     #[inline]
     fn write_to_buffer( &self, context: C, buffer: &mut [u8] ) -> io::Result< () > {
-        let mut cursor = Cursor::new( buffer );
-        self.write_to_stream( context, &mut cursor )
+        let mut writer = BufferCollector {
+            context,
+            buffer,
+            position: 0
+        };
+
+        self.write_to( &mut writer )?;
+        Ok(())
     }
 
     #[inline]
