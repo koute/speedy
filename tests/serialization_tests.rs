@@ -77,6 +77,30 @@ macro_rules! symmetric_tests {
                 let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
                 assert_eq!( serialized, $be_bytes );
             }
+
+            #[test]
+            fn serialize_to_buffer_le() {
+                let original: $type = $value;
+                let mut buffer = Vec::new();
+                buffer.resize( Writable::< Endianness >::bytes_needed( &original ), 0xff );
+                original.write_to_buffer( Endianness::LittleEndian, &mut buffer ).unwrap();
+                assert_eq!( buffer, $le_bytes );
+
+                let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
+                assert_eq!( buffer, serialized );
+            }
+
+            #[test]
+            fn serialize_to_buffer_be() {
+                let original: $type = $value;
+                let mut buffer = Vec::new();
+                buffer.resize( Writable::< Endianness >::bytes_needed( &original ), 0xff );
+                original.write_to_buffer( Endianness::BigEndian, &mut buffer ).unwrap();
+                assert_eq!( buffer, $be_bytes );
+
+                let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
+                assert_eq!( buffer, serialized );
+            }
         }
     )* }
 }
