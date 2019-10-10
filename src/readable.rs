@@ -10,6 +10,12 @@ use crate::reader::Reader;
 use crate::context::Context;
 use crate::endianness::Endianness;
 
+#[inline(never)]
+#[cold]
+fn eof() -> io::Error {
+    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input buffer" )
+}
+
 struct BufferReader< 'a, C > where C: Context {
     context: C,
     position: usize,
@@ -31,9 +37,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
         let position = self.position;
         self.position += length;
 
-        let result = self.slice.get( position..position + length )
-            .ok_or_else( || io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of file" ) );
-
+        let result = self.slice.get( position..position + length ).ok_or_else( eof );
         Some( result )
     }
 
