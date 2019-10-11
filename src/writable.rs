@@ -1,7 +1,6 @@
 use std::io::{
     self,
-    Write,
-    Cursor
+    Write
 };
 
 use std::fs::File;
