@@ -151,6 +151,11 @@ pub trait Reader< 'a, C: Context >: Sized {
     fn read_vec< T >( &mut self, length: usize ) -> io::Result< Vec< T > >
         where T: Readable< 'a, C >
     {
+        let (required, overflow) = T::minimum_bytes_needed().overflowing_mul( length );
+        if overflow || self.can_read_at_least( required ) == Some( false ) {
+            return Err( eof() );
+        }
+
         if T::speedy_is_primitive() {
             let mut vec = Vec::with_capacity( length );
             unsafe {
