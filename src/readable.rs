@@ -34,10 +34,8 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
 
     #[inline(always)]
     fn read_bytes_borrowed( &mut self, length: usize ) -> Option< io::Result< &'a [u8] > > {
-        let position = self.position;
+        let result = self.slice.get( self.position..self.position + length ).ok_or_else( eof );
         self.position += length;
-
-        let result = self.slice.get( position..position + length ).ok_or_else( eof );
         Some( result )
     }
 
@@ -67,10 +65,8 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
     #[inline(always)]
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
         let length = output.len();
-        let position = self.position;
+        let bytes = self.slice.get( self.position..self.position + length ).ok_or_else( eof )?;
         self.position += length;
-
-        let bytes = self.slice.get( position..position + length ).ok_or_else( eof )?;
         output.copy_from_slice( bytes );
 
         Ok(())
