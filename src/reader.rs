@@ -19,7 +19,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     fn context_mut( &mut self ) -> &mut C;
 
     #[inline(always)]
-    fn remaining_bytes( &self ) -> Option< usize > {
+    fn can_read_at_least( &self, _size: usize ) -> Option< bool > {
         None
     }
 
@@ -124,13 +124,6 @@ pub trait Reader< 'a, C: Context >: Sized {
             T::speedy_convert_slice_endianness( self.endianness(), &mut vec );
             Ok( vec )
         } else {
-            if let Some( remaining ) = self.remaining_bytes() {
-                let (required, overflow) = T::minimum_bytes_needed().overflowing_mul( length );
-                if overflow || remaining < required {
-                    return Err( eof() );
-                }
-            }
-
             let mut vec: Vec< T > = Vec::with_capacity( length );
             for _ in 0..length {
                 let value = self.read_value()?;

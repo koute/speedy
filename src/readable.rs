@@ -42,8 +42,8 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
-    fn remaining_bytes( &self ) -> Option< usize > {
-        Some( self.slice.len() - self.position )
+    fn can_read_at_least( &self, size: usize ) -> Option< bool > {
+        Some( self.slice.get( self.position..self.position + size ).is_some() )
     }
 
     #[inline(always)]
@@ -77,8 +77,8 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
     }
 
     #[inline(always)]
-    fn remaining_bytes( &self ) -> Option< usize > {
-        Some( self.slice.len() - self.position )
+    fn can_read_at_least( &self, size: usize ) -> Option< bool > {
+        Some( self.slice.get( self.position..self.position + size ).is_some() )
     }
 
     #[inline(always)]
