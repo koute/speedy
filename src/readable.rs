@@ -5,6 +5,7 @@ use std::io::{
 
 use std::fs::File;
 use std::path::Path;
+use std::marker::PhantomData;
 
 use crate::reader::Reader;
 use crate::context::Context;
@@ -18,30 +19,45 @@ fn eof() -> io::Error {
 
 struct BufferReader< 'a, C > where C: Context {
     context: C,
-    position: usize,
-    slice: &'a [u8]
+    ptr: *const u8,
+    end: *const u8,
+    phantom: PhantomData< &'a [u8] >
 }
 
 impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     #[inline(always)]
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
         let length = output.len();
-        let bytes = self.read_bytes_borrowed( length ).unwrap()?;
-        output.copy_from_slice( bytes );
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( eof() );
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
+            self.ptr = self.ptr.add( length );
+        }
 
         Ok(())
     }
 
     #[inline(always)]
     fn read_bytes_borrowed( &mut self, length: usize ) -> Option< io::Result< &'a [u8] > > {
-        let result = self.slice.get( self.position..self.position + length ).ok_or_else( eof );
-        self.position += length;
-        Some( result )
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Some( Err( eof() ) );
+        }
+
+        let slice;
+        unsafe {
+            slice = std::slice::from_raw_parts( self.ptr, length );
+            self.ptr = self.ptr.add( length );
+        }
+
+        Some( Ok( slice ) )
     }
 
     #[inline(always)]
     fn can_read_at_least( &self, size: usize ) -> Option< bool > {
-        Some( self.slice.get( self.position..self.position + size ).is_some() )
+        Some( (self.end as usize - self.ptr as usize) >= size )
     }
 
     #[inline(always)]
@@ -57,24 +73,30 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
 
 struct CopyingBufferReader< 'a, C > where C: Context {
     context: C,
-    position: usize,
-    slice: &'a [u8]
+    ptr: *const u8,
+    end: *const u8,
+    phantom: PhantomData< &'a [u8] >
 }
 
 impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
     #[inline(always)]
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
         let length = output.len();
-        let bytes = self.slice.get( self.position..self.position + length ).ok_or_else( eof )?;
-        self.position += length;
-        output.copy_from_slice( bytes );
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( eof() );
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
+            self.ptr = self.ptr.add( length );
+        }
 
         Ok(())
     }
 
     #[inline(always)]
     fn can_read_at_least( &self, size: usize ) -> Option< bool > {
-        Some( self.slice.get( self.position..self.position + size ).is_some() )
+        Some( (self.end as usize - self.ptr as usize) >= size )
     }
 
     #[inline(always)]
@@ -132,7 +154,13 @@ pub trait Readable< 'a, C: Context >: Sized {
             return Err( eof() );
         }
 
-        let mut reader = BufferReader { context, position: 0, slice: buffer };
+        let mut reader = BufferReader {
+            context,
+            ptr: buffer.as_ptr(),
+            end: unsafe { buffer.as_ptr().add( buffer.len() ) },
+            phantom: PhantomData
+        };
+
         Self::read_from( &mut reader )
     }
 
@@ -142,7 +170,13 @@ pub trait Readable< 'a, C: Context >: Sized {
             return Err( eof() );
         }
 
-        let mut reader = CopyingBufferReader { context, position: 0, slice: buffer };
+        let mut reader = CopyingBufferReader {
+            context,
+            ptr: buffer.as_ptr(),
+            end: unsafe { buffer.as_ptr().add( buffer.len() ) },
+            phantom: PhantomData
+        };
+
         Self::read_from( &mut reader )
     }
 
