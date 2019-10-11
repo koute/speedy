@@ -30,6 +30,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_u8( &mut self ) -> io::Result< u8 > {
+        if self.can_read_at_least( 1 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 1] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( slice[0] )
@@ -42,6 +46,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_u16( &mut self ) -> io::Result< u16 > {
+        if self.can_read_at_least( 2 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 2] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( self.context().endianness().read_u16( &slice ) )
@@ -49,6 +57,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_i16( &mut self ) -> io::Result< i16 > {
+        if self.can_read_at_least( 2 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 2] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( self.context().endianness().read_i16( &slice ) )
@@ -56,6 +68,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_u32( &mut self ) -> io::Result< u32 > {
+        if self.can_read_at_least( 4 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 4] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( self.context().endianness().read_u32( &slice ) )
@@ -63,6 +79,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_i32( &mut self ) -> io::Result< i32 > {
+        if self.can_read_at_least( 4 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 4] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( self.context().endianness().read_i32( &slice ) )
@@ -70,6 +90,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_u64( &mut self ) -> io::Result< u64 > {
+        if self.can_read_at_least( 8 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 8] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( self.context().endianness().read_u64( &slice ) )
@@ -77,6 +101,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_i64( &mut self ) -> io::Result< i64 > {
+        if self.can_read_at_least( 8 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 8] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( self.context().endianness().read_i64( &slice ) )
@@ -84,6 +112,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_f32( &mut self ) -> io::Result< f32 > {
+        if self.can_read_at_least( 4 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 4] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( self.context().endianness().read_f32( &slice ) )
@@ -91,6 +123,10 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_f64( &mut self ) -> io::Result< f64 > {
+        if self.can_read_at_least( 8 ) == Some( false ) {
+            return Err( eof() );
+        }
+
         let mut slice: [u8; 8] = unsafe { mem::uninitialized() };
         self.read_bytes( &mut slice )?;
         Ok( self.context().endianness().read_f64( &slice ) )
