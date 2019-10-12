@@ -129,6 +129,19 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
     (impl_params, ty_params, where_clause)
 }
 
+struct Struct< 'a > {
+    fields: Vec< Field< 'a > >
+}
+
+impl< 'a > Struct< 'a > {
+    fn new( fields: impl IntoIterator< Item = &'a syn::Field > + 'a ) -> Self {
+        let fields: Vec< _ > = get_fields( fields.into_iter() ).collect();
+        Struct {
+            fields
+        }
+    }
+}
+
 struct Field< 'a > {
     index: usize,
     name: Option< &'a syn::Ident >,
@@ -155,20 +168,20 @@ impl< 'a > Field< 'a > {
     }
 }
 
-enum Attribute {
+enum FieldAttribute {
     DefaultOnEof,
     Count( syn::Expr )
 }
 
-impl syn::parse::Parse for Attribute {
+impl syn::parse::Parse for FieldAttribute {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let key: syn::Ident = input.parse()?;
         let value = match key.to_string().as_str() {
-            "default_on_eof" => Attribute::DefaultOnEof,
+            "default_on_eof" => FieldAttribute::DefaultOnEof,
             "count" => {
                 let _: Token![=] = input.parse()?;
                 let expr: syn::Expr = input.parse()?;
-                Attribute::Count( expr )
+                FieldAttribute::Count( expr )
             },
             key => panic!( "Unrecognized attribute: '{}'", key )
         };
@@ -177,13 +190,13 @@ impl syn::parse::Parse for Attribute {
     }
 }
 
-struct Attributes( syn::punctuated::Punctuated< Attribute, Token![,] > );
+struct FieldAttributes( syn::punctuated::Punctuated< FieldAttribute, Token![,] > );
 
-impl syn::parse::Parse for Attributes {
+impl syn::parse::Parse for FieldAttributes {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let content;
         parenthesized!( content in input );
-        Ok( Attributes( content.parse_terminated( Attribute::parse )? ) )
+        Ok( FieldAttributes( content.parse_terminated( FieldAttribute::parse )? ) )
     }
 }
 
@@ -196,11 +209,11 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             for attr in &field.attrs {
                 let path = attr.path.clone().into_token_stream().to_string();
                 if path == "speedy" {
-                    let parsed_attrs: Attributes = syn::parse2( attr.tokens.clone() ).unwrap();
+                    let parsed_attrs: FieldAttributes = syn::parse2( attr.tokens.clone() ).unwrap();
                     for attr in parsed_attrs.0 {
                         match attr {
-                            Attribute::DefaultOnEof => default_on_eof = true,
-                            Attribute::Count( expr ) => count = Some( expr )
+                            FieldAttribute::DefaultOnEof => default_on_eof = true,
+                            FieldAttribute::Count( expr ) => count = Some( expr ),
                         }
                     }
                 }
@@ -227,36 +240,37 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
     iter
 }
 
-fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (TokenStream, TokenStream, TokenStream)
-    where I: IntoIterator< Item = &'a syn::Field > + 'a
-{
-    let fields = fields.into_iter();
+fn read_field_body( count: Option< syn::Expr >, default_on_eof: bool ) -> TokenStream {
+    let body = if let Some( ref count ) = count {
+        quote! { _reader_.read_vec( (#count) as usize ).map( |_value_| _value_.into() ) }
+    } else {
+        quote! { _reader_.read_value() }
+    };
+
+    if default_on_eof {
+        quote! {
+            match #body {
+                Ok( value ) => value,
+                Err( ref error ) if error.kind() == std::io::ErrorKind::UnexpectedEof => std::default::Default::default(),
+                Err( error ) => return Err( error )
+            }
+        }
+    } else {
+        quote! { #body? }
+    }
+}
+
+fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> (TokenStream, TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_readers = Vec::new();
     let mut minimum_bytes_needed = Vec::new();
-    for field in get_fields( fields ) {
-        let ident = field.var_name();
+    for field in st.fields {
         types.push( field.ty );
+        let name = field.var_name();
 
-        let body = if let Some( ref count ) = field.count {
-            quote! { _reader_.read_vec( (#count) as usize ).map( |_value_| _value_.into() ) }
-        } else {
-            quote! { _reader_.read_value() }
-        };
-
-        let name = quote! { #ident };
+        let read_value = read_field_body( field.count.clone(), field.default_on_eof );
+        field_readers.push( quote! { let #name = #read_value; } );
         field_names.push( name );
-        if field.default_on_eof {
-            field_readers.push( quote! {
-                let #ident = match #body {
-                    Ok( value ) => value,
-                    Err( ref error ) if error.kind() == std::io::ErrorKind::UnexpectedEof => std::default::Default::default(),
-                    Err( error ) => return Err( error )
-                };
-            });
-        } else {
-            field_readers.push( quote! { let #ident = #body?; } );
-        }
 
         if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
             minimum_bytes_needed.push( minimum_bytes );
@@ -269,33 +283,32 @@ fn readable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (Tok
     (body, initializer, minimum_bytes_needed)
 }
 
-fn writable_body< 'a, I >( types: &mut Vec< &'a syn::Type >, fields: I ) -> (TokenStream, TokenStream)
-    where I: IntoIterator< Item = Field< 'a > > + 'a
-{
-    let fields = fields.into_iter();
+fn write_field_body( name: &syn::Ident, count: Option< syn::Expr > ) -> TokenStream {
+    if let Some( count ) = count {
+        let error_message = format!( "the length of '{}' is not the same as its 'count' attribute", name );
+        quote! {
+            let __expected = #count;
+            if #name.len() != __expected as usize {
+                return Err( std::io::Error::new( std::io::ErrorKind::InvalidData, #error_message ) );
+            }
+            _writer_.write_slice( &#name )?;
+        }
+    } else {
+        quote! { _writer_.write_value( #name )?; }
+    }
+}
+
+fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> (TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
-    for field in fields {
+    for field in st.fields {
         types.push( field.ty );
 
-        let var_name = field.var_name();
-        field_names.push( var_name.clone() );
-        let expr = quote! { #var_name };
+        let name = field.var_name();
+        field_names.push( name.clone() );
 
-        let body = if let Some( count ) = field.count {
-            let error_message = format!( "the length of '{}' is not the same as its 'count' attribute", var_name );
-            quote! {
-                let __expected = #count;
-                if #expr.len() != __expected as usize {
-                    return Err( std::io::Error::new( std::io::ErrorKind::InvalidData, #error_message ) );
-                }
-                _writer_.write_slice( &#expr )?;
-            }
-        } else {
-            quote! { _writer_.write_value( #expr )?; }
-        };
-
-        field_writers.push( body );
+        let write_value = write_field_body( &name, field.count.clone() );
+        field_writers.push( write_value );
     }
 
     let body = quote! { #(#field_writers)* };
@@ -397,7 +410,8 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
     let mut types = Vec::new();
     let (reader_body, minimum_bytes_needed_body) = match &input.data {
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { named, .. } ), .. } ) => {
-            let (body, initializer, minimum_bytes) = readable_body( &mut types, named );
+            let st = Struct::new( named );
+            let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
             let reader_body = quote! {
                 #body
                 Ok( #name { #initializer } )
@@ -405,7 +419,8 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
             (reader_body, minimum_bytes)
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { unnamed, .. } ), .. } ) => {
-            let (body, initializer, minimum_bytes) = readable_body( &mut types, unnamed );
+            let st = Struct::new( unnamed );
+            let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
             let reader_body = quote! {
                 #body
                 Ok( #name( #initializer ) )
@@ -424,7 +439,8 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
 
                     match variant.fields {
                         syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
-                            let (body, initializer, minimum_bytes) = readable_body( &mut types, named );
+                            let st = Struct::new( named );
+                            let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
                             variant_matches.push( quote! {
                                 #kind => {
                                     #body
@@ -434,7 +450,8 @@ fn impl_readable( input: syn::DeriveInput ) -> TokenStream {
                             variant_minimum_sizes.push( minimum_bytes );
                         },
                         syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
-                            let (body, initializer, minimum_bytes) = readable_body( &mut types, unnamed );
+                            let st = Struct::new( unnamed );
+                            let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
                             variant_matches.push( quote! {
                                 #kind => {
                                     #body
@@ -514,18 +531,18 @@ fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
             quote! {}
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { ref named, .. } ), .. } ) => {
-            let fields: Vec< _ > = get_fields( named ).collect();
-            let assignments = assign_to_variables( &fields );
-            let (body, _) = writable_body( &mut types, fields );
+            let st = Struct::new( named );
+            let assignments = assign_to_variables( &st.fields );
+            let (body, _) = writable_body( &mut types, st );
             quote! {
                 #assignments
                 #body
             }
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ), .. } ) => {
-            let fields: Vec< _ > = get_fields( unnamed ).collect();
-            let assignments = assign_to_variables( &fields );
-            let (body, _) = writable_body( &mut types, fields );
+            let st = Struct::new( unnamed );
+            let assignments = assign_to_variables( &st.fields );
+            let (body, _) = writable_body( &mut types, st );
             quote! {
                 #assignments
                 #body
@@ -540,7 +557,8 @@ fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
                     let variant_path = quote! { #name::#unqualified_ident };
                     match variant.fields {
                         syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
-                            let (body, identifiers) = writable_body( &mut types, get_fields( named ) );
+                            let st = Struct::new( named );
+                            let (body, identifiers) = writable_body( &mut types, st );
                             quote! {
                                 #variant_path { #identifiers } => {
                                     _writer_.write_value( &#kind )?;
@@ -549,7 +567,8 @@ fn impl_writable( input: syn::DeriveInput ) -> TokenStream {
                             }
                         },
                         syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
-                            let (body, identifiers) = writable_body( &mut types, get_fields( unnamed ) );
+                            let st = Struct::new( unnamed );
+                            let (body, identifiers) = writable_body( &mut types, st );
                             quote! {
                                 #variant_path( #identifiers ) => {
                                     _writer_.write_value( &#kind )?;
