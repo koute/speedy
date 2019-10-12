@@ -19,6 +19,19 @@ pub trait Reader< 'a, C: Context >: Sized {
     fn context_mut( &mut self ) -> &mut C;
 
     #[inline(always)]
+    fn skip_bytes( &mut self, mut length: usize ) -> io::Result< () > {
+        while length > 0 {
+            const CHUNK_SIZE: usize = 1024;
+            let mut dummy_buffer: [u8; CHUNK_SIZE] = unsafe { std::mem::uninitialized() };
+            let chunk_size = if length < CHUNK_SIZE { length } else { CHUNK_SIZE };
+            self.read_bytes( &mut dummy_buffer[ 0..chunk_size ] )?;
+            length -= chunk_size;
+        }
+
+        Ok(())
+    }
+
+    #[inline(always)]
     fn can_read_at_least( &self, _size: usize ) -> Option< bool > {
         None
     }

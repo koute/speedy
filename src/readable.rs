@@ -41,6 +41,18 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
+    fn skip_bytes( &mut self, length: usize ) -> io::Result< () > {
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( eof() );
+        }
+
+        unsafe {
+            self.ptr = self.ptr.add( length );
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
     fn read_bytes_borrowed( &mut self, length: usize ) -> Option< io::Result< &'a [u8] > > {
         if self.can_read_at_least( length ) == Some( false ) {
             return Some( Err( eof() ) );
@@ -91,6 +103,18 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
             self.ptr = self.ptr.add( length );
         }
 
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn skip_bytes( &mut self, length: usize ) -> io::Result< () > {
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( eof() );
+        }
+
+        unsafe {
+            self.ptr = self.ptr.add( length );
+        }
         Ok(())
     }
 
