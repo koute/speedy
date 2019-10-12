@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fmt::Debug;
 
 #[allow(unused_imports)]
 use speedy::{Readable, Writable, Endianness};
@@ -103,6 +104,117 @@ macro_rules! symmetric_tests {
             }
         }
     )* }
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStruct {
+    /// A doc comment.
+    a: u8,
+    b: u16,
+    c: u32
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedTupleStruct( u8, u16, u32 );
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedUnitStruct;
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedEmptyStruct {}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+enum DerivedSimpleEnum {
+    /// A doc comment.
+    A,
+    B = 10,
+    C
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+enum DerivedEnum {
+    A,
+    B( u8, u16, u32 ),
+    C {
+        /// A doc comment.
+        a: u8,
+        b: u16,
+        c: u32
+    }
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithLifetimeBytes< 'a > {
+    bytes: Cow< 'a, [u8] >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithLifetimeStr< 'a > {
+    inner: Cow< 'a, str >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithGenericCow< 'a, T: 'a + ToOwned + ?Sized > where <T as ToOwned>::Owned: Debug {
+    inner: Cow< 'a, T >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithGenericRef< 'a, T: 'a + ?Sized > {
+    inner: &'a T
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithGeneric< T > {
+    inner: T
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithDefaultOnEof {
+    a: u8,
+    #[speedy(default_on_eof)]
+    b: u16,
+    #[speedy(default_on_eof)]
+    c: u32
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedRecursiveStruct {
+    inner: Vec< DerivedRecursiveStruct >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithCount {
+    length: u8,
+    #[speedy(count = length * 2)]
+    data: Vec< bool >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithCowWithCount< 'a > {
+    length: u8,
+    #[speedy(count = length * 2)]
+    data: Cow< 'a, [bool] >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedTupleStructWithVecWithCount(
+    u8,
+    #[speedy(count = t0 * 2)]
+    Vec< bool >
+);
+
+mod inner {
+    use speedy::{Readable, Writable};
+
+    #[derive(Readable, Writable)]
+    struct Private {
+    }
+
+    // This is here only to make sure it compiles.
+    #[derive(Readable, Writable)]
+    pub struct Public {
+        field: Vec< Private >
+    }
 }
 
 #[derive(Clone, PartialEq, Debug, Readable, Writable)]
@@ -359,4 +471,155 @@ symmetric_tests! {
         le = [0xb9, 0x59, 0, 0],
         be = [0, 0, 0x59, 0xb9]
     }
+    derived_struct for DerivedStruct {
+        in = DerivedStruct { a: 1, b: 2, c: 3 },
+        le = [1, 2, 0, 3, 0, 0, 0],
+        be = [1, 0, 2, 0, 0, 0, 3]
+    }
+    derived_tuple_struct for DerivedTupleStruct {
+        in = DerivedTupleStruct( 1, 2, 3 ),
+        le = [1, 2, 0, 3, 0, 0, 0],
+        be = [1, 0, 2, 0, 0, 0, 3]
+    }
+    derived_unit_struct for DerivedUnitStruct {
+        in = DerivedUnitStruct,
+        le = [],
+        be = []
+    }
+    derived_empty_struct for DerivedEmptyStruct {
+        in = DerivedEmptyStruct {},
+        le = [],
+        be = []
+    }
+    derived_simple_enum_a for DerivedSimpleEnum {
+        in = DerivedSimpleEnum::A,
+        le = [0, 0, 0, 0],
+        be = [0, 0, 0, 0]
+    }
+    derived_simple_enum_b for DerivedSimpleEnum {
+        in = DerivedSimpleEnum::B,
+        le = [10, 0, 0, 0],
+        be = [0, 0, 0, 10]
+    }
+    derived_simple_enum_c for DerivedSimpleEnum {
+        in = DerivedSimpleEnum::C,
+        le = [11, 0, 0, 0],
+        be = [0, 0, 0, 11]
+    }
+    derived_enum_unit_variant for DerivedEnum {
+        in = DerivedEnum::A,
+        le = [0, 0, 0, 0],
+        be = [0, 0, 0, 0]
+    }
+    derived_enum_tuple_variant for DerivedEnum {
+        in = DerivedEnum::B( 10, 20, 30 ),
+        le = [1, 0, 0, 0, 10, 20, 0, 30, 0, 0, 0],
+        be = [0, 0, 0, 1, 10, 0, 20, 0, 0, 0, 30]
+    }
+    derived_enum_struct_variant for DerivedEnum {
+        in = DerivedEnum::C { a: 100, b: 200, c: 300 },
+        le = [2, 0, 0, 0, 100, 200, 0, 44, 1, 0, 0],
+        be = [0, 0, 0, 2, 100, 0, 200, 0, 0, 1, 44]
+    }
+    derived_struct_with_lifetime_bytes for DerivedStructWithLifetimeBytes {
+        in = DerivedStructWithLifetimeBytes { bytes: Cow::Borrowed( &[2, 4, 8] ) },
+        le = [3, 0, 0, 0, 2, 4, 8],
+        be = [0, 0, 0, 3, 2, 4, 8]
+    }
+    derived_struct_with_lifetime_str for DerivedStructWithLifetimeStr {
+        in = DerivedStructWithLifetimeStr { inner: Cow::Borrowed( "ABC" ) },
+        le = [3, 0, 0, 0, 0x41, 0x42, 0x43],
+        be = [0, 0, 0, 3, 0x41, 0x42, 0x43]
+    }
+    derived_struct_with_generic_cow for DerivedStructWithGenericCow< str > {
+        in = DerivedStructWithGenericCow { inner: Cow::Borrowed( "ABC" ) },
+        le = [3, 0, 0, 0, 0x41, 0x42, 0x43],
+        be = [0, 0, 0, 3, 0x41, 0x42, 0x43]
+    }
+    derived_struct_with_generic for DerivedStructWithGeneric< Cow< [u8] > > {
+        in = DerivedStructWithGeneric { inner: Cow::Borrowed( &[1_u8, 2_u8, 3_u8][..] ) },
+        le = [3, 0, 0, 0, 1, 2, 3],
+        be = [0, 0, 0, 3, 1, 2, 3]
+    }
+    derived_recursive_struct_empty for DerivedRecursiveStruct {
+        in = DerivedRecursiveStruct { inner: Vec::new() },
+        le = [0, 0, 0, 0],
+        be = [0, 0, 0, 0]
+    }
+    derived_recursive_struct_one_element for DerivedRecursiveStruct {
+        in = DerivedRecursiveStruct { inner: vec![ DerivedRecursiveStruct { inner: Vec::new() } ] },
+        le = [1, 0, 0, 0, 0, 0, 0, 0],
+        be = [0, 0, 0, 1, 0, 0, 0, 0]
+    }
+    derived_struct_with_vec_with_count for DerivedStructWithVecWithCount {
+        in = DerivedStructWithVecWithCount { length: 2, data: vec![ true, false, false, true ] },
+        le = [2, 1, 0, 0, 1],
+        be = [2, 1, 0, 0, 1]
+    }
+    derived_struct_with_cow_with_count for DerivedStructWithCowWithCount {
+        in = DerivedStructWithCowWithCount { length: 2, data: vec![ true, false, false, true ].into() },
+        le = [2, 1, 0, 0, 1],
+        be = [2, 1, 0, 0, 1]
+    }
+    derived_tuple_struct_with_vec_with_count for DerivedTupleStructWithVecWithCount {
+        in = DerivedTupleStructWithVecWithCount( 2, vec![ true, false, false, true ] ),
+        le = [2, 1, 0, 0, 1],
+        be = [2, 1, 0, 0, 1]
+    }
+}
+
+#[test]
+fn test_derived_struct_with_default_on_eof() {
+    use speedy::{
+       Readable,
+       Endianness
+    };
+
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0, c: 0 } );
+
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA, 0xBB] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0, c: 0 } );
+
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA, 0xBB, 0xCC] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0xCCBB, c: 0 } );
+}
+
+#[test]
+fn test_length_mismatch_with_count_attribute() {
+    use speedy::{
+        Endianness,
+        Writable
+    };
+
+    let err = DerivedStructWithVecWithCount {
+        length: 0,
+        data: vec![ true ]
+    }.write_to_vec( Endianness::LittleEndian ).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "the length of 'data' is not the same as its 'count' attribute"
+    );
+}
+
+#[test]
+fn test_minimum_bytes_needed() {
+    use speedy::{
+        Readable,
+        Endianness
+    };
+
+    assert_eq!( <DerivedStruct as Readable< Endianness >>::minimum_bytes_needed(), 7 );
+    assert_eq!( <DerivedTupleStruct as Readable< Endianness >>::minimum_bytes_needed(), 7 );
+    assert_eq!( <DerivedUnitStruct as Readable< Endianness >>::minimum_bytes_needed(), 0 );
+    assert_eq!( <DerivedEmptyStruct as Readable< Endianness >>::minimum_bytes_needed(), 0 );
+    assert_eq!( <DerivedSimpleEnum as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedEnum as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedStructWithLifetimeBytes as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedStructWithLifetimeStr as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedStructWithDefaultOnEof as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedStructWithVecWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedStructWithCowWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedTupleStructWithVecWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
 }
