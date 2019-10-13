@@ -7,13 +7,36 @@ use crate::writable::Writable;
 
 pub trait Writer< C: Context > {
     fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () >;
-    fn write_u8( &mut self, value: u8 ) -> io::Result< () >;
-    fn write_u16( &mut self, value: u16 ) -> io::Result< () >;
-    fn write_u32( &mut self, value: u32 ) -> io::Result< () >;
-    fn write_u64( &mut self, value: u64 ) -> io::Result< () >;
 
     fn context( &self ) -> &C;
     fn context_mut( &mut self ) -> &mut C;
+
+    #[inline(always)]
+    fn write_u8( &mut self, value: u8 ) -> io::Result< () > {
+        let slice = unsafe { std::slice::from_raw_parts( &value, 1 ) };
+        self.write_bytes( slice )
+    }
+
+    #[inline(always)]
+    fn write_u16( &mut self, mut value: u16 ) -> io::Result< () > {
+        self.context().endianness().swap_u16( &mut value );
+        let slice = unsafe { std::slice::from_raw_parts( &value as *const u16 as *const u8, 2 ) };
+        self.write_bytes( slice )
+    }
+
+    #[inline(always)]
+    fn write_u32( &mut self, mut value: u32 ) -> io::Result< () > {
+        self.context().endianness().swap_u32( &mut value );
+        let slice = unsafe { std::slice::from_raw_parts( &value as *const u32 as *const u8, 4 ) };
+        self.write_bytes( slice )
+    }
+
+    #[inline(always)]
+    fn write_u64( &mut self, mut value: u64 ) -> io::Result< () > {
+        self.context().endianness().swap_u64( &mut value );
+        let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 8 ) };
+        self.write_bytes( slice )
+    }
 
     #[inline(always)]
     fn write_i8( &mut self, value: i8 ) -> io::Result< () > {
