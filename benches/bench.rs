@@ -8,7 +8,7 @@ use test::{Bencher, black_box};
 use speedy::{Context, Readable, Reader, Writable, Endianness};
 
 #[bench]
-fn serialization_manual_megabyte_buffer( b: &mut Bencher ) {
+fn write_manual_megabyte_buffer( b: &mut Bencher ) {
     let mut buffer: Vec< u8 > = Vec::new();
     buffer.resize( 1024 * 1024, 1 );
     buffer = black_box( buffer );
@@ -21,7 +21,7 @@ fn serialization_manual_megabyte_buffer( b: &mut Bencher ) {
 
 // These two benchmarks should have exactly the same speeds.
 #[bench]
-fn serialization_speedy_megabyte_buffer_le( b: &mut Bencher ) {
+fn write_speedy_megabyte_buffer_le( b: &mut Bencher ) {
     let mut buffer: Vec< u8 > = Vec::new();
     buffer.resize( 1024 * 1024, 1 );
     buffer = black_box( buffer );
@@ -33,7 +33,7 @@ fn serialization_speedy_megabyte_buffer_le( b: &mut Bencher ) {
 }
 
 #[bench]
-fn serialization_speedy_megabyte_buffer_be( b: &mut Bencher ) {
+fn write_speedy_megabyte_buffer_be( b: &mut Bencher ) {
     let mut buffer: Vec< u8 > = Vec::new();
     buffer.resize( 1024 * 1024, 1 );
     buffer = black_box( buffer );
@@ -45,7 +45,7 @@ fn serialization_speedy_megabyte_buffer_be( b: &mut Bencher ) {
 }
 
 #[bench]
-fn deserialization_speedy_megabyte_buffer_cow_borrowed( b: &mut Bencher ) {
+fn read_speedy_megabyte_buffer_cow_borrowed( b: &mut Bencher ) {
     let mut buffer: Vec< u8 > = Vec::new();
     buffer.resize( 1024 * 1024, 1 );
     let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
@@ -58,7 +58,7 @@ fn deserialization_speedy_megabyte_buffer_cow_borrowed( b: &mut Bencher ) {
 }
 
 #[bench]
-fn deserialization_speedy_megabyte_buffer_cow_owned( b: &mut Bencher ) {
+fn read_speedy_megabyte_buffer_cow_owned( b: &mut Bencher ) {
     let mut buffer: Vec< u8 > = Vec::new();
     buffer.resize( 1024 * 1024, 1 );
     let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
@@ -87,7 +87,7 @@ impl< 'a, C: Context > Readable< 'a, C > for Byte {
 }
 
 #[bench]
-fn deserialization_speedy_megabyte_buffer_vec_non_primitive( b: &mut Bencher ) {
+fn read_speedy_megabyte_buffer_vec_non_primitive( b: &mut Bencher ) {
     let mut buffer: Vec< Byte > = Vec::new();
     buffer.resize( 1024 * 1024, Byte( 1 ) );
     let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
@@ -111,7 +111,7 @@ struct Dummy {
 }
 
 #[bench]
-fn deserialization_speedy_many_small_structs( b: &mut Bencher ) {
+fn read_speedy_many_small_structs( b: &mut Bencher ) {
     let mut buffer: Vec< Dummy > = Vec::new();
     let dummy = Dummy {
         a: 1,
