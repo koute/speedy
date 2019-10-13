@@ -223,10 +223,52 @@ struct DerivedStructWithVecWithCount {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithCowWithCount< 'a > {
+struct DerivedStructWithStringWithCount {
+    length: u8,
+    #[speedy(count = length * 2)]
+    data: String
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithCowSliceWithCount< 'a > {
     length: u8,
     #[speedy(count = length * 2)]
     data: Cow< 'a, [bool] >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithCowStrWithCount< 'a > {
+    length: u8,
+    #[speedy(count = length * 2)]
+    data: Cow< 'a, str >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithHashMapWithCount {
+    length: u8,
+    #[speedy(count = length / 4)]
+    data: HashMap< u8, u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithBTreeMapWithCount {
+    length: u8,
+    #[speedy(count = length / 4)]
+    data: BTreeMap< u8, u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithHashSetWithCount {
+    length: u8,
+    #[speedy(count = length / 4)]
+    data: HashSet< u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithBTreeSetWithCount {
+    length: u8,
+    #[speedy(count = length / 4)]
+    data: BTreeSet< u8 >
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -609,10 +651,40 @@ symmetric_tests! {
         le = [2, 1, 0, 0, 1],
         be = [2, 1, 0, 0, 1]
     }
-    derived_struct_with_cow_with_count for DerivedStructWithCowWithCount {
-        in = DerivedStructWithCowWithCount { length: 2, data: vec![ true, false, false, true ].into() },
+    derived_struct_with_string_with_count for DerivedStructWithStringWithCount {
+        in = DerivedStructWithStringWithCount { length: 2, data: "ABCD".into() },
+        le = [2, b'A', b'B', b'C', b'D'],
+        be = [2, b'A', b'B', b'C', b'D']
+    }
+    derived_struct_with_cow_slice_with_count for DerivedStructWithCowSliceWithCount {
+        in = DerivedStructWithCowSliceWithCount { length: 2, data: vec![ true, false, false, true ].into() },
         le = [2, 1, 0, 0, 1],
         be = [2, 1, 0, 0, 1]
+    }
+    derived_struct_with_cow_str_with_count for DerivedStructWithCowStrWithCount {
+        in = DerivedStructWithCowStrWithCount { length: 2, data: "ABCD".into() },
+        le = [2, b'A', b'B', b'C', b'D'],
+        be = [2, b'A', b'B', b'C', b'D']
+    }
+    derived_struct_with_hash_map_with_count for DerivedStructWithHashMapWithCount {
+        in = DerivedStructWithHashMapWithCount { length: 4, data: vec![ (50, 60) ].into_iter().collect() },
+        le = [4, 50, 60],
+        be = [4, 50, 60]
+    }
+    derived_struct_with_btree_map_with_count for DerivedStructWithBTreeMapWithCount {
+        in = DerivedStructWithBTreeMapWithCount { length: 4, data: vec![ (50, 60) ].into_iter().collect() },
+        le = [4, 50, 60],
+        be = [4, 50, 60]
+    }
+    derived_struct_with_hash_set_with_count for DerivedStructWithHashSetWithCount {
+        in = DerivedStructWithHashSetWithCount { length: 4, data: vec![ 50 ].into_iter().collect() },
+        le = [4, 50],
+        be = [4, 50]
+    }
+    derived_struct_with_btree_set_with_count for DerivedStructWithBTreeSetWithCount {
+        in = DerivedStructWithBTreeSetWithCount { length: 4, data: vec![ 50 ].into_iter().collect() },
+        le = [4, 50],
+        be = [4, 50]
     }
     derived_tuple_struct_with_vec_with_count for DerivedTupleStructWithVecWithCount {
         in = DerivedTupleStructWithVecWithCount( 2, vec![ true, false, false, true ] ),
@@ -673,7 +745,7 @@ fn test_minimum_bytes_needed() {
     assert_eq!( <DerivedStructWithLifetimeStr as Readable< Endianness >>::minimum_bytes_needed(), 4 );
     assert_eq!( <DerivedStructWithDefaultOnEof as Readable< Endianness >>::minimum_bytes_needed(), 1 );
     assert_eq!( <DerivedStructWithVecWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
-    assert_eq!( <DerivedStructWithCowWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedStructWithCowSliceWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
     assert_eq!( <DerivedTupleStructWithVecWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
     assert_eq!( <DerivedSimpleEnumTagTypeU8 as Readable< Endianness >>::minimum_bytes_needed(), 1 );
     assert_eq!( <DerivedSimpleEnumTagTypeU16 as Readable< Endianness >>::minimum_bytes_needed(), 2 );

@@ -11,6 +11,9 @@ mod writer;
 mod context;
 mod endianness;
 
+#[doc(hidden)]
+pub mod private;
+
 #[cfg(feature = "speedy-derive")]
 pub use speedy_derive::{Readable, Writable};
 

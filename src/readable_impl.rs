@@ -19,7 +19,7 @@ impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
 {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
+        let length = crate::private::read_length( reader )?;
         reader.read_collection( length )
     }
 
@@ -35,7 +35,7 @@ impl< 'a, C, T > Readable< 'a, C > for BTreeSet< T >
 {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
+        let length = crate::private::read_length( reader )?;
         reader.read_collection( length )
     }
 
@@ -53,7 +53,7 @@ impl< 'a, C, K, V, S > Readable< 'a, C > for HashMap< K, V, S >
 {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
+        let length = crate::private::read_length( reader )?;
         reader.read_collection( length )
     }
 
@@ -70,7 +70,7 @@ impl< 'a, C, T, S > Readable< 'a, C > for HashSet< T, S >
 {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
+        let length = crate::private::read_length( reader )?;
         reader.read_collection( length )
     }
 
@@ -181,10 +181,7 @@ impl< 'a, C: Context > Readable< 'a, C > for String {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
         let bytes: Vec< u8 > = reader.read_value()?;
-        match String::from_utf8( bytes ) {
-            Err( error ) => Err( io::Error::new( io::ErrorKind::InvalidData, error ) ),
-            Ok( string ) => Ok( string )
-        }
+        crate::private::vec_to_string( bytes )
     }
 
     #[inline]
@@ -196,20 +193,9 @@ impl< 'a, C: Context > Readable< 'a, C > for String {
 impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
+        let length = crate::private::read_length( reader )?;
         let bytes: Cow< 'a, [u8] > = reader.read_cow( length )?;
-        match bytes {
-            Cow::Borrowed( bytes ) => {
-                std::str::from_utf8( bytes )
-                    .map( Cow::Borrowed )
-                    .map_err( |error| io::Error::new( io::ErrorKind::InvalidData, error ) )
-            },
-            Cow::Owned( bytes ) => {
-                String::from_utf8( bytes )
-                    .map( Cow::Owned )
-                    .map_err( |error| io::Error::new( io::ErrorKind::InvalidData, error ) )
-            }
-        }
+        crate::private::cow_bytes_to_cow_str( bytes )
     }
 
     #[inline]
@@ -221,7 +207,7 @@ impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
+        let length = crate::private::read_length( reader )?;
         reader.read_vec( length )
     }
 
@@ -234,7 +220,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] > where [T]: ToOwned< Owned = Vec< T > > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
-        let length = reader.read_u32()? as usize;
+        let length = crate::private::read_length( reader )?;
         reader.read_cow( length )
     }
 

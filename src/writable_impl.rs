@@ -12,17 +12,7 @@ use crate::writer::Writer;
 use crate::context::Context;
 use crate::utils::as_bytes;
 
-#[inline]
-fn write_length< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
-    where C: Context,
-          W: ?Sized + Writer< C >
-{
-    if length as u64 > std::u32::MAX as u64 {
-         return Err( io::Error::new( io::ErrorKind::InvalidData, "out of range length" ) );
-    }
-
-    writer.write_u32( length as u32 )
-}
+use crate::private::write_length;
 
 impl< C, K, V > Writable< C > for BTreeMap< K, V >
     where C: Context,

@@ -262,7 +262,8 @@ struct Field< 'a > {
     name: Option< &'a syn::Ident >,
     ty: &'a syn::Type,
     default_on_eof: bool,
-    count: Option< syn::Expr >
+    count: Option< syn::Expr >,
+    special_ty: Option< SpecialTy >
 }
 
 impl< 'a > Field< 'a > {
@@ -317,6 +318,127 @@ impl syn::parse::Parse for FieldAttributes {
     }
 }
 
+enum SpecialTy {
+    String,
+    Vec( syn::Type ),
+    CowSlice( syn::Lifetime, syn::Type ),
+    CowStr( syn::Lifetime ),
+    HashMap( syn::Type, syn::Type ),
+    HashSet( syn::Type ),
+    BTreeMap( syn::Type, syn::Type ),
+    BTreeSet( syn::Type )
+}
+
+fn extract_inner_ty( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< &syn::Type > {
+    if args.len() != 1 {
+        return None;
+    }
+
+    match args[ 0 ] {
+        syn::GenericArgument::Type( ref ty ) => Some( ty ),
+         _ => None
+    }
+}
+
+fn extract_inner_ty_2( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< (&syn::Type, &syn::Type) > {
+    if args.len() != 2 {
+        return None;
+    }
+
+    let ty_1 = match args[ 0 ] {
+        syn::GenericArgument::Type( ref ty ) => ty,
+         _ => return None
+    };
+
+    let ty_2 = match args[ 1 ] {
+        syn::GenericArgument::Type( ref ty ) => ty,
+         _ => return None
+    };
+
+    Some( (ty_1, ty_2) )
+}
+
+fn extract_lifetime_and_inner_ty( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< (&syn::Lifetime, &syn::Type) > {
+    if args.len() != 2 {
+        return None;
+    }
+
+    let lifetime = match args[ 0 ] {
+        syn::GenericArgument::Lifetime( ref lifetime ) => lifetime,
+        _ => return None
+    };
+
+    let ty = match args[ 1 ] {
+        syn::GenericArgument::Type( ref ty ) => ty,
+         _ => return None
+    };
+
+    Some( (lifetime, ty) )
+}
+
+fn extract_slice_inner_ty( ty: &syn::Type ) -> Option< &syn::Type > {
+    match *ty {
+        syn::Type::Slice( syn::TypeSlice { ref elem, .. } ) => {
+            Some( &*elem )
+        },
+        _ => None
+    }
+}
+
+fn is_bare_ty( ty: &syn::Type, name: &str ) -> bool {
+    match *ty {
+        syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
+            segments[ 0 ].ident == name && segments[ 0 ].arguments.is_empty()
+        },
+        _ => false
+    }
+}
+
+fn parse_special_ty( ty: &syn::Type ) -> Option< SpecialTy > {
+    match *ty {
+        syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
+            let name = &segments[ 0 ].ident;
+            match segments[ 0 ].arguments {
+                syn::PathArguments::None => {
+                    if name == "String" {
+                        Some( SpecialTy::String )
+                    } else {
+                        None
+                    }
+                },
+                syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { colon2_token: None, ref args, .. } ) => {
+                    if name == "Vec" {
+                        Some( SpecialTy::Vec( extract_inner_ty( args )?.clone() ) )
+                    } else if name == "HashSet" {
+                        Some( SpecialTy::HashSet( extract_inner_ty( args )?.clone() ) )
+                    } else if name == "BTreeSet" {
+                        Some( SpecialTy::BTreeSet( extract_inner_ty( args )?.clone() ) )
+                    } else if name == "Cow" {
+                        let (lifetime, ty) = extract_lifetime_and_inner_ty( args )?;
+                        if let Some( inner_ty ) = extract_slice_inner_ty( ty ) {
+                            Some( SpecialTy::CowSlice( lifetime.clone(), inner_ty.clone() ) )
+                        } else if is_bare_ty( ty, "str" ) {
+                            Some( SpecialTy::CowStr( lifetime.clone() ) )
+                        } else {
+                            None
+                        }
+                    } else if name == "HashMap" {
+                        let (key_ty, value_ty) = extract_inner_ty_2( args )?;
+                        Some( SpecialTy::HashMap( key_ty.clone(), value_ty.clone() ) )
+                    } else if name == "BTreeMap" {
+                        let (key_ty, value_ty) = extract_inner_ty_2( args )?;
+                        Some( SpecialTy::BTreeMap( key_ty.clone(), value_ty.clone() ) )
+                    } else {
+                        None
+                    }
+                },
+                _ => None
+            }
+        },
+        _ => None
+    }
+}
+
 fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) -> Result< Vec< Field< 'a > >, syn::Error > {
     let iter = fields.into_iter()
         .enumerate()
@@ -336,12 +458,22 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 }
             }
 
+            let special_ty = parse_special_ty( &field.ty );
             if count.is_some() {
-                let type_name = field.ty.clone().into_token_stream().to_string().replace( " ", "" );
-                let is_vec = type_name.starts_with( "Vec<" );
-                let is_cow_slice = type_name.starts_with( "Cow<" ) && type_name.ends_with( "]>" ) && type_name.contains( ",[" );
-                if !is_vec && !is_cow_slice {
-                    return Err( syn::Error::new( field.ty.span(), "The 'count' attribute is only supported for `Vec` or for `Cow<[_]>`" ) );
+                match special_ty {
+                    | Some( SpecialTy::String )
+                    | Some( SpecialTy::Vec( .. ) )
+                    | Some( SpecialTy::CowSlice( .. ) )
+                    | Some( SpecialTy::CowStr( .. ) )
+                    | Some( SpecialTy::HashMap( .. ) )
+                    | Some( SpecialTy::HashSet( .. ) )
+                    | Some( SpecialTy::BTreeMap( .. ) )
+                    | Some( SpecialTy::BTreeSet( .. ) )
+                        => {},
+
+                    None => {
+                        return Err( syn::Error::new( field.ty.span(), "The 'count' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`" ) );
+                    }
                 }
             }
 
@@ -350,18 +482,62 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 name: field.ident.as_ref(),
                 ty: &field.ty,
                 default_on_eof,
-                count
+                count,
+                special_ty
             })
         });
 
     iter.collect()
 }
 
-fn read_field_body( count: Option< syn::Expr >, default_on_eof: bool ) -> TokenStream {
-    let body = if let Some( ref count ) = count {
-        quote! { _reader_.read_vec( (#count) as usize ).map( |_value_| _value_.into() ) }
-    } else {
-        quote! { _reader_.read_value() }
+fn read_field_body( special_ty: Option< &SpecialTy >, count: Option< syn::Expr >, default_on_eof: bool ) -> TokenStream {
+    let read_count_body = match &count {
+        Some( count ) => quote! { ((#count) as usize) },
+        None => {
+            quote! {
+                speedy::private::read_length( _reader_ )?
+            }
+        }
+    };
+
+    let body = match special_ty {
+        Some( SpecialTy::String ) => {
+            quote! {{
+                let _count_ = #read_count_body;
+                _reader_.read_vec( _count_ ).and_then( speedy::private::vec_to_string )
+            }}
+        },
+        Some( SpecialTy::Vec( .. ) ) => {
+            quote! {{
+                let _count_ = #read_count_body;
+                _reader_.read_vec( _count_ )
+            }}
+        },
+        Some( SpecialTy::CowSlice( .. ) ) => {
+            quote! {{
+                let _count_ = #read_count_body;
+                _reader_.read_cow( _count_ )
+            }}
+        },
+        Some( SpecialTy::CowStr( .. ) ) => {
+            quote! {{
+                let _count_ = #read_count_body;
+                _reader_.read_cow( _count_ ).and_then( speedy::private::cow_bytes_to_cow_str )
+            }}
+        },
+        Some( SpecialTy::HashMap( .. ) ) |
+        Some( SpecialTy::HashSet( .. ) ) |
+        Some( SpecialTy::BTreeMap( .. ) ) |
+        Some( SpecialTy::BTreeSet( .. ) ) => {
+            quote! {{
+                let _count_ = #read_count_body;
+                _reader_.read_collection( _count_ )
+            }}
+        },
+        None => {
+            assert!( count.is_none() );
+            quote! { _reader_.read_value() }
+        }
     };
 
     if default_on_eof {
@@ -385,7 +561,7 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
         types.push( field.ty );
         let name = field.var_name();
 
-        let read_value = read_field_body( field.count.clone(), field.default_on_eof );
+        let read_value = read_field_body( field.special_ty.as_ref(), field.count.clone(), field.default_on_eof );
         field_readers.push( quote! { let #name = #read_value; } );
         field_names.push( name );
 
@@ -400,18 +576,52 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
     (body, initializer, minimum_bytes_needed)
 }
 
-fn write_field_body( name: &syn::Ident, count: Option< syn::Expr > ) -> TokenStream {
-    if let Some( count ) = count {
-        let error_message = format!( "the length of '{}' is not the same as its 'count' attribute", name );
-        quote! {
-            let __expected = #count;
-            if #name.len() != __expected as usize {
-                return Err( std::io::Error::new( std::io::ErrorKind::InvalidData, #error_message ) );
+fn write_field_body( name: &syn::Ident, special_ty: Option< &SpecialTy >, count: Option< syn::Expr > ) -> TokenStream {
+    let write_length_body = match &count {
+        Some( count ) => {
+            let field_name = format!( "{}", name );
+            quote! {
+                if #name.len() != (#count) as usize {
+                    return Err( speedy::private::error_length_is_not_the_same_as_count( #field_name ) );
+                }
             }
-            _writer_.write_slice( &#name )?;
+        },
+        None => quote! { speedy::private::write_length( #name.len(), _writer_ )?; }
+    };
+
+    match special_ty {
+        Some( SpecialTy::String ) |
+        Some( SpecialTy::CowStr( .. ) ) => {
+            quote! {{
+                #write_length_body
+                _writer_.write_slice( #name.as_bytes() )?;
+            }}
+        },
+        Some( SpecialTy::Vec( .. ) ) => {
+            quote! {{
+                #write_length_body
+                _writer_.write_slice( &#name )?;
+            }}
+        },
+        Some( SpecialTy::CowSlice( .. ) ) => {
+            quote! {{
+                #write_length_body
+                _writer_.write_slice( &#name )?;
+            }}
+        },
+        Some( SpecialTy::HashMap( .. ) ) |
+        Some( SpecialTy::HashSet( .. ) ) |
+        Some( SpecialTy::BTreeMap( .. ) ) |
+        Some( SpecialTy::BTreeSet( .. ) ) => {
+            quote! {{
+                #write_length_body
+                _writer_.write_collection( #name.iter() )?;
+            }}
+        },
+        None => {
+            assert!( count.is_none() );
+            quote! { _writer_.write_value( #name )?; }
         }
-    } else {
-        quote! { _writer_.write_value( #name )?; }
     }
 }
 
@@ -424,7 +634,7 @@ fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
         let name = field.var_name();
         field_names.push( name.clone() );
 
-        let write_value = write_field_body( &name, field.count.clone() );
+        let write_value = write_field_body( &name, field.special_ty.as_ref(), field.count.clone() );
         field_writers.push( write_value );
     }
 
