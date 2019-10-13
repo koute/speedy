@@ -136,8 +136,26 @@ pub trait Writable< C: Context > {
 
     #[inline]
     fn write_to_vec( &self, context: C ) -> io::Result< Vec< u8 > > {
-        let mut vec = Vec::with_capacity( self.bytes_needed() );
-        self.write_to_stream( context, &mut vec )?;
+        let capacity = self.bytes_needed()?;
+        let mut vec = Vec::with_capacity( capacity );
+        unsafe {
+            vec.set_len( capacity );
+        }
+
+        let mut writer = BufferCollector {
+            context,
+            buffer: vec.as_mut_slice(),
+            position: 0
+        };
+
+        self.write_to( &mut writer )?;
+
+        let position = writer.position;
+        unsafe {
+            vec.set_len( position );
+        }
+
+        debug_assert_eq!( position, capacity );
         Ok( vec )
     }
 
