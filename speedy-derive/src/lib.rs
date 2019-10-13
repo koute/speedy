@@ -294,7 +294,10 @@ impl< 'a > Field< 'a > {
 
 enum FieldAttribute {
     DefaultOnEof,
-    Count( syn::Expr )
+    Count {
+        key_token: kw::count,
+        expr: syn::Expr
+    }
 }
 
 impl syn::parse::Parse for FieldAttribute {
@@ -304,10 +307,13 @@ impl syn::parse::Parse for FieldAttribute {
             input.parse::< kw::default_on_eof >()?;
             FieldAttribute::DefaultOnEof
         } else if lookahead.peek( kw::count ) {
-            input.parse::< kw::count >()?;
+            let key_token = input.parse::< kw::count >()?;
             let _: Token![=] = input.parse()?;
             let expr: syn::Expr = input.parse()?;
-            FieldAttribute::Count( expr )
+            FieldAttribute::Count {
+                key_token,
+                expr
+            }
         } else {
             return Err( lookahead.error() )
         };
@@ -460,7 +466,14 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     for attr in parsed_attrs.0 {
                         match attr {
                             FieldAttribute::DefaultOnEof => default_on_eof = true,
-                            FieldAttribute::Count( expr ) => count = Some( expr ),
+                            FieldAttribute::Count { key_token, expr } => {
+                                if count.is_some() {
+                                    let message = "Duplicate 'count'";
+                                    return Err( syn::Error::new( key_token.span(), message ) );
+                                }
+
+                                count = Some( expr );
+                            }
                         }
                     }
                 }
