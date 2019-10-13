@@ -291,6 +291,30 @@ struct DerivedStructWithVecWithCountWithDefaultOnEof {
     data: Vec< u8 >
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithLengthTypeU8 {
+    #[speedy(length_type = u8)]
+    data: Vec< u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithLengthTypeU16 {
+    #[speedy(length_type = u16)]
+    data: Vec< u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithLengthTypeU32 {
+    #[speedy(length_type = u32)]
+    data: Vec< u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithLengthTypeU64 {
+    #[speedy(length_type = u64)]
+    data: Vec< u8 >
+}
+
 mod inner {
     use speedy::{Readable, Writable};
 
@@ -703,6 +727,26 @@ symmetric_tests! {
         in = DerivedTupleStructWithVecWithCount( 2, vec![ true, false, false, true ] ),
         le = [2, 1, 0, 0, 1],
         be = [2, 1, 0, 0, 1]
+    }
+    derived_struct_with_vec_with_length_type_u8 for DerivedStructWithVecWithLengthTypeU8 {
+        in = DerivedStructWithVecWithLengthTypeU8 { data: vec![ 100, 101 ] },
+        le = [2, 100, 101],
+        be = [2, 100, 101]
+    }
+    derived_struct_with_vec_with_length_type_u16 for DerivedStructWithVecWithLengthTypeU16 {
+        in = DerivedStructWithVecWithLengthTypeU16 { data: vec![ 100, 101 ] },
+        le = [2, 0, 100, 101],
+        be = [0, 2, 100, 101]
+    }
+    derived_struct_with_vec_with_length_type_u32 for DerivedStructWithVecWithLengthTypeU32 {
+        in = DerivedStructWithVecWithLengthTypeU32 { data: vec![ 100, 101 ] },
+        le = [2, 0, 0, 0, 100, 101],
+        be = [0, 0, 0, 2, 100, 101]
+    }
+    derived_struct_with_vec_with_length_type_u64 for DerivedStructWithVecWithLengthTypeU64 {
+        in = DerivedStructWithVecWithLengthTypeU64 { data: vec![ 100, 101 ] },
+        le = [2, 0, 0, 0, 0, 0, 0, 0, 100, 101],
+        be = [0, 0, 0, 0, 0, 0, 0, 2, 100, 101]
     }
 }
 

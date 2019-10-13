@@ -31,6 +31,12 @@ pub fn error_length_is_not_the_same_as_count( field_name: &str ) -> io::Error {
     std::io::Error::new( std::io::ErrorKind::InvalidData, error_message )
 }
 
+#[inline(never)]
+#[cold]
+pub fn error_out_of_range_length() -> io::Error {
+    io::Error::new( io::ErrorKind::InvalidData, "out of range length" )
+}
+
 #[inline]
 pub fn vec_to_string( bytes: Vec< u8 > ) -> Result< String, io::Error > {
     String::from_utf8( bytes ).map_err( error_invalid_string_utf8 )
@@ -53,15 +59,87 @@ pub fn cow_bytes_to_cow_str( bytes: Cow< [u8] > ) -> Result< Cow< str >, io::Err
 }
 
 #[inline]
-pub fn write_length< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+pub fn write_length_u64< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+    where C: Context,
+          W: ?Sized + Writer< C >
+{
+    writer.write_u64( length as u64 )
+}
+
+#[inline]
+pub fn write_length_u32< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
     where C: Context,
           W: ?Sized + Writer< C >
 {
     if length as u64 > std::u32::MAX as u64 {
-         return Err( io::Error::new( io::ErrorKind::InvalidData, "out of range length" ) );
+         return Err( error_out_of_range_length() );
     }
 
     writer.write_u32( length as u32 )
+}
+
+#[inline]
+pub fn write_length_u16< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+    where C: Context,
+          W: ?Sized + Writer< C >
+{
+    if length as u64 > std::u16::MAX as u64 {
+         return Err( error_out_of_range_length() );
+    }
+
+    writer.write_u16( length as u16 )
+}
+
+#[inline]
+pub fn write_length_u8< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+    where C: Context,
+          W: ?Sized + Writer< C >
+{
+    if length as u64 > std::u8::MAX as u64 {
+         return Err( error_out_of_range_length() );
+    }
+
+    writer.write_u8( length as u8 )
+}
+
+#[inline]
+pub fn write_length< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+    where C: Context,
+          W: ?Sized + Writer< C >
+{
+    write_length_u32( length, writer )
+}
+
+#[inline]
+pub fn read_length_u64< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+    where C: Context,
+          R: Reader< 'a, C >
+{
+    reader.read_u64().map( |value| value as usize )
+}
+
+#[inline]
+pub fn read_length_u32< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+    where C: Context,
+          R: Reader< 'a, C >
+{
+    reader.read_u32().map( |value| value as usize )
+}
+
+#[inline]
+pub fn read_length_u16< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+    where C: Context,
+          R: Reader< 'a, C >
+{
+    reader.read_u16().map( |value| value as usize )
+}
+
+#[inline]
+pub fn read_length_u8< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+    where C: Context,
+          R: Reader< 'a, C >
+{
+    reader.read_u8().map( |value| value as usize )
 }
 
 #[inline]
@@ -69,7 +147,7 @@ pub fn read_length< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
     where C: Context,
           R: Reader< 'a, C >
 {
-    reader.read_u32().map( |value| value as usize )
+    read_length_u32( reader )
 }
 
 pub trait IntoLength {

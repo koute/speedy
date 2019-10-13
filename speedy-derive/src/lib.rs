@@ -42,6 +42,7 @@ mod kw {
     syn::custom_keyword!( count );
     syn::custom_keyword!( default_on_eof );
     syn::custom_keyword!( tag_type );
+    syn::custom_keyword!( length_type );
 
     syn::custom_keyword!( u8 );
     syn::custom_keyword!( u16 );
@@ -146,12 +147,15 @@ enum ItemKind {
     Enum
 }
 
+#[derive(Copy, Clone)]
 enum BasicType {
     U8,
     U16,
     U32,
     U64
 }
+
+const DEFAULT_LENGTH_TYPE: BasicType = BasicType::U32;
 
 impl syn::parse::Parse for BasicType {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
@@ -271,6 +275,7 @@ struct Field< 'a > {
     ty: &'a syn::Type,
     default_on_eof: bool,
     count: Option< syn::Expr >,
+    length_type: Option< BasicType >,
     special_ty: Option< SpecialTy >
 }
 
@@ -297,6 +302,10 @@ enum FieldAttribute {
     Count {
         key_token: kw::count,
         expr: syn::Expr
+    },
+    LengthType {
+        key_token: kw::length_type,
+        ty: BasicType
     }
 }
 
@@ -313,6 +322,14 @@ impl syn::parse::Parse for FieldAttribute {
             FieldAttribute::Count {
                 key_token,
                 expr
+            }
+        } else if lookahead.peek( kw::length_type ) {
+            let key_token = input.parse::< kw::length_type>()?;
+            let _: Token![=] = input.parse()?;
+            let ty: BasicType = input.parse()?;
+            FieldAttribute::LengthType {
+                key_token,
+                ty
             }
         } else {
             return Err( lookahead.error() )
@@ -459,6 +476,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
         .map( |(index, field)| {
             let mut default_on_eof = false;
             let mut count = None;
+            let mut length_type = None;
             for attr in &field.attrs {
                 let path = attr.path.clone().into_token_stream().to_string();
                 if path == "speedy" {
@@ -472,7 +490,25 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                                     return Err( syn::Error::new( key_token.span(), message ) );
                                 }
 
+                                if length_type.is_some() {
+                                    let message = "You cannot have both 'length_type' and 'count' on the same field";
+                                    return Err( syn::Error::new( field.ty.span(), message ) );
+                                }
+
                                 count = Some( expr );
+                            }
+                            FieldAttribute::LengthType { key_token, ty } => {
+                                if length_type.is_some() {
+                                    let message = "Duplicate 'length_type'";
+                                    return Err( syn::Error::new( key_token.span(), message ) );
+                                }
+
+                                if count.is_some() {
+                                    let message = "You cannot have both 'length_type' and 'count' on the same field";
+                                    return Err( syn::Error::new( field.ty.span(), message ) );
+                                }
+
+                                length_type = Some( ty );
                             }
                         }
                     }
@@ -498,12 +534,31 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 }
             }
 
+            if length_type.is_some() {
+                match special_ty {
+                    | Some( SpecialTy::String )
+                    | Some( SpecialTy::Vec( .. ) )
+                    | Some( SpecialTy::CowSlice( .. ) )
+                    | Some( SpecialTy::CowStr( .. ) )
+                    | Some( SpecialTy::HashMap( .. ) )
+                    | Some( SpecialTy::HashSet( .. ) )
+                    | Some( SpecialTy::BTreeMap( .. ) )
+                    | Some( SpecialTy::BTreeSet( .. ) )
+                        => {},
+
+                    None => {
+                        return Err( syn::Error::new( field.ty.span(), "The 'length_type' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`" ) );
+                    }
+                }
+            }
+
             Ok( Field {
                 index,
                 name: field.ident.as_ref(),
                 ty: &field.ty,
                 default_on_eof,
                 count,
+                length_type,
                 special_ty
             })
         });
@@ -525,8 +580,15 @@ fn read_field_body( field: &Field ) -> TokenStream {
     let read_count_body = match field.count {
         Some( ref count ) => quote! { ((#count) as usize) },
         None => {
+            let read_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
+                BasicType::U8 => quote! { read_length_u8 },
+                BasicType::U16 => quote! { read_length_u16 },
+                BasicType::U32 => quote! { read_length_u32 },
+                BasicType::U64 => quote! { read_length_u64 }
+            };
+
             let body = quote! {
-                speedy::private::read_length( _reader_ )
+                speedy::private::#read_length_fn( _reader_ )
             };
 
             if field.default_on_eof {
@@ -618,7 +680,16 @@ fn write_field_body( field: &Field ) -> TokenStream {
                 }
             }
         },
-        None => quote! { speedy::private::write_length( #name.len(), _writer_ )?; }
+        None => {
+            let write_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
+                BasicType::U8 => quote! { write_length_u8 },
+                BasicType::U16 => quote! { write_length_u16 },
+                BasicType::U32 => quote! { write_length_u32 },
+                BasicType::U64 => quote! { write_length_u64 }
+            };
+
+            quote! { speedy::private::#write_length_fn( #name.len(), _writer_ )?; }
+        }
     };
 
     match field.special_ty {
@@ -774,7 +845,14 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
             | Some( SpecialTy::BTreeMap( .. ) )
             | Some( SpecialTy::BTreeSet( .. ) )
             => {
-                Some( quote! { 4 } )
+                let size: usize = match field.length_type {
+                    Some( BasicType::U8 ) => 1,
+                    Some( BasicType::U16 ) => 2,
+                    None | Some( BasicType::U32 ) => 4,
+                    Some( BasicType::U64 ) => 8
+                };
+
+                Some( quote! { #size } )
             },
             None => {
                 let ty = &field.ty;
