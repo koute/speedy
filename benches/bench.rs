@@ -1,13 +1,10 @@
 #![feature(test)]
 
 extern crate test;
-extern crate byteorder;
-extern crate speedy;
 
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::borrow::Cow;
 use test::{Bencher, black_box};
-use byteorder::{ReadBytesExt, NativeEndian};
 use speedy::{Context, Readable, Reader, Writable, Endianness};
 
 #[bench]
