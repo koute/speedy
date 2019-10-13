@@ -132,6 +132,39 @@ enum DerivedSimpleEnum {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u8)]
+enum DerivedSimpleEnumTagTypeU8 {
+    A,
+    B = 0xab,
+    C
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u16)]
+enum DerivedSimpleEnumTagTypeU16 {
+    A,
+    B = 0xabcd,
+    C
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u32)]
+enum DerivedSimpleEnumTagTypeU32 {
+    A,
+    B = 0xabcdef01,
+    C
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u64)]
+#[repr(u64)]
+enum DerivedSimpleEnumTagTypeU64 {
+    A,
+    B = 0xabcdef0123456789_u64,
+    C
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
 enum DerivedEnum {
     A,
     B( u8, u16, u32 ),
@@ -506,6 +539,26 @@ symmetric_tests! {
         le = [11, 0, 0, 0],
         be = [0, 0, 0, 11]
     }
+    derived_simple_enum_tag_type_u8 for DerivedSimpleEnumTagTypeU8 {
+        in = DerivedSimpleEnumTagTypeU8::B,
+        le = [0xab],
+        be = [0xab]
+    }
+    derived_simple_enum_tag_type_u16 for DerivedSimpleEnumTagTypeU16 {
+        in = DerivedSimpleEnumTagTypeU16::B,
+        le = [0xcd, 0xab],
+        be = [0xab, 0xcd]
+    }
+    derived_simple_enum_tag_type_u32 for DerivedSimpleEnumTagTypeU32 {
+        in = DerivedSimpleEnumTagTypeU32::B,
+        le = [0x01, 0xef, 0xcd, 0xab],
+        be = [0xab, 0xcd, 0xef, 0x01]
+    }
+    derived_simple_enum_tag_type_u64 for DerivedSimpleEnumTagTypeU64 {
+        in = DerivedSimpleEnumTagTypeU64::B,
+        le = [0x89, 0x67, 0x45, 0x23, 0x01, 0xef, 0xcd, 0xab],
+        be = [0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89]
+    }
     derived_enum_unit_variant for DerivedEnum {
         in = DerivedEnum::A,
         le = [0, 0, 0, 0],
@@ -622,4 +675,8 @@ fn test_minimum_bytes_needed() {
     assert_eq!( <DerivedStructWithVecWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
     assert_eq!( <DerivedStructWithCowWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
     assert_eq!( <DerivedTupleStructWithVecWithCount as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedSimpleEnumTagTypeU8 as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!( <DerivedSimpleEnumTagTypeU16 as Readable< Endianness >>::minimum_bytes_needed(), 2 );
+    assert_eq!( <DerivedSimpleEnumTagTypeU32 as Readable< Endianness >>::minimum_bytes_needed(), 4 );
+    assert_eq!( <DerivedSimpleEnumTagTypeU64 as Readable< Endianness >>::minimum_bytes_needed(), 8 );
 }

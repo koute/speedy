@@ -41,6 +41,12 @@ pub fn writable( input: proc_macro::TokenStream ) -> proc_macro::TokenStream {
 mod kw {
     syn::custom_keyword!( count );
     syn::custom_keyword!( default_on_eof );
+    syn::custom_keyword!( tag_type );
+
+    syn::custom_keyword!( u8 );
+    syn::custom_keyword!( u16 );
+    syn::custom_keyword!( u32 );
+    syn::custom_keyword!( u64 );
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -133,6 +139,109 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
     };
 
     (impl_params, ty_params, where_clause)
+}
+
+enum ItemKind {
+    Struct,
+    Enum
+}
+
+enum BasicType {
+    U8,
+    U16,
+    U32,
+    U64
+}
+
+enum ItemAttribute {
+    TagType {
+        key_token: kw::tag_type,
+        ty: BasicType
+    }
+}
+
+impl syn::parse::Parse for ItemAttribute {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let lookahead = input.lookahead1();
+        let value = if lookahead.peek( kw::tag_type ) {
+            let key_token = input.parse::< kw::tag_type >()?;
+            let _: Token![=] = input.parse()?;
+            let lookahead = input.lookahead1();
+            let ty = if lookahead.peek( kw::u8 ) {
+                input.parse::< kw::u8 >()?;
+                BasicType::U8
+            } else if lookahead.peek( kw::u16 ) {
+                input.parse::< kw::u16 >()?;
+                BasicType::U16
+            } else if lookahead.peek( kw::u32 ) {
+                input.parse::< kw::u32 >()?;
+                BasicType::U32
+            } else if lookahead.peek( kw::u64 ) {
+                input.parse::< kw::u64 >()?;
+                BasicType::U64
+            } else {
+                return Err( lookahead.error() );
+            };
+
+            ItemAttribute::TagType {
+                key_token,
+                ty
+            }
+        } else {
+            return Err( lookahead.error() )
+        };
+
+        Ok( value )
+    }
+}
+
+struct RawItemAttributes( syn::punctuated::Punctuated< ItemAttribute, Token![,] > );
+
+impl syn::parse::Parse for RawItemAttributes {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let content;
+        parenthesized!( content in input );
+        Ok( RawItemAttributes( content.parse_terminated( ItemAttribute::parse )? ) )
+    }
+}
+
+struct ItemAttributes {
+    tag_type: Option< BasicType >
+}
+
+fn parse_item_attributes( kind: ItemKind, attrs: &[syn::Attribute] ) -> Result< ItemAttributes, syn::Error > {
+    let mut tag_type = None;
+    for raw_attr in attrs {
+        let path = raw_attr.path.clone().into_token_stream().to_string();
+        if path != "speedy" {
+            continue;
+        }
+
+        let parsed_attrs: RawItemAttributes = syn::parse2( raw_attr.tokens.clone() )?;
+        for attr in parsed_attrs.0 {
+            match attr {
+                ItemAttribute::TagType { key_token, ty } => {
+                    if tag_type.is_some() {
+                        let message = "Duplicate 'tag_type'";
+                        return Err( syn::Error::new( key_token.span(), message ) );
+                    }
+                    match kind {
+                        ItemKind::Enum => {},
+                        ItemKind::Struct => {
+                            let message = "The 'tag_type' attribute can only be used on enums";
+                            return Err( syn::Error::new( key_token.span(), message ) );
+                        }
+                    }
+
+                    tag_type = Some( ty );
+                }
+            }
+        }
+    }
+
+    Ok( ItemAttributes {
+        tag_type
+    })
 }
 
 struct Struct< 'a > {
@@ -326,25 +435,34 @@ fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
 
 struct EnumCtx {
     ident: syn::Ident,
-    previous_kind: Option< u32 >,
-    kind_to_full_name: HashMap< u32, String >
+    previous_kind: Option< u64 >,
+    kind_to_full_name: HashMap< u64, String >,
+    tag_type: BasicType
 }
 
 impl EnumCtx {
-    fn new( ident: &syn::Ident ) -> Self {
+    fn new( ident: &syn::Ident, tag_type: Option< BasicType > ) -> Self {
         EnumCtx {
             ident: ident.clone(),
             previous_kind: None,
-            kind_to_full_name: HashMap::new()
+            kind_to_full_name: HashMap::new(),
+            tag_type: tag_type.unwrap_or( BasicType::U32 )
         }
     }
 
-    fn next( &mut self, variant: &syn::Variant ) -> Result< u32, syn::Error > {
+    fn next( &mut self, variant: &syn::Variant ) -> Result< TokenStream, syn::Error > {
+        let max = match self.tag_type {
+            BasicType::U8 => std::u8::MAX as u64,
+            BasicType::U16 => std::u16::MAX as u64,
+            BasicType::U32 => std::u32::MAX as u64,
+            BasicType::U64 => std::u64::MAX
+        };
+
         let full_name = format!( "{}::{}", self.ident, variant.ident );
         let kind = match variant.discriminant {
             None => {
                 let kind = if let Some( previous_kind ) = self.previous_kind {
-                    if previous_kind >= u32::MAX {
+                    if previous_kind >= max {
                         let message = format!( "Enum discriminant `{}` is too big!", full_name );
                         return Err( syn::Error::new( variant.span(), message ) );
                     }
@@ -361,14 +479,13 @@ impl EnumCtx {
                 let value = raw_value.base10_parse::< u64 >().map_err( |err| {
                     syn::Error::new( raw_value.span(), err )
                 })?;
-                if value > u32::MAX as u64 {
+                if value > max {
                     let message = format!( "Enum discriminant `{}` is too big!", full_name );
                     return Err( syn::Error::new( raw_value.span(), message ) );
                 }
 
-                let kind = value as u32;
-                self.previous_kind = Some( kind );
-                kind
+                self.previous_kind = Some( value );
+                value
             },
             Some((_, ref expr)) => {
                 let message = format!( "Enum discriminant `{}` is currently unsupported!", full_name );
@@ -382,6 +499,24 @@ impl EnumCtx {
         }
 
         self.kind_to_full_name.insert( kind, full_name );
+        let kind = match self.tag_type {
+            BasicType::U8 => {
+                let kind = kind as u8;
+                quote! { #kind }
+            },
+            BasicType::U16 => {
+                let kind = kind as u16;
+                quote! { #kind }
+            },
+            BasicType::U32 => {
+                let kind = kind as u32;
+                quote! { #kind }
+            },
+            BasicType::U64 => {
+                let kind = kind as u64;
+                quote! { #kind }
+            }
+        };
         Ok( kind )
     }
 }
@@ -426,6 +561,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let mut types = Vec::new();
     let (reader_body, minimum_bytes_needed_body) = match &input.data {
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { named, .. } ), .. } ) => {
+            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
             let st = Struct::new( named )?;
             let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
             let reader_body = quote! {
@@ -435,6 +571,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             (reader_body, minimum_bytes)
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { unnamed, .. } ), .. } ) => {
+            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
             let st = Struct::new( unnamed )?;
             let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
             let reader_body = quote! {
@@ -444,7 +581,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             (reader_body, minimum_bytes)
         },
         syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
-            let mut ctx = EnumCtx::new( &name );
+            let item_attrs = parse_item_attributes( ItemKind::Enum, &input.attrs )?;
+            let mut ctx = EnumCtx::new( &name, item_attrs.tag_type );
             let mut variant_matches = Vec::with_capacity( variants.len() );
             let mut variant_minimum_sizes = Vec::with_capacity( variants.len() );
             for variant in variants {
@@ -485,18 +623,26 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 }
             }
 
+            let (tag_reader, tag_size) = match ctx.tag_type {
+                BasicType::U64 => (quote! { read_u64 }, 8_usize),
+                BasicType::U32 => (quote! { read_u32 }, 4_usize),
+                BasicType::U16 => (quote! { read_u16 }, 2_usize),
+                BasicType::U8 => (quote! { read_u8 }, 1_usize)
+            };
+
             let reader_body = quote! {
-                let kind_: u32 = _reader_.read_value()?;
+                let kind_ = _reader_.#tag_reader()?;
                 match kind_ {
                     #(#variant_matches),*
                     _ => Err( std::io::Error::new( std::io::ErrorKind::InvalidData, "invalid enum variant" ) )
                 }
             };
             let minimum_bytes_needed_body = min( variant_minimum_sizes.into_iter() );
-            let minimum_bytes_needed_body = quote! { (#minimum_bytes_needed_body) + 4 }; // For the tag.
+            let minimum_bytes_needed_body = quote! { (#minimum_bytes_needed_body) + #tag_size };
             (reader_body, minimum_bytes_needed_body)
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unit, .. } ) => {
+            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
             let reader_body = quote! {
                 Ok( #name )
             };
@@ -548,9 +694,11 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let mut types = Vec::new();
     let writer_body = match input.data {
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unit, .. } ) => {
+            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
             quote! {}
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { ref named, .. } ), .. } ) => {
+            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
             let st = Struct::new( named )?;
             let assignments = assign_to_variables( &st.fields );
             let (body, _) = writable_body( &mut types, st );
@@ -560,6 +708,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             }
         },
         syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ), .. } ) => {
+            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
             let st = Struct::new( unnamed )?;
             let assignments = assign_to_variables( &st.fields );
             let (body, _) = writable_body( &mut types, st );
@@ -569,7 +718,15 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             }
         },
         syn::Data::Enum( syn::DataEnum { ref variants, .. } ) => {
-            let mut ctx = EnumCtx::new( &name );
+            let item_attrs = parse_item_attributes( ItemKind::Enum, &input.attrs )?;
+            let mut ctx = EnumCtx::new( &name, item_attrs.tag_type );
+            let tag_writer = match ctx.tag_type {
+                BasicType::U64 => quote! { write_u64 },
+                BasicType::U32 => quote! { write_u32 },
+                BasicType::U16 => quote! { write_u16 },
+                BasicType::U8 => quote! { write_u8 }
+            };
+
             let variants: Result< Vec< _ >, syn::Error > = variants.iter()
                 .map( |variant| {
                     let kind = ctx.next( &variant )?;
@@ -581,7 +738,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                             let (body, identifiers) = writable_body( &mut types, st );
                             quote! {
                                 #variant_path { #identifiers } => {
-                                    _writer_.write_value( &#kind )?;
+                                    _writer_.#tag_writer( #kind )?;
                                     #body
                                 }
                             }
@@ -591,14 +748,14 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                             let (body, identifiers) = writable_body( &mut types, st );
                             quote! {
                                 #variant_path( #identifiers ) => {
-                                    _writer_.write_value( &#kind )?;
+                                    _writer_.#tag_writer( #kind )?;
                                     #body
                                 }
                             }
                         },
                         syn::Fields::Unit => {
                             quote! { #variant_path => {
-                                _writer_.write_value( &#kind )?;
+                                _writer_.#tag_writer( #kind )?;
                             }}
                         },
                     };
