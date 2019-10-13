@@ -278,6 +278,19 @@ struct DerivedTupleStructWithVecWithCount(
     Vec< bool >
 );
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithDefaultOnEof {
+    #[speedy(default_on_eof)]
+    data: Vec< u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithCountWithDefaultOnEof {
+    length: u8,
+    #[speedy(count = length, default_on_eof)]
+    data: Vec< u8 >
+}
+
 mod inner {
     use speedy::{Readable, Writable};
 
@@ -708,6 +721,15 @@ fn test_derived_struct_with_default_on_eof() {
 
     let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA, 0xBB, 0xCC] ).unwrap();
     assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0xCCBB, c: 0 } );
+
+    let deserialized: DerivedStructWithVecWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithVecWithDefaultOnEof { data: vec![] } );
+
+    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[2, 0xAA, 0xBB] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithVecWithCountWithDefaultOnEof { length: 2, data: vec![0xAA, 0xBB] } );
+
+    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[2, 0xAA] ).unwrap();
+    assert_eq!( deserialized, DerivedStructWithVecWithCountWithDefaultOnEof { length: 2, data: vec![] } );
 }
 
 #[test]

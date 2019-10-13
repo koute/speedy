@@ -490,12 +490,27 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
     iter.collect()
 }
 
+fn default_on_eof_body( body: TokenStream ) -> TokenStream {
+    quote! {
+        match #body {
+            Ok( value ) => value,
+            Err( ref error ) if error.kind() == std::io::ErrorKind::UnexpectedEof => std::default::Default::default(),
+            Err( error ) => return Err( error )
+        }
+    }
+}
+
 fn read_field_body( special_ty: Option< &SpecialTy >, count: Option< syn::Expr >, default_on_eof: bool ) -> TokenStream {
     let read_count_body = match &count {
         Some( count ) => quote! { ((#count) as usize) },
         None => {
-            quote! {
-                speedy::private::read_length( _reader_ )?
+            let body = quote! {
+                speedy::private::read_length( _reader_ )
+            };
+            if default_on_eof {
+                default_on_eof_body( body )
+            } else {
+                quote! { #body? }
             }
         }
     };
@@ -541,13 +556,7 @@ fn read_field_body( special_ty: Option< &SpecialTy >, count: Option< syn::Expr >
     };
 
     if default_on_eof {
-        quote! {
-            match #body {
-                Ok( value ) => value,
-                Err( ref error ) if error.kind() == std::io::ErrorKind::UnexpectedEof => std::default::Default::default(),
-                Err( error ) => return Err( error )
-            }
-        }
+        default_on_eof_body( body )
     } else {
         quote! { #body? }
     }
