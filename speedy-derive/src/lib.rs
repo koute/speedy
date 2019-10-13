@@ -153,6 +153,29 @@ enum BasicType {
     U64
 }
 
+impl syn::parse::Parse for BasicType {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let lookahead = input.lookahead1();
+        let ty = if lookahead.peek( kw::u8 ) {
+            input.parse::< kw::u8 >()?;
+            BasicType::U8
+        } else if lookahead.peek( kw::u16 ) {
+            input.parse::< kw::u16 >()?;
+            BasicType::U16
+        } else if lookahead.peek( kw::u32 ) {
+            input.parse::< kw::u32 >()?;
+            BasicType::U32
+        } else if lookahead.peek( kw::u64 ) {
+            input.parse::< kw::u64 >()?;
+            BasicType::U64
+        } else {
+            return Err( lookahead.error() );
+        };
+
+        Ok( ty )
+    }
+}
+
 enum ItemAttribute {
     TagType {
         key_token: kw::tag_type,
@@ -166,22 +189,7 @@ impl syn::parse::Parse for ItemAttribute {
         let value = if lookahead.peek( kw::tag_type ) {
             let key_token = input.parse::< kw::tag_type >()?;
             let _: Token![=] = input.parse()?;
-            let lookahead = input.lookahead1();
-            let ty = if lookahead.peek( kw::u8 ) {
-                input.parse::< kw::u8 >()?;
-                BasicType::U8
-            } else if lookahead.peek( kw::u16 ) {
-                input.parse::< kw::u16 >()?;
-                BasicType::U16
-            } else if lookahead.peek( kw::u32 ) {
-                input.parse::< kw::u32 >()?;
-                BasicType::U32
-            } else if lookahead.peek( kw::u64 ) {
-                input.parse::< kw::u64 >()?;
-                BasicType::U64
-            } else {
-                return Err( lookahead.error() );
-            };
+            let ty: BasicType = input.parse()?;
 
             ItemAttribute::TagType {
                 key_token,
