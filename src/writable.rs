@@ -12,11 +12,7 @@ use crate::writer::Writer;
 use crate::context::Context;
 use crate::endianness::Endianness;
 
-#[inline(never)]
-#[cold]
-fn eof() -> io::Error {
-    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of output buffer" )
-}
+use crate::private::error_end_of_output_buffer;
 
 struct BufferCollector< 'a, C: Context > {
     context: C,
@@ -27,7 +23,7 @@ struct BufferCollector< 'a, C: Context > {
 impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
     #[inline]
     fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () > {
-        let buffer = self.buffer.get_mut( self.position..self.position + slice.len() ).ok_or_else( eof )?;
+        let buffer = self.buffer.get_mut( self.position..self.position + slice.len() ).ok_or_else( error_end_of_output_buffer )?;
         buffer.copy_from_slice( slice );
         self.position += slice.len();
         Ok(())
@@ -36,7 +32,7 @@ impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
     #[inline]
     fn write_u8( &mut self, value: u8 ) -> io::Result< () > {
         if self.position >= self.buffer.len() {
-            return Err( eof() );
+            return Err( error_end_of_output_buffer() );
         }
 
         self.buffer[ self.position ] = value;
@@ -46,7 +42,7 @@ impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
 
     #[inline]
     fn write_u16( &mut self, mut value: u16 ) -> io::Result< () > {
-        let buffer = self.buffer.get_mut( self.position..self.position + 2 ).ok_or_else( eof )?;
+        let buffer = self.buffer.get_mut( self.position..self.position + 2 ).ok_or_else( error_end_of_output_buffer )?;
         self.context.endianness().swap_u16( &mut value );
         let value = unsafe { std::slice::from_raw_parts( &value as *const u16 as *const u8, 2 ) };
         buffer.copy_from_slice( value );
@@ -56,7 +52,7 @@ impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
 
     #[inline]
     fn write_u32( &mut self, mut value: u32 ) -> io::Result< () > {
-        let buffer = self.buffer.get_mut( self.position..self.position + 4 ).ok_or_else( eof )?;
+        let buffer = self.buffer.get_mut( self.position..self.position + 4 ).ok_or_else( error_end_of_output_buffer )?;
         self.context.endianness().swap_u32( &mut value );
         let value = unsafe { std::slice::from_raw_parts( &value as *const u32 as *const u8, 4 ) };
         buffer.copy_from_slice( value );
@@ -66,7 +62,7 @@ impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
 
     #[inline]
     fn write_u64( &mut self, mut value: u64 ) -> io::Result< () > {
-        let buffer = self.buffer.get_mut( self.position..self.position + 8 ).ok_or_else( eof )?;
+        let buffer = self.buffer.get_mut( self.position..self.position + 8 ).ok_or_else( error_end_of_output_buffer )?;
         self.context.endianness().swap_u64( &mut value );
         let value = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 8 ) };
         buffer.copy_from_slice( value );
@@ -183,7 +179,7 @@ pub trait Writable< C: Context > {
 
     #[inline]
     fn write_to_buffer( &self, context: C, buffer: &mut [u8] ) -> io::Result< () > {
-        let buffer = buffer.get_mut( 0..self.bytes_needed() ).ok_or_else( eof )?;
+        let buffer = buffer.get_mut( 0..self.bytes_needed() ).ok_or_else( error_end_of_output_buffer )?;
         let mut writer = BufferCollector {
             context,
             buffer,

@@ -7,11 +7,7 @@ use crate::endianness::Endianness;
 use crate::readable::Readable;
 use crate::context::Context;
 
-#[inline(never)]
-#[cold]
-fn eof() -> io::Error {
-    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input" )
-}
+use crate::private::error_end_of_input;
 
 pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () >;
@@ -44,7 +40,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_u8( &mut self ) -> io::Result< u8 > {
         if self.can_read_at_least( 1 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 1] = unsafe { mem::uninitialized() };
@@ -60,7 +56,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_u16( &mut self ) -> io::Result< u16 > {
         if self.can_read_at_least( 2 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 2] = unsafe { mem::uninitialized() };
@@ -71,7 +67,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_i16( &mut self ) -> io::Result< i16 > {
         if self.can_read_at_least( 2 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 2] = unsafe { mem::uninitialized() };
@@ -82,7 +78,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_u32( &mut self ) -> io::Result< u32 > {
         if self.can_read_at_least( 4 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 4] = unsafe { mem::uninitialized() };
@@ -93,7 +89,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_i32( &mut self ) -> io::Result< i32 > {
         if self.can_read_at_least( 4 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 4] = unsafe { mem::uninitialized() };
@@ -104,7 +100,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_u64( &mut self ) -> io::Result< u64 > {
         if self.can_read_at_least( 8 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 8] = unsafe { mem::uninitialized() };
@@ -115,7 +111,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_i64( &mut self ) -> io::Result< i64 > {
         if self.can_read_at_least( 8 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 8] = unsafe { mem::uninitialized() };
@@ -126,7 +122,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_f32( &mut self ) -> io::Result< f32 > {
         if self.can_read_at_least( 4 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 4] = unsafe { mem::uninitialized() };
@@ -137,7 +133,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     fn read_f64( &mut self ) -> io::Result< f64 > {
         if self.can_read_at_least( 8 ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut slice: [u8; 8] = unsafe { mem::uninitialized() };
@@ -161,7 +157,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     {
         let (required, overflow) = T::minimum_bytes_needed().overflowing_mul( length );
         if overflow || self.can_read_at_least( required ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         if T::speedy_is_primitive() {

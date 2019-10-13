@@ -37,6 +37,18 @@ pub fn error_out_of_range_length() -> io::Error {
     io::Error::new( io::ErrorKind::InvalidData, "out of range length" )
 }
 
+#[inline(never)]
+#[cold]
+pub(crate) fn error_end_of_input() -> io::Error {
+    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input" )
+}
+
+#[inline(never)]
+#[cold]
+pub(crate) fn error_end_of_output_buffer() -> io::Error {
+    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of output buffer" )
+}
+
 #[inline]
 pub fn vec_to_string( bytes: Vec< u8 > ) -> Result< String, io::Error > {
     String::from_utf8( bytes ).map_err( error_invalid_string_utf8 )

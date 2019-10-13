@@ -11,11 +11,7 @@ use crate::reader::Reader;
 use crate::context::Context;
 use crate::endianness::Endianness;
 
-#[inline(never)]
-#[cold]
-fn eof() -> io::Error {
-    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input buffer" )
-}
+use crate::private::error_end_of_input;
 
 struct BufferReader< 'a, C > where C: Context {
     context: C,
@@ -29,7 +25,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
         let length = output.len();
         if self.can_read_at_least( length ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         unsafe {
@@ -43,7 +39,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     #[inline(always)]
     fn skip_bytes( &mut self, length: usize ) -> io::Result< () > {
         if self.can_read_at_least( length ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         unsafe {
@@ -55,7 +51,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     #[inline(always)]
     fn read_bytes_borrowed( &mut self, length: usize ) -> Option< io::Result< &'a [u8] > > {
         if self.can_read_at_least( length ) == Some( false ) {
-            return Some( Err( eof() ) );
+            return Some( Err( error_end_of_input() ) );
         }
 
         let slice;
@@ -95,7 +91,7 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
     fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
         let length = output.len();
         if self.can_read_at_least( length ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         unsafe {
@@ -109,7 +105,7 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
     #[inline(always)]
     fn skip_bytes( &mut self, length: usize ) -> io::Result< () > {
         if self.can_read_at_least( length ) == Some( false ) {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         unsafe {
@@ -175,7 +171,7 @@ pub trait Readable< 'a, C: Context >: Sized {
     #[inline]
     fn read_from_buffer( context: C, buffer: &'a [u8] ) -> io::Result< Self > {
         if buffer.len() < Self::minimum_bytes_needed() {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut reader = BufferReader {
@@ -191,7 +187,7 @@ pub trait Readable< 'a, C: Context >: Sized {
     #[inline]
     fn read_from_buffer_owned( context: C, buffer: &[u8] ) -> io::Result< Self > {
         if buffer.len() < Self::minimum_bytes_needed() {
-            return Err( eof() );
+            return Err( error_end_of_input() );
         }
 
         let mut reader = CopyingBufferReader {
