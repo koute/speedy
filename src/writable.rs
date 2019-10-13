@@ -79,6 +79,11 @@ impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
     fn context_mut( &mut self ) -> &mut C {
         &mut self.context
     }
+
+    #[inline(always)]
+    fn can_write_at_least( &self, size: usize ) -> Option< bool > {
+        Some( self.buffer.get( self.position..self.position + size ).is_some() )
+    }
 }
 
 struct WritingCollector< C: Context, T: Write > {

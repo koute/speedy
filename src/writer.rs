@@ -12,6 +12,11 @@ pub trait Writer< C: Context > {
     fn context_mut( &mut self ) -> &mut C;
 
     #[inline(always)]
+    fn can_write_at_least( &self, _size: usize ) -> Option< bool > {
+        None
+    }
+
+    #[inline(always)]
     fn write_u8( &mut self, value: u8 ) -> io::Result< () > {
         let slice = unsafe { std::slice::from_raw_parts( &value, 1 ) };
         self.write_bytes( slice )
