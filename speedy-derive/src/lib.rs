@@ -558,12 +558,13 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
     let mut field_readers = Vec::new();
     let mut minimum_bytes_needed = Vec::new();
     for field in st.fields {
-        types.push( field.ty );
         let name = field.var_name();
+        let ty = field.ty;
 
         let read_value = read_field_body( field.special_ty.as_ref(), field.count.clone(), field.default_on_eof );
-        field_readers.push( quote! { let #name = #read_value; } );
+        field_readers.push( quote! { let #name: #ty = #read_value; } );
         field_names.push( name );
+        types.push( ty );
 
         if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
             minimum_bytes_needed.push( minimum_bytes );
