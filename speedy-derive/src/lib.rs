@@ -764,8 +764,23 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
     if field.default_on_eof || field.count.is_some() {
         None
     } else {
-        let ty = &field.ty;
-        Some( quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() } )
+        match field.special_ty {
+            | Some( SpecialTy::String )
+            | Some( SpecialTy::Vec( .. ) )
+            | Some( SpecialTy::CowSlice( .. ) )
+            | Some( SpecialTy::CowStr( .. ) )
+            | Some( SpecialTy::HashMap( .. ) )
+            | Some( SpecialTy::HashSet( .. ) )
+            | Some( SpecialTy::BTreeMap( .. ) )
+            | Some( SpecialTy::BTreeSet( .. ) )
+            => {
+                Some( quote! { 4 } )
+            },
+            None => {
+                let ty = &field.ty;
+                Some( quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() } )
+            }
+        }
     }
 }
 
