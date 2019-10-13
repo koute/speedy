@@ -582,7 +582,7 @@ fn write_field_body( name: &syn::Ident, special_ty: Option< &SpecialTy >, count:
         Some( count ) => {
             let field_name = format!( "{}", name );
             quote! {
-                if #name.len() != (#count) as usize {
+                if !speedy::private::are_lengths_the_same( #name.len(), #count ) {
                     return Err( speedy::private::error_length_is_not_the_same_as_count( #field_name ) );
                 }
             }

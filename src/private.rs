@@ -71,3 +71,36 @@ pub fn read_length< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
 {
     reader.read_u32().map( |value| value as usize )
 }
+
+pub trait IntoLength {
+    fn into_length( self ) -> usize;
+}
+
+impl IntoLength for usize {
+    fn into_length( self ) -> usize { self }
+}
+
+impl IntoLength for u32 {
+    fn into_length( self ) -> usize { self as usize }
+}
+
+impl IntoLength for u16 {
+    fn into_length( self ) -> usize { self as usize }
+}
+
+impl IntoLength for u8 {
+    fn into_length( self ) -> usize { self as usize }
+}
+
+impl< 'a, T > IntoLength for &'a T where T: IntoLength + Copy {
+    fn into_length( self ) -> usize { (*self).into_length() }
+}
+
+impl< 'a, T > IntoLength for &'a mut T where T: IntoLength + Copy {
+    fn into_length( self ) -> usize { (*self).into_length() }
+}
+
+#[inline]
+pub fn are_lengths_the_same( lhs: usize, rhs: impl IntoLength ) -> bool {
+    lhs == rhs.into_length()
+}
