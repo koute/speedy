@@ -521,14 +521,15 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
     }
 }
 
-fn read_field_body( special_ty: Option< &SpecialTy >, count: Option< syn::Expr >, default_on_eof: bool ) -> TokenStream {
-    let read_count_body = match &count {
-        Some( count ) => quote! { ((#count) as usize) },
+fn read_field_body( field: &Field ) -> TokenStream {
+    let read_count_body = match field.count {
+        Some( ref count ) => quote! { ((#count) as usize) },
         None => {
             let body = quote! {
                 speedy::private::read_length( _reader_ )
             };
-            if default_on_eof {
+
+            if field.default_on_eof {
                 default_on_eof_body( body )
             } else {
                 quote! { #body? }
@@ -536,7 +537,7 @@ fn read_field_body( special_ty: Option< &SpecialTy >, count: Option< syn::Expr >
         }
     };
 
-    let body = match special_ty {
+    let body = match field.special_ty {
         Some( SpecialTy::String ) => {
             quote! {{
                 let _count_ = #read_count_body;
@@ -571,12 +572,12 @@ fn read_field_body( special_ty: Option< &SpecialTy >, count: Option< syn::Expr >
             }}
         },
         None => {
-            assert!( count.is_none() );
+            assert!( field.count.is_none() );
             quote! { _reader_.read_value() }
         }
     };
 
-    if default_on_eof {
+    if field.default_on_eof {
         default_on_eof_body( body )
     } else {
         quote! { #body? }
@@ -588,10 +589,9 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
     let mut field_readers = Vec::new();
     let mut minimum_bytes_needed = Vec::new();
     for field in st.fields {
+        let read_value = read_field_body( &field );
         let name = field.var_name();
         let ty = field.ty;
-
-        let read_value = read_field_body( field.special_ty.as_ref(), field.count.clone(), field.default_on_eof );
         field_readers.push( quote! { let #name: #ty = #read_value; } );
         field_names.push( name );
         types.push( ty );
@@ -607,9 +607,10 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
     (body, initializer, minimum_bytes_needed)
 }
 
-fn write_field_body( name: &syn::Ident, special_ty: Option< &SpecialTy >, count: Option< syn::Expr > ) -> TokenStream {
-    let write_length_body = match &count {
-        Some( count ) => {
+fn write_field_body( field: &Field ) -> TokenStream {
+    let name = field.var_name();
+    let write_length_body = match field.count {
+        Some( ref count ) => {
             let field_name = format!( "{}", name );
             quote! {
                 if !speedy::private::are_lengths_the_same( #name.len(), #count ) {
@@ -620,7 +621,7 @@ fn write_field_body( name: &syn::Ident, special_ty: Option< &SpecialTy >, count:
         None => quote! { speedy::private::write_length( #name.len(), _writer_ )?; }
     };
 
-    match special_ty {
+    match field.special_ty {
         Some( SpecialTy::String ) |
         Some( SpecialTy::CowStr( .. ) ) => {
             quote! {{
@@ -650,7 +651,7 @@ fn write_field_body( name: &syn::Ident, special_ty: Option< &SpecialTy >, count:
             }}
         },
         None => {
-            assert!( count.is_none() );
+            assert!( field.count.is_none() );
             quote! { _writer_.write_value( #name )?; }
         }
     }
@@ -660,12 +661,9 @@ fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
     for field in st.fields {
+        let write_value = write_field_body( &field );
         types.push( field.ty );
-
-        let name = field.var_name();
-        field_names.push( name.clone() );
-
-        let write_value = write_field_body( &name, field.special_ty.as_ref(), field.count.clone() );
+        field_names.push( field.var_name().clone() );
         field_writers.push( write_value );
     }
 
