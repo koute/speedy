@@ -123,7 +123,7 @@ pub trait Writable< C: Context > {
 
     #[inline]
     fn write_to_buffer( &self, context: C, buffer: &mut [u8] ) -> io::Result< () > {
-        let buffer = buffer.get_mut( 0..self.bytes_needed() ).ok_or_else( error_end_of_output_buffer )?;
+        let buffer = buffer.get_mut( 0..self.bytes_needed()? ).ok_or_else( error_end_of_output_buffer )?;
         let mut writer = BufferCollector {
             context,
             buffer,
@@ -158,16 +158,13 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         let mut writer = SizeCalculatorCollector {
             size: 0
         };
 
-        if let Err( _ ) = self.write_to( &mut writer ) {
-            0
-        } else {
-            writer.size
-        }
+        self.write_to( &mut writer )?;
+        Ok( writer.size )
     }
 
     // Since specialization is not stable yet we do it this way.

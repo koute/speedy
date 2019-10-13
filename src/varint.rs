@@ -262,8 +262,8 @@ impl< C: Context > Writable< C > for VarInt64 {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
-        get_length( self.0.leading_zeros() ) as usize + 1
+    fn bytes_needed( &self ) -> io::Result< usize > {
+        Ok( get_length( self.0.leading_zeros() ) as usize + 1 )
     }
 }
 

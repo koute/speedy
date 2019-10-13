@@ -26,13 +26,13 @@ impl< C, K, V > Writable< C > for BTreeMap< K, V >
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         let mut count = mem::size_of::< u32 >();
         for (key, value) in self {
-            count += key.bytes_needed() + value.bytes_needed();
+            count += key.bytes_needed()? + value.bytes_needed()?;
         }
 
-        count
+        Ok( count )
     }
 }
 
@@ -47,13 +47,13 @@ impl< C, T > Writable< C > for BTreeSet< T >
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         let mut count = mem::size_of::< u32 >();
         for value in self {
-            count += value.bytes_needed();
+            count += value.bytes_needed()?;
         }
 
-        count
+        Ok( count )
     }
 }
 
@@ -69,13 +69,13 @@ impl< C, K, V, S > Writable< C > for HashMap< K, V, S >
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         let mut count = mem::size_of::< u32 >();
         for (key, value) in self {
-            count += key.bytes_needed() + value.bytes_needed();
+            count += key.bytes_needed()? + value.bytes_needed()?;
         }
 
-        count
+        Ok( count )
     }
 }
 
@@ -90,13 +90,13 @@ impl< C, T, S > Writable< C > for HashSet< T, S >
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         let mut count = mem::size_of::< u32 >();
         for value in self {
-            count += value.bytes_needed();
+            count += value.bytes_needed()?;
         }
 
-        count
+        Ok( count )
     }
 }
 
@@ -109,8 +109,8 @@ macro_rules! impl_for_primitive {
             }
 
             #[inline]
-            fn bytes_needed( &self ) -> usize {
-                mem::size_of::< Self >()
+            fn bytes_needed( &self ) -> io::Result< usize > {
+                Ok( mem::size_of::< Self >() )
             }
 
             #[doc(hidden)]
@@ -146,8 +146,8 @@ impl< C: Context > Writable< C > for usize {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
-        mem::size_of::< u64 >()
+    fn bytes_needed( &self ) -> io::Result< usize > {
+        Ok( mem::size_of::< u64 >() )
     }
 }
 
@@ -158,8 +158,8 @@ impl< C: Context > Writable< C > for bool {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
-        1
+    fn bytes_needed( &self ) -> io::Result< usize > {
+        Ok( 1 )
     }
 }
 
@@ -170,8 +170,8 @@ impl< C: Context > Writable< C > for char {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
-        mem::size_of::< u32 >()
+    fn bytes_needed( &self ) -> io::Result< usize > {
+        Ok( mem::size_of::< u32 >() )
     }
 }
 
@@ -182,7 +182,7 @@ impl< C: Context > Writable< C > for String {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         Writable::< C >::bytes_needed( self.as_bytes() )
     }
 }
@@ -194,7 +194,7 @@ impl< C: Context > Writable< C > for str {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         Writable::< C >::bytes_needed( self.as_bytes() )
     }
 }
@@ -206,7 +206,7 @@ impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         Writable::< C >::bytes_needed( self.as_bytes() )
     }
 }
@@ -219,17 +219,17 @@ impl< C: Context, T: Writable< C > > Writable< C > for [T] {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         if T::speedy_is_primitive() {
-            return 4 + self.len() * mem::size_of::< T >();
+            return Ok( 4 + self.len() * mem::size_of::< T >() );
         }
 
         let mut sum = 4;
         for element in self {
-            sum += element.bytes_needed();
+            sum += element.bytes_needed()?;
         }
 
-        sum
+        Ok( sum )
     }
 }
 
@@ -240,7 +240,7 @@ impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where 
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         Writable::< C >::bytes_needed( self.as_ref() )
     }
 }
@@ -252,7 +252,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for Vec< T > {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         Writable::< C >::bytes_needed( self.as_slice() )
     }
 }
@@ -265,8 +265,8 @@ impl< C: Context, T: Writable< C > > Writable< C > for Range< T > {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
-        Writable::< C >::bytes_needed( &self.start ) + Writable::< C >::bytes_needed( &self.end )
+    fn bytes_needed( &self ) -> io::Result< usize > {
+        Ok( Writable::< C >::bytes_needed( &self.start )? + Writable::< C >::bytes_needed( &self.end )? )
     }
 }
 
@@ -282,11 +282,11 @@ impl< C: Context, T: Writable< C > > Writable< C > for Option< T > {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         if let Some( ref value ) = *self {
-            1 + Writable::< C >::bytes_needed( value )
+            Ok( 1 + Writable::< C >::bytes_needed( value )? )
         } else {
-            1
+            Ok( 1 )
         }
     }
 }
@@ -298,8 +298,8 @@ impl< C: Context > Writable< C > for () {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
-        0
+    fn bytes_needed( &self ) -> io::Result< usize > {
+        Ok( 0 )
     }
 }
 
@@ -317,14 +317,14 @@ macro_rules! impl_for_tuple {
             }
 
             #[inline]
-            fn bytes_needed( &self ) -> usize {
+            fn bytes_needed( &self ) -> io::Result< usize > {
                 #[allow(non_snake_case)]
                 let &($(ref $name,)+) = self;
                 let mut size = 0;
                 $(
-                    size += Writable::< C >::bytes_needed( $name );
+                    size += Writable::< C >::bytes_needed( $name )?;
                 )+
-                size
+                Ok( size )
             }
         }
     }
@@ -354,8 +354,8 @@ impl< C: Context > Writable< C > for Endianness {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> usize {
-        1
+    fn bytes_needed( &self ) -> io::Result< usize > {
+        Ok( 1 )
     }
 }
 
@@ -366,7 +366,7 @@ impl< 'a, C, T > Writable< C > for &'a T where C: Context, T: Writable< C > {
     }
 
     #[inline(always)]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         (**self).bytes_needed()
     }
 }
@@ -378,7 +378,7 @@ impl< 'a, C, T > Writable< C > for &'a mut T where C: Context, T: Writable< C > 
     }
 
     #[inline(always)]
-    fn bytes_needed( &self ) -> usize {
+    fn bytes_needed( &self ) -> io::Result< usize > {
         (**self).bytes_needed()
     }
 }
