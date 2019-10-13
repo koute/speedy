@@ -132,6 +132,26 @@ fn read_speedy_many_small_structs( b: &mut Bencher ) {
     })
 }
 
+#[bench]
+fn write_speedy_many_small_structs( b: &mut Bencher ) {
+    let mut buffer: Vec< Dummy > = Vec::new();
+    let dummy = Dummy {
+        a: 1,
+        b: 2,
+        c: 3,
+        d: 4,
+        e: 5.0,
+        f: 6.0,
+        g: true
+    };
+    buffer.resize( 1024 * 1024, dummy );
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        buffer.write_to_vec( Endianness::NATIVE ).unwrap()
+    })
+}
+
 pub struct XorShift64 {
     a: u64,
 }
