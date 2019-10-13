@@ -156,11 +156,6 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_bytes_cow( &mut self, length: usize ) -> io::Result< Cow< 'a, [u8] > > {
-        self.read_cow( length )
-    }
-
-    #[inline]
     fn read_vec< T >( &mut self, length: usize ) -> io::Result< Vec< T > >
         where T: Readable< 'a, C >
     {
