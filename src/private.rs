@@ -39,6 +39,24 @@ pub fn error_out_of_range_length() -> io::Error {
 
 #[inline(never)]
 #[cold]
+pub fn error_invalid_enum_variant() -> io::Error {
+    io::Error::new( io::ErrorKind::InvalidData, "invalid enum variant" )
+}
+
+#[inline(never)]
+#[cold]
+pub(crate) fn error_out_of_range_char() -> io::Error {
+    io::Error::new( io::ErrorKind::InvalidData, "out of range char" )
+}
+
+#[inline(never)]
+#[cold]
+pub(crate) fn error_too_big_usize_for_this_architecture() -> io::Error {
+    io::Error::new( io::ErrorKind::InvalidData, "value cannot fit into an usize on this architecture" )
+}
+
+#[inline(never)]
+#[cold]
 pub(crate) fn error_end_of_input() -> io::Error {
     io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input" )
 }

@@ -966,7 +966,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 let kind_ = _reader_.#tag_reader()?;
                 match kind_ {
                     #(#variant_matches),*
-                    _ => Err( std::io::Error::new( std::io::ErrorKind::InvalidData, "invalid enum variant" ) )
+                    _ => Err( speedy::private::error_invalid_enum_variant() )
                 }
             };
             let minimum_bytes_needed_body = min( variant_minimum_sizes.into_iter() );
