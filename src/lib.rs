@@ -10,6 +10,7 @@ mod writable_impl;
 mod writer;
 mod context;
 mod endianness;
+mod varint;
 
 #[doc(hidden)]
 pub mod private;

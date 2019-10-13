@@ -12,6 +12,8 @@ use {
     }
 };
 
+pub use crate::varint::VarInt64;
+
 #[inline(never)]
 #[cold]
 fn error_invalid_string_utf8( error: std::string::FromUtf8Error ) -> io::Error {

@@ -134,3 +134,109 @@ fn deserialization_speedy_many_small_structs( b: &mut Bencher ) {
         deserialized
     })
 }
+
+pub struct XorShift64 {
+    a: u64,
+}
+
+impl XorShift64 {
+    pub fn new( seed: u64 ) -> XorShift64 {
+        XorShift64 { a: seed }
+    }
+
+    pub fn next( &mut self ) -> u64 {
+        let mut x = self.a;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.a = x;
+        x
+    }
+}
+
+#[bench]
+fn read_varint_random( b: &mut Bencher ) {
+    use speedy::private::VarInt64;
+    let mut rng = XorShift64 { a: 1234 };
+
+    let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| (1_u64 << (rng.next() % 63)).into() ).collect();
+    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        deserialized
+    })
+}
+
+#[bench]
+fn read_varint_always_one_byte( b: &mut Bencher ) {
+    use speedy::private::VarInt64;
+    let mut rng = XorShift64 { a: 1234 };
+
+    let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| (rng.next() % 100).into() ).collect();
+    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        deserialized
+    })
+}
+
+#[bench]
+fn read_varint_always_eight_bytes( b: &mut Bencher ) {
+    use speedy::private::VarInt64;
+    let mut rng = XorShift64 { a: 1234 };
+
+    let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| ((rng.next() % 100) | (1 << 63)).into() ).collect();
+    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        deserialized
+    })
+}
+
+#[bench]
+fn write_varint_random( b: &mut Bencher ) {
+    use speedy::private::VarInt64;
+    let mut rng = XorShift64 { a: 1234 };
+
+    let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| (1_u64 << (rng.next() % 63)).into() ).collect();
+    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        buffer.write_to_vec( Endianness::NATIVE ).unwrap()
+    })
+}
+
+#[bench]
+fn write_varint_always_one_byte( b: &mut Bencher ) {
+    use speedy::private::VarInt64;
+    let mut rng = XorShift64 { a: 1234 };
+
+    let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| (rng.next() % 100).into() ).collect();
+    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        buffer.write_to_vec( Endianness::NATIVE ).unwrap()
+    })
+}
+
+#[bench]
+fn write_varint_always_eight_bytes( b: &mut Bencher ) {
+    use speedy::private::VarInt64;
+    let mut rng = XorShift64 { a: 1234 };
+
+    let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| ((rng.next() % 100) | (1 << 63)).into() ).collect();
+    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+
+    buffer = black_box( buffer );
+    b.iter( || {
+        buffer.write_to_vec( Endianness::NATIVE ).unwrap()
+    })
+}
