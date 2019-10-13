@@ -57,26 +57,6 @@ impl< C: Context, T: Write > Writer< C > for WritingCollector< C, T > {
     }
 
     #[inline]
-    fn write_u8( &mut self, value: u8 ) -> io::Result< () > {
-        self.writer.write_u8( value )
-    }
-
-    #[inline]
-    fn write_u16( &mut self, value: u16 ) -> io::Result< () > {
-        self.context.endianness().write_to_stream_u16( &mut self.writer, value )
-    }
-
-    #[inline]
-    fn write_u32( &mut self, value: u32 ) -> io::Result< () > {
-        self.context.endianness().write_to_stream_u32( &mut self.writer, value )
-    }
-
-    #[inline]
-    fn write_u64( &mut self, value: u64 ) -> io::Result< () > {
-        self.context.endianness().write_to_stream_u64( &mut self.writer, value )
-    }
-
-    #[inline]
     fn context( &self ) -> &C {
         &self.context
     }
