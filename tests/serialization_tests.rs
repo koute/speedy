@@ -548,12 +548,12 @@ symmetric_tests! {
         le = [10, 0, 11, 0],
         be = [0, 10, 0, 11]
     }
-    option_u8_some for Option< u16 > {
+    option_u16_some for Option< u16 > {
         in = Some( 10 ),
         le = [1, 10, 0],
         be = [1, 0, 10]
     }
-    option_u8_none for Option< u16 > {
+    option_u16_none for Option< u16 > {
         in = None,
         le = [0],
         be = [0]
