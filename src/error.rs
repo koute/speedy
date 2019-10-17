@@ -12,10 +12,26 @@ pub struct Error {
 
 #[derive(Debug)]
 pub enum ErrorKind {
+    InvalidChar,
+    InvalidEnumVariant,
+    InvalidUtf8,
+    OutOfRangeLength,
+    OutOfRangeUsize,
+    UnexpectedEndOfInput,
+    UnexpectedEndOfOutputBuffer,
+
+    LengthIsNotTheSameAsCount {
+        field_name: &'static str
+    },
+
     IoError( io::Error )
 }
 
 impl Error {
+    fn new( kind: ErrorKind ) -> Self {
+        Error { kind }
+    }
+
     #[inline]
     pub(crate) fn from_io_error( error: io::Error ) -> Self {
         Error {
@@ -27,6 +43,14 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt( &self, fmt: &mut fmt::Formatter ) -> fmt::Result {
         match self.kind {
+            ErrorKind::InvalidChar => write!( fmt, "out of range char" ),
+            ErrorKind::InvalidEnumVariant => write!( fmt, "invalid enum variant" ),
+            ErrorKind::InvalidUtf8 => write!( fmt, "encountered invalid utf-8" ),
+            ErrorKind::OutOfRangeLength => write!( fmt, "out of range length" ),
+            ErrorKind::OutOfRangeUsize => write!( fmt, "value cannot fit into an usize on this architecture" ),
+            ErrorKind::UnexpectedEndOfInput => write!( fmt, "unexpected end of input" ),
+            ErrorKind::UnexpectedEndOfOutputBuffer => write!( fmt, "unexpected end of output buffer" ),
+            ErrorKind::LengthIsNotTheSameAsCount { field_name } => write!( fmt, "the length of '{}' is not the same as its 'count' attribute", field_name ),
             ErrorKind::IoError( ref error ) => write!( fmt, "{}", error )
         }
     }
@@ -35,7 +59,8 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source( &self ) -> Option< &(dyn std::error::Error + 'static) > {
         match self.kind {
-            ErrorKind::IoError( ref error ) => Some( error )
+            ErrorKind::IoError( ref error ) => Some( error ),
+            _ => None
         }
     }
 }
@@ -47,71 +72,64 @@ pub trait IsEof {
 impl IsEof for Error {
     fn is_eof( &self ) -> bool {
         match self.kind {
-            ErrorKind::IoError( ref error ) => error.kind() == std::io::ErrorKind::UnexpectedEof
+            ErrorKind::UnexpectedEndOfInput |
+            ErrorKind::UnexpectedEndOfOutputBuffer => true,
+            ErrorKind::IoError( ref error ) => error.kind() == std::io::ErrorKind::UnexpectedEof,
+            _ => false
         }
     }
 }
 
 #[inline(never)]
 #[cold]
-pub fn error_invalid_string_utf8< T >( error: std::string::FromUtf8Error ) -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, error ) );
-    T::from( error )
+pub fn error_invalid_string_utf8< T >( _: std::string::FromUtf8Error ) -> T where T: From< Error > {
+    T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
 #[inline(never)]
 #[cold]
-pub fn error_invalid_str_utf8< T >( error: std::str::Utf8Error ) -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, error ) );
-    T::from( error )
+pub fn error_invalid_str_utf8< T >( _: std::str::Utf8Error ) -> T where T: From< Error > {
+    T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
 #[inline(never)]
 #[cold]
-pub fn error_length_is_not_the_same_as_count< T >( field_name: &str ) -> T where T: From< Error > {
-    let error_message = format!( "the length of '{}' is not the same as its 'count' attribute", field_name );
-    let error = Error::from_io_error( std::io::Error::new( std::io::ErrorKind::InvalidData, error_message ) );
-    T::from( error )
+pub fn error_length_is_not_the_same_as_count< T >( field_name: &'static str ) -> T where T: From< Error > {
+    T::from( Error::new( ErrorKind::LengthIsNotTheSameAsCount { field_name } ) )
 }
 
 #[inline(never)]
 #[cold]
 pub fn error_out_of_range_length< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "out of range length" ) );
-    T::from( error )
+    T::from( Error::new( ErrorKind::OutOfRangeLength ) )
 }
 
 #[inline(never)]
 #[cold]
 pub fn error_invalid_enum_variant< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "invalid enum variant" ) );
-    T::from( error )
+    T::from( Error::new( ErrorKind::InvalidEnumVariant ) )
 }
 
 #[inline(never)]
 #[cold]
 pub fn error_out_of_range_char< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "out of range char" ) );
-    T::from( error )
+    T::from( Error::new( ErrorKind::InvalidChar ) )
 }
 
 #[inline(never)]
 #[cold]
 pub fn error_too_big_usize_for_this_architecture< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "value cannot fit into an usize on this architecture" ) );
-    T::from( error )
+    T::from( Error::new( ErrorKind::OutOfRangeUsize ) )
 }
 
 #[inline(never)]
 #[cold]
 pub fn error_end_of_input< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input" ) );
-    T::from( error )
+    T::from( Error::new( ErrorKind::UnexpectedEndOfInput ) )
 }
 
 #[inline(never)]
 #[cold]
 pub fn error_end_of_output_buffer< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of output buffer" ) );
-    T::from( error )
+    T::from( Error::new( ErrorKind::UnexpectedEndOfOutputBuffer ) )
 }
