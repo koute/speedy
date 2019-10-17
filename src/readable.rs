@@ -12,7 +12,7 @@ use crate::context::Context;
 use crate::endianness::Endianness;
 use crate::Error;
 
-use crate::private::error_end_of_input;
+use crate::error::error_end_of_input;
 
 struct BufferReader< 'a, C > where C: Context {
     context: C,

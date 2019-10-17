@@ -100,7 +100,7 @@ impl< 'a, C: Context > Readable< 'a, C > for char {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = reader.read_u32()?;
-        std::char::from_u32( value ).ok_or_else( crate::private::error_out_of_range_char )
+        std::char::from_u32( value ).ok_or_else( crate::error::error_out_of_range_char )
     }
 
     #[inline]
@@ -165,7 +165,7 @@ impl< 'a, C: Context > Readable< 'a, C > for usize {
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = u64::read_from( reader )?;
         if value > std::usize::MAX as u64 {
-            return Err( crate::private::error_too_big_usize_for_this_architecture() );
+            return Err( crate::error::error_too_big_usize_for_this_architecture() );
         }
         Ok( value as usize )
     }
@@ -320,7 +320,7 @@ impl< 'a, C: Context > Readable< 'a, C > for Endianness {
         match value {
             0 => Ok( Endianness::LittleEndian ),
             1 => Ok( Endianness::BigEndian ),
-            _ => Err( crate::private::error_invalid_enum_variant() )
+            _ => Err( crate::error::error_invalid_enum_variant() )
         }
     }
 

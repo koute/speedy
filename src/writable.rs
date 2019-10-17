@@ -11,7 +11,7 @@ use crate::context::Context;
 use crate::endianness::Endianness;
 use crate::Error;
 
-use crate::private::error_end_of_output_buffer;
+use crate::error::error_end_of_output_buffer;
 
 struct BufferCollector< 'a, C: Context > {
     context: C,

@@ -3,81 +3,25 @@ use {
         Context,
         Error,
         Reader,
-        Writer
+        Writer,
+        error::{
+            error_invalid_string_utf8,
+            error_invalid_str_utf8
+        }
     },
     std::{
         borrow::{
             Cow
-        },
-        io
+        }
     }
 };
 
 pub use crate::varint::VarInt64;
-
-#[inline(never)]
-#[cold]
-fn error_invalid_string_utf8< T >( error: std::string::FromUtf8Error ) -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, error ) );
-    T::from( error )
-}
-
-#[inline(never)]
-#[cold]
-fn error_invalid_str_utf8< T >( error: std::str::Utf8Error ) -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, error ) );
-    T::from( error )
-}
-
-#[inline(never)]
-#[cold]
-pub fn error_length_is_not_the_same_as_count< T >( field_name: &str ) -> T where T: From< Error > {
-    let error_message = format!( "the length of '{}' is not the same as its 'count' attribute", field_name );
-    let error = Error::from_io_error( std::io::Error::new( std::io::ErrorKind::InvalidData, error_message ) );
-    T::from( error )
-}
-
-#[inline(never)]
-#[cold]
-pub fn error_out_of_range_length< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "out of range length" ) );
-    T::from( error )
-}
-
-#[inline(never)]
-#[cold]
-pub fn error_invalid_enum_variant< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "invalid enum variant" ) );
-    T::from( error )
-}
-
-#[inline(never)]
-#[cold]
-pub(crate) fn error_out_of_range_char< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "out of range char" ) );
-    T::from( error )
-}
-
-#[inline(never)]
-#[cold]
-pub(crate) fn error_too_big_usize_for_this_architecture< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "value cannot fit into an usize on this architecture" ) );
-    T::from( error )
-}
-
-#[inline(never)]
-#[cold]
-pub(crate) fn error_end_of_input< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input" ) );
-    T::from( error )
-}
-
-#[inline(never)]
-#[cold]
-pub(crate) fn error_end_of_output_buffer< T >() -> T where T: From< Error > {
-    let error = Error::from_io_error( io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of output buffer" ) );
-    T::from( error )
-}
+pub use crate::error::{
+    error_length_is_not_the_same_as_count,
+    error_out_of_range_length,
+    error_invalid_enum_variant
+};
 
 #[inline]
 pub fn vec_to_string< E >( bytes: Vec< u8 > ) -> Result< String, E > where E: From< Error > {

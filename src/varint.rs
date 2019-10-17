@@ -193,7 +193,7 @@ impl< C: Context > Writable< C > for VarInt64 {
         let length = get_length( value.leading_zeros() );
 
         if let Some( false ) = writer.can_write_at_least( length as usize + 1 ) {
-            return Err( crate::private::error_end_of_output_buffer() );
+            return Err( crate::error::error_end_of_output_buffer() );
         }
 
         match length {

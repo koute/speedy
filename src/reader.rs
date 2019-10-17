@@ -6,7 +6,7 @@ use crate::endianness::Endianness;
 use crate::readable::Readable;
 use crate::context::Context;
 
-use crate::private::error_end_of_input;
+use crate::error::error_end_of_input;
 
 pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
