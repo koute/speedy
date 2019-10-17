@@ -44,9 +44,9 @@ fn main() {
     };
 
     let endian = Endianness::LittleEndian;
-    let bytes = original.write_to_vec( endian ).unwrap();
+    let bytes = original.write_to_vec_with_ctx( endian ).unwrap();
     let deserialized: Struct =
-        Struct::read_from_buffer( endian, &bytes ).unwrap();
+        Struct::read_from_buffer_with_ctx( endian, &bytes ).unwrap();
 
     assert_eq!( original, deserialized );
 }

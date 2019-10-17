@@ -124,7 +124,7 @@ pub trait Writable< C: Context > {
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error >;
 
     #[inline]
-    fn write_to_buffer( &self, context: C, buffer: &mut [u8] ) -> Result< (), C::Error > {
+    fn write_to_buffer_with_ctx( &self, context: C, buffer: &mut [u8] ) -> Result< (), C::Error > {
         let buffer = buffer.get_mut( 0..self.bytes_needed()? ).ok_or_else( error_end_of_output_buffer )?;
         let mut writer = BufferCollector {
             context,
@@ -137,7 +137,7 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn write_to_vec( &self, context: C ) -> Result< Vec< u8 >, C::Error > {
+    fn write_to_vec_with_ctx( &self, context: C ) -> Result< Vec< u8 >, C::Error > {
         let capacity = self.bytes_needed()?;
         let mut vec = Vec::with_capacity( capacity );
         unsafe {
@@ -162,7 +162,7 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn write_to_stream< S: Write >( &self, context: C, stream: S ) -> Result< (), C::Error > {
+    fn write_to_stream_with_ctx< S: Write >( &self, context: C, stream: S ) -> Result< (), C::Error > {
         let mut writer = WritingCollector {
             context,
             writer: stream
@@ -172,13 +172,13 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn write_to_file( &self, context: C, path: impl AsRef< Path > ) -> Result< (), C::Error > {
+    fn write_to_file_with_ctx( &self, context: C, path: impl AsRef< Path > ) -> Result< (), C::Error > {
         let stream = File::create( path ).map_err( |error| {
             let error = Error::from_io_error( error );
             <C::Error as From< Error >>::from( error )
         })?;
         let stream = io::BufWriter::new( stream );
-        self.write_to_stream( context, stream )
+        self.write_to_stream_with_ctx( context, stream )
     }
 
     #[inline]

@@ -272,13 +272,13 @@ fn test_varint64_serialization() {
         ($($value:expr => $expected:expr),+) => {
             $(
                 assert_eq!(
-                    VarInt64( $value ).write_to_vec( Endianness::LittleEndian ).unwrap(),
+                    VarInt64( $value ).write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap(),
                     &$expected
                 );
             )+
             $(
                 assert_eq!(
-                    VarInt64( $value ).write_to_vec( Endianness::BigEndian ).unwrap(),
+                    VarInt64( $value ).write_to_vec_with_ctx( Endianness::BigEndian ).unwrap(),
                     &$expected
                 );
             )+
@@ -338,11 +338,11 @@ fn test_varint64_bruteforce() {
 
         for &value in &values {
             let value = VarInt64( value );
-            let serialized_le = value.write_to_vec( crate::Endianness::LittleEndian ).unwrap();
-            let deserialized = VarInt64::read_from_buffer( crate::Endianness::LittleEndian, &serialized_le ).unwrap();
+            let serialized_le = value.write_to_vec_with_ctx( crate::Endianness::LittleEndian ).unwrap();
+            let deserialized = VarInt64::read_from_buffer_with_ctx( crate::Endianness::LittleEndian, &serialized_le ).unwrap();
             assert_eq!( deserialized, value );
 
-            let serialized_be = value.write_to_vec( crate::Endianness::BigEndian ).unwrap();
+            let serialized_be = value.write_to_vec_with_ctx( crate::Endianness::BigEndian ).unwrap();
             assert_eq!( serialized_be, serialized_le );
         }
     }

@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn simple_write_to_vec() {
         let value = SimpleStruct { a: 1, b: 2, c: 3 };
-        let data = value.write_to_vec( Endianness::NATIVE ).unwrap();
+        let data = value.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
         assert_eq!( data, vec![ 1, 2, 3 ] );
     }
 
@@ -81,21 +81,21 @@ mod tests {
     fn simple_read_from_stream() {
         let data = vec![ 1, 2, 3 ];
         let cursor = io::Cursor::new( data );
-        let value = SimpleStruct::read_from_stream( Endianness::NATIVE, cursor ).unwrap();
+        let value = SimpleStruct::read_from_stream_with_ctx( Endianness::NATIVE, cursor ).unwrap();
         assert_eq!( value, SimpleStruct { a: 1, b: 2, c: 3 } );
     }
 
     #[test]
     fn simple_read_from_buffer() {
         let data = vec![ 1, 2, 3 ];
-        let value = SimpleStruct::read_from_buffer( Endianness::NATIVE, &data ).unwrap();
+        let value = SimpleStruct::read_from_buffer_with_ctx( Endianness::NATIVE, &data ).unwrap();
         assert_eq!( value, SimpleStruct { a: 1, b: 2, c: 3 } );
     }
 
     #[test]
     fn simple_read_bytes_from_buffer_owned() {
         let data = vec![ 2, 0, 0, 0, 12, 34 ];
-        let value: Cow< [u8] > = Readable::read_from_buffer_owned( Endianness::LittleEndian, &data ).unwrap();
+        let value: Cow< [u8] > = Readable::read_from_buffer_owned_with_ctx( Endianness::LittleEndian, &data ).unwrap();
         assert_eq!( &*value, &[12, 34] );
         assert_ne!( value.as_ptr(), data[ 4.. ].as_ptr() );
     }
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn simple_read_bytes_from_buffer_borrowed() {
         let data = vec![ 2, 0, 0, 0, 12, 34 ];
-        let value: Cow< [u8] > = Readable::read_from_buffer( Endianness::LittleEndian, &data ).unwrap();
+        let value: Cow< [u8] > = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &data ).unwrap();
         assert_eq!( &*value, &[12, 34] );
         assert_eq!( value.as_ptr(), data[ 4.. ].as_ptr() );
     }
@@ -111,24 +111,24 @@ mod tests {
     #[test]
     fn read_write_u8_vec() {
         let original: Vec< u8 > = vec![ 1, 2, 3 ];
-        let serialized = original.write_to_vec( Endianness::NATIVE ).unwrap();
-        let deserialized: Vec< u8 > = Vec::< u8 >::read_from_buffer( Endianness::NATIVE, &serialized ).unwrap();
+        let serialized = original.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
+        let deserialized: Vec< u8 > = Vec::< u8 >::read_from_buffer_with_ctx( Endianness::NATIVE, &serialized ).unwrap();
         assert_eq!( original, deserialized );
     }
 
     #[test]
     fn read_write_u64_vec() {
         let original: Vec< u64 > = vec![ 1, 2, 3 ];
-        let serialized = original.write_to_vec( Endianness::NATIVE ).unwrap();
-        let deserialized: Vec< u64 > = Vec::< u64 >::read_from_buffer( Endianness::NATIVE, &serialized ).unwrap();
+        let serialized = original.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
+        let deserialized: Vec< u64 > = Vec::< u64 >::read_from_buffer_with_ctx( Endianness::NATIVE, &serialized ).unwrap();
         assert_eq!( original, deserialized );
     }
 
     #[test]
     fn read_write_string() {
         let original: String = "Hello world!".to_owned();
-        let serialized = original.write_to_vec( Endianness::NATIVE ).unwrap();
-        let deserialized: String = String::read_from_buffer( Endianness::NATIVE, &serialized ).unwrap();
+        let serialized = original.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
+        let deserialized: String = String::read_from_buffer_with_ctx( Endianness::NATIVE, &serialized ).unwrap();
         assert_eq!( original, deserialized );
     }
 }

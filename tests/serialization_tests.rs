@@ -21,62 +21,62 @@ macro_rules! symmetric_tests {
             #[test]
             fn round_trip_le_borrowed_aligned() {
                 let original: $type = $value;
-                let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer( Endianness::LittleEndian, &serialized ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 
             #[test]
             fn round_trip_le_borrowed_unaligned() {
                 let original: (u8, $type) = (1, $value);
-                let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
-                let deserialized: (u8, $type) = Readable::read_from_buffer( Endianness::LittleEndian, &serialized ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let deserialized: (u8, $type) = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 
             #[test]
             fn round_trip_le_owned() {
                 let original: $type = $value;
-                let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer_owned( Endianness::LittleEndian, &serialized ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_owned_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 
             #[test]
             fn round_trip_be_borrowed_aligned() {
                 let original: $type = $value;
-                let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer( Endianness::BigEndian, &serialized ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 
             #[test]
             fn round_trip_be_borrowed_unaligned() {
                 let original: (u8, $type) = (1, $value);
-                let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
-                let deserialized: (u8, $type) = Readable::read_from_buffer( Endianness::BigEndian, &serialized ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
+                let deserialized: (u8, $type) = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 
             #[test]
             fn round_trip_be_owned() {
                 let original: $type = $value;
-                let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer_owned( Endianness::BigEndian, &serialized ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_owned_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 
             #[test]
             fn serialized_bytes_le() {
                 let original: $type = $value;
-                let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
                 assert_eq!( serialized, $le_bytes );
             }
 
             #[test]
             fn serialized_bytes_be() {
                 let original: $type = $value;
-                let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
                 assert_eq!( serialized, $be_bytes );
             }
 
@@ -85,10 +85,10 @@ macro_rules! symmetric_tests {
                 let original: $type = $value;
                 let mut buffer = Vec::new();
                 buffer.resize( Writable::< Endianness >::bytes_needed( &original ).unwrap(), 0xff );
-                original.write_to_buffer( Endianness::LittleEndian, &mut buffer ).unwrap();
+                original.write_to_buffer_with_ctx( Endianness::LittleEndian, &mut buffer ).unwrap();
                 assert_eq!( buffer, $le_bytes );
 
-                let serialized = original.write_to_vec( Endianness::LittleEndian ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
                 assert_eq!( buffer, serialized );
             }
 
@@ -97,10 +97,10 @@ macro_rules! symmetric_tests {
                 let original: $type = $value;
                 let mut buffer = Vec::new();
                 buffer.resize( Writable::< Endianness >::bytes_needed( &original ).unwrap(), 0xff );
-                original.write_to_buffer( Endianness::BigEndian, &mut buffer ).unwrap();
+                original.write_to_buffer_with_ctx( Endianness::BigEndian, &mut buffer ).unwrap();
                 assert_eq!( buffer, $be_bytes );
 
-                let serialized = original.write_to_vec( Endianness::BigEndian ).unwrap();
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
                 assert_eq!( buffer, serialized );
             }
 
@@ -830,22 +830,22 @@ fn test_derived_struct_with_default_on_eof() {
        Endianness
     };
 
-    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA] ).unwrap();
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[0xAA] ).unwrap();
     assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0, c: 0 } );
 
-    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA, 0xBB] ).unwrap();
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[0xAA, 0xBB] ).unwrap();
     assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0, c: 0 } );
 
-    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[0xAA, 0xBB, 0xCC] ).unwrap();
+    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[0xAA, 0xBB, 0xCC] ).unwrap();
     assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0xCCBB, c: 0 } );
 
-    let deserialized: DerivedStructWithVecWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[] ).unwrap();
+    let deserialized: DerivedStructWithVecWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[] ).unwrap();
     assert_eq!( deserialized, DerivedStructWithVecWithDefaultOnEof { data: vec![] } );
 
-    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[2, 0xAA, 0xBB] ).unwrap();
+    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[2, 0xAA, 0xBB] ).unwrap();
     assert_eq!( deserialized, DerivedStructWithVecWithCountWithDefaultOnEof { length: 2, data: vec![0xAA, 0xBB] } );
 
-    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof = Readable::read_from_buffer( Endianness::LittleEndian, &[2, 0xAA] ).unwrap();
+    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[2, 0xAA] ).unwrap();
     assert_eq!( deserialized, DerivedStructWithVecWithCountWithDefaultOnEof { length: 2, data: vec![] } );
 }
 
@@ -859,7 +859,7 @@ fn test_length_mismatch_with_count_attribute() {
     let err = DerivedStructWithVecWithCount {
         length: 0,
         data: vec![ true ]
-    }.write_to_vec( Endianness::LittleEndian ).unwrap_err();
+    }.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap_err();
 
     assert_eq!(
         err.to_string(),

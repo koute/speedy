@@ -27,7 +27,7 @@ fn write_speedy_megabyte_buffer_le( b: &mut Bencher ) {
     buffer = black_box( buffer );
     b.iter( || {
         let mut output = Vec::new();
-        buffer.write_to_stream( Endianness::LittleEndian, &mut output ).unwrap();
+        buffer.write_to_stream_with_ctx( Endianness::LittleEndian, &mut output ).unwrap();
         output
     })
 }
@@ -39,7 +39,7 @@ fn write_speedy_megabyte_buffer_be( b: &mut Bencher ) {
     buffer = black_box( buffer );
     b.iter( || {
         let mut output = Vec::new();
-        buffer.write_to_stream( Endianness::BigEndian, &mut output ).unwrap();
+        buffer.write_to_stream_with_ctx( Endianness::BigEndian, &mut output ).unwrap();
         output
     })
 }
@@ -48,11 +48,11 @@ fn write_speedy_megabyte_buffer_be( b: &mut Bencher ) {
 fn read_speedy_megabyte_buffer_cow_borrowed( b: &mut Bencher ) {
     let mut buffer: Vec< u8 > = Vec::new();
     buffer.resize( 1024 * 1024, 1 );
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        let deserialized: Cow< [u8] > = Readable::read_from_buffer( Endianness::NATIVE, &buffer ).unwrap();
+        let deserialized: Cow< [u8] > = Readable::read_from_buffer_with_ctx( Endianness::NATIVE, &buffer ).unwrap();
         deserialized
     })
 }
@@ -61,11 +61,11 @@ fn read_speedy_megabyte_buffer_cow_borrowed( b: &mut Bencher ) {
 fn read_speedy_megabyte_buffer_cow_owned( b: &mut Bencher ) {
     let mut buffer: Vec< u8 > = Vec::new();
     buffer.resize( 1024 * 1024, 1 );
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        let deserialized: Cow< [u8] > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        let deserialized: Cow< [u8] > = Readable::read_from_buffer_owned_with_ctx( Endianness::NATIVE, &buffer ).unwrap();
         deserialized
     })
 }
@@ -90,11 +90,11 @@ impl< 'a, C: Context > Readable< 'a, C > for Byte {
 fn read_speedy_megabyte_buffer_vec_non_primitive( b: &mut Bencher ) {
     let mut buffer: Vec< Byte > = Vec::new();
     buffer.resize( 1024 * 1024, Byte( 1 ) );
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        let deserialized: Vec< Byte > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        let deserialized: Vec< Byte > = Readable::read_from_buffer_owned_with_ctx( Endianness::NATIVE, &buffer ).unwrap();
         deserialized
     })
 }
@@ -123,11 +123,11 @@ fn read_speedy_many_small_structs( b: &mut Bencher ) {
         g: true
     };
     buffer.resize( 1024 * 1024, dummy );
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        let deserialized: Vec< Dummy > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        let deserialized: Vec< Dummy > = Readable::read_from_buffer_owned_with_ctx( Endianness::NATIVE, &buffer ).unwrap();
         deserialized
     })
 }
@@ -148,7 +148,7 @@ fn write_speedy_many_small_structs( b: &mut Bencher ) {
 
     buffer = black_box( buffer );
     b.iter( || {
-        buffer.write_to_vec( Endianness::NATIVE ).unwrap()
+        buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap()
     })
 }
 
@@ -177,11 +177,11 @@ fn read_varint_random( b: &mut Bencher ) {
     let mut rng = XorShift64 { a: 1234 };
 
     let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| (1_u64 << (rng.next() % 63)).into() ).collect();
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned_with_ctx( Endianness::NATIVE, &buffer ).unwrap();
         deserialized
     })
 }
@@ -192,11 +192,11 @@ fn read_varint_always_one_byte( b: &mut Bencher ) {
     let mut rng = XorShift64 { a: 1234 };
 
     let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| (rng.next() % 100).into() ).collect();
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned_with_ctx( Endianness::NATIVE, &buffer ).unwrap();
         deserialized
     })
 }
@@ -207,11 +207,11 @@ fn read_varint_always_eight_bytes( b: &mut Bencher ) {
     let mut rng = XorShift64 { a: 1234 };
 
     let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| ((rng.next() % 100) | (1 << 63)).into() ).collect();
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned( Endianness::NATIVE, &buffer ).unwrap();
+        let deserialized: Vec< VarInt64 > = Readable::read_from_buffer_owned_with_ctx( Endianness::NATIVE, &buffer ).unwrap();
         deserialized
     })
 }
@@ -222,11 +222,11 @@ fn write_varint_random( b: &mut Bencher ) {
     let mut rng = XorShift64 { a: 1234 };
 
     let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| (1_u64 << (rng.next() % 63)).into() ).collect();
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        buffer.write_to_vec( Endianness::NATIVE ).unwrap()
+        buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap()
     })
 }
 
@@ -236,11 +236,11 @@ fn write_varint_always_one_byte( b: &mut Bencher ) {
     let mut rng = XorShift64 { a: 1234 };
 
     let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| (rng.next() % 100).into() ).collect();
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        buffer.write_to_vec( Endianness::NATIVE ).unwrap()
+        buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap()
     })
 }
 
@@ -250,10 +250,10 @@ fn write_varint_always_eight_bytes( b: &mut Bencher ) {
     let mut rng = XorShift64 { a: 1234 };
 
     let buffer: Vec< VarInt64 > = (0..1024 * 1024).into_iter().map( |_| ((rng.next() % 100) | (1 << 63)).into() ).collect();
-    let mut buffer = buffer.write_to_vec( Endianness::NATIVE ).unwrap();
+    let mut buffer = buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();
 
     buffer = black_box( buffer );
     b.iter( || {
-        buffer.write_to_vec( Endianness::NATIVE ).unwrap()
+        buffer.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap()
     })
 }

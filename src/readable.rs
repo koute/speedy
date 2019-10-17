@@ -173,7 +173,7 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer( context: C, buffer: &'a [u8] ) -> Result< Self, C::Error > {
+    fn read_from_buffer_with_ctx( context: C, buffer: &'a [u8] ) -> Result< Self, C::Error > {
         if buffer.len() < Self::minimum_bytes_needed() {
             return Err( error_end_of_input() );
         }
@@ -189,7 +189,7 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer_owned( context: C, buffer: &[u8] ) -> Result< Self, C::Error > {
+    fn read_from_buffer_owned_with_ctx( context: C, buffer: &[u8] ) -> Result< Self, C::Error > {
         if buffer.len() < Self::minimum_bytes_needed() {
             return Err( error_end_of_input() );
         }
@@ -205,19 +205,19 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_stream< S: Read >( context: C, stream: S ) -> Result< Self, C::Error > {
+    fn read_from_stream_with_ctx< S: Read >( context: C, stream: S ) -> Result< Self, C::Error > {
         StreamReader::deserialize( context, stream )
     }
 
     #[inline]
-    fn read_from_file( context: C, path: impl AsRef< Path > ) -> Result< Self, C::Error > {
+    fn read_from_file_with_ctx( context: C, path: impl AsRef< Path > ) -> Result< Self, C::Error > {
         let stream = File::open( path ).map_err( |error| {
             let error = Error::from_io_error( error );
             <C::Error as From< Error >>::from( error )
         })?;
 
         let stream = io::BufReader::new( stream );
-        Self::read_from_stream( context, stream )
+        Self::read_from_stream_with_ctx( context, stream )
     }
 
     // Since specialization is not stable yet we do it this way.
