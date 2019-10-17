@@ -6,8 +6,6 @@ use std::io::{
 use std::fs::File;
 use std::path::Path;
 
-use byteorder::WriteBytesExt;
-
 use crate::writer::Writer;
 use crate::context::Context;
 use crate::endianness::Endianness;
