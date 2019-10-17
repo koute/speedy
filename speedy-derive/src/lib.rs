@@ -570,7 +570,7 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
     quote! {
         match #body {
             Ok( value ) => value,
-            Err( ref error ) if error.kind() == std::io::ErrorKind::UnexpectedEof => std::default::Default::default(),
+            Err( ref error ) if speedy::IsEof::is_eof( error ) => std::default::Default::default(),
             Err( error ) => return Err( error )
         }
     }
@@ -992,7 +992,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let output = quote! {
         impl< 'a_, #impl_params C_: speedy::Context > speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
             #[inline]
-            fn read_from< R_: speedy::Reader< 'a_, C_ > >( _reader_: &mut R_ ) -> std::io::Result< Self > {
+            fn read_from< R_: speedy::Reader< 'a_, C_ > >( _reader_: &mut R_ ) -> std::result::Result< Self, C_::Error > {
                 #reader_body
             }
 
@@ -1108,7 +1108,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let output = quote! {
         impl< #impl_params C_: speedy::Context > speedy::Writable< C_ > for #name #ty_params #where_clause {
             #[inline]
-            fn write_to< T_: ?Sized + speedy::Writer< C_ > >( &self, _writer_: &mut T_ ) -> std::io::Result< () > {
+            fn write_to< T_: ?Sized + speedy::Writer< C_ > >( &self, _writer_: &mut T_ ) -> std::result::Result< (), C_::Error > {
                 #writer_body
                 Ok(())
             }

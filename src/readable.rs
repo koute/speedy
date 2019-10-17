@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 use crate::reader::Reader;
 use crate::context::Context;
 use crate::endianness::Endianness;
+use crate::Error;
 
 use crate::private::error_end_of_input;
 
@@ -22,7 +23,7 @@ struct BufferReader< 'a, C > where C: Context {
 
 impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     #[inline(always)]
-    fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
+    fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
         let length = output.len();
         if self.can_read_at_least( length ) == Some( false ) {
             return Err( error_end_of_input() );
@@ -37,7 +38,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
-    fn skip_bytes( &mut self, length: usize ) -> io::Result< () > {
+    fn skip_bytes( &mut self, length: usize ) -> Result< (), C::Error > {
         if self.can_read_at_least( length ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -49,7 +50,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
-    fn read_bytes_borrowed( &mut self, length: usize ) -> Option< io::Result< &'a [u8] > > {
+    fn read_bytes_borrowed( &mut self, length: usize ) -> Option< Result< &'a [u8], C::Error > > {
         if self.can_read_at_least( length ) == Some( false ) {
             return Some( Err( error_end_of_input() ) );
         }
@@ -88,7 +89,7 @@ struct CopyingBufferReader< 'a, C > where C: Context {
 
 impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
     #[inline(always)]
-    fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
+    fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
         let length = output.len();
         if self.can_read_at_least( length ) == Some( false ) {
             return Err( error_end_of_input() );
@@ -103,7 +104,7 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
     }
 
     #[inline(always)]
-    fn skip_bytes( &mut self, length: usize ) -> io::Result< () > {
+    fn skip_bytes( &mut self, length: usize ) -> Result< (), C::Error > {
         if self.can_read_at_least( length ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -137,8 +138,11 @@ struct StreamReader< C: Context, S: Read > {
 
 impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
     #[inline(always)]
-    fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () > {
-        self.reader.read_exact( output )
+    fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
+        self.reader.read_exact( output ).map_err( |error| {
+            let error = Error::from_io_error( error );
+            <C::Error as From< Error >>::from( error )
+        })
     }
 
     #[inline(always)]
@@ -154,14 +158,14 @@ impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
 
 impl< C: Context, S: Read > StreamReader< C, S > {
     #[inline]
-    fn deserialize< 'a, T: Readable< 'a, C > >( context: C, reader: S ) -> io::Result< T > {
+    fn deserialize< 'a, T: Readable< 'a, C > >( context: C, reader: S ) -> Result< T, C::Error > {
         let mut reader = StreamReader { context, reader };
         T::read_from( &mut reader )
     }
 }
 
 pub trait Readable< 'a, C: Context >: Sized {
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self >;
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error >;
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
@@ -169,7 +173,7 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer( context: C, buffer: &'a [u8] ) -> io::Result< Self > {
+    fn read_from_buffer( context: C, buffer: &'a [u8] ) -> Result< Self, C::Error > {
         if buffer.len() < Self::minimum_bytes_needed() {
             return Err( error_end_of_input() );
         }
@@ -185,7 +189,7 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer_owned( context: C, buffer: &[u8] ) -> io::Result< Self > {
+    fn read_from_buffer_owned( context: C, buffer: &[u8] ) -> Result< Self, C::Error > {
         if buffer.len() < Self::minimum_bytes_needed() {
             return Err( error_end_of_input() );
         }
@@ -201,13 +205,18 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_stream< S: Read >( context: C, stream: S ) -> io::Result< Self > {
+    fn read_from_stream< S: Read >( context: C, stream: S ) -> Result< Self, C::Error > {
         StreamReader::deserialize( context, stream )
     }
 
     #[inline]
-    fn read_from_file( context: C, path: impl AsRef< Path > ) -> io::Result< Self > {
-        let stream = io::BufReader::new( File::open( path )? );
+    fn read_from_file( context: C, path: impl AsRef< Path > ) -> Result< Self, C::Error > {
+        let stream = File::open( path ).map_err( |error| {
+            let error = Error::from_io_error( error );
+            <C::Error as From< Error >>::from( error )
+        })?;
+
+        let stream = io::BufReader::new( stream );
         Self::read_from_stream( context, stream )
     }
 

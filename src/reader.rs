@@ -1,4 +1,3 @@
-use std::io;
 use std::mem;
 use std::borrow::Cow;
 use std::iter::FromIterator;
@@ -10,12 +9,12 @@ use crate::context::Context;
 use crate::private::error_end_of_input;
 
 pub trait Reader< 'a, C: Context >: Sized {
-    fn read_bytes( &mut self, output: &mut [u8] ) -> io::Result< () >;
+    fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
     fn context( &self ) -> &C;
     fn context_mut( &mut self ) -> &mut C;
 
     #[inline(always)]
-    fn skip_bytes( &mut self, mut length: usize ) -> io::Result< () > {
+    fn skip_bytes( &mut self, mut length: usize ) -> Result< (), C::Error > {
         while length > 0 {
             const CHUNK_SIZE: usize = 1024;
             let mut dummy_buffer: [u8; CHUNK_SIZE] = unsafe { std::mem::uninitialized() };
@@ -33,12 +32,12 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_bytes_borrowed( &mut self, _length: usize ) -> Option< io::Result< &'a [u8] > > {
+    fn read_bytes_borrowed( &mut self, _length: usize ) -> Option< Result< &'a [u8], C::Error > > {
         None
     }
 
     #[inline(always)]
-    fn read_u8( &mut self ) -> io::Result< u8 > {
+    fn read_u8( &mut self ) -> Result< u8, C::Error > {
         if self.can_read_at_least( 1 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -49,12 +48,12 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_i8( &mut self ) -> io::Result< i8 > {
+    fn read_i8( &mut self ) -> Result< i8, C::Error > {
         self.read_u8().map( |byte| byte as i8 )
     }
 
     #[inline(always)]
-    fn read_u16( &mut self ) -> io::Result< u16 > {
+    fn read_u16( &mut self ) -> Result< u16, C::Error > {
         if self.can_read_at_least( 2 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -65,7 +64,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_i16( &mut self ) -> io::Result< i16 > {
+    fn read_i16( &mut self ) -> Result< i16, C::Error > {
         if self.can_read_at_least( 2 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -76,7 +75,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_u32( &mut self ) -> io::Result< u32 > {
+    fn read_u32( &mut self ) -> Result< u32, C::Error > {
         if self.can_read_at_least( 4 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -87,7 +86,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_i32( &mut self ) -> io::Result< i32 > {
+    fn read_i32( &mut self ) -> Result< i32, C::Error > {
         if self.can_read_at_least( 4 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -98,7 +97,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_u64( &mut self ) -> io::Result< u64 > {
+    fn read_u64( &mut self ) -> Result< u64, C::Error > {
         if self.can_read_at_least( 8 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -109,7 +108,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_i64( &mut self ) -> io::Result< i64 > {
+    fn read_i64( &mut self ) -> Result< i64, C::Error > {
         if self.can_read_at_least( 8 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -120,7 +119,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_f32( &mut self ) -> io::Result< f32 > {
+    fn read_f32( &mut self ) -> Result< f32, C::Error > {
         if self.can_read_at_least( 4 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -131,7 +130,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_f64( &mut self ) -> io::Result< f64 > {
+    fn read_f64( &mut self ) -> Result< f64, C::Error > {
         if self.can_read_at_least( 8 ) == Some( false ) {
             return Err( error_end_of_input() );
         }
@@ -142,7 +141,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_value< T: Readable< 'a, C > >( &mut self ) -> io::Result< T > {
+    fn read_value< T: Readable< 'a, C > >( &mut self ) -> Result< T, C::Error > {
         T::read_from( self )
     }
 
@@ -152,7 +151,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_vec< T >( &mut self, length: usize ) -> io::Result< Vec< T > >
+    fn read_vec< T >( &mut self, length: usize ) -> Result< Vec< T >, C::Error >
         where T: Readable< 'a, C >
     {
         let (required, overflow) = T::minimum_bytes_needed().overflowing_mul( length );
@@ -187,7 +186,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_cow< T >( &mut self, length: usize ) -> io::Result< Cow< 'a, [T] > >
+    fn read_cow< T >( &mut self, length: usize ) -> Result< Cow< 'a, [T] >, C::Error >
         where T: Readable< 'a, C >,
               [T]: ToOwned< Owned = Vec< T > >
     {
@@ -214,7 +213,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_collection< T, U >( &mut self, length: usize ) -> io::Result< U >
+    fn read_collection< T, U >( &mut self, length: usize ) -> Result< U, C::Error >
         where U: FromIterator< T >,
               T: Readable< 'a, C >
     {

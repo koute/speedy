@@ -1,6 +1,7 @@
 #![cfg_attr(feature = "external_doc", feature(external_doc))]
 #![cfg_attr(feature = "external_doc", doc(include = "../README.md"))]
 
+mod error;
 mod utils;
 mod readable;
 mod readable_impl;
@@ -27,6 +28,8 @@ pub use crate::writer::Writer;
 pub use crate::endianness::Endianness;
 pub use crate::context::Context;
 
+pub use crate::error::{Error, IsEof};
+
 #[cfg(test)]
 mod tests {
     use std::io;
@@ -49,7 +52,7 @@ mod tests {
     }
 
     impl< C: Context > Writable< C > for SimpleStruct {
-        fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
+        fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
             writer.write_value( &self.a )?;
             writer.write_value( &self.b )?;
             writer.write_value( &self.c )?;
@@ -59,7 +62,7 @@ mod tests {
     }
 
     impl< 'a, C: Context > Readable< 'a, C > for SimpleStruct {
-        fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+        fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
             let a = reader.read_u8()?;
             let b = reader.read_u8()?;
             let c = reader.read_u8()?;

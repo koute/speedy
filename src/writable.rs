@@ -9,6 +9,7 @@ use std::path::Path;
 use crate::writer::Writer;
 use crate::context::Context;
 use crate::endianness::Endianness;
+use crate::Error;
 
 use crate::private::error_end_of_output_buffer;
 
@@ -20,7 +21,7 @@ struct BufferCollector< 'a, C: Context > {
 
 impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
     #[inline]
-    fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () > {
+    fn write_bytes( &mut self, slice: &[u8] ) -> Result< (), C::Error > {
         let buffer = self.buffer.get_mut( self.position..self.position + slice.len() ).ok_or_else( error_end_of_output_buffer )?;
         buffer.copy_from_slice( slice );
         self.position += slice.len();
@@ -50,8 +51,11 @@ struct WritingCollector< C: Context, T: Write > {
 
 impl< C: Context, T: Write > Writer< C > for WritingCollector< C, T > {
     #[inline]
-    fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () > {
-        self.writer.write_all( slice )
+    fn write_bytes( &mut self, slice: &[u8] ) -> Result< (), C::Error > {
+        self.writer.write_all( slice ).map_err( |error| {
+            let error = Error::from_io_error( error );
+            <C::Error as From< Error >>::from( error )
+        })
     }
 
     #[inline]
@@ -71,31 +75,31 @@ struct SizeCalculatorCollector {
 
 impl< C: Context > Writer< C > for SizeCalculatorCollector {
     #[inline]
-    fn write_bytes( &mut self, slice: &[u8] ) -> io::Result< () > {
+    fn write_bytes( &mut self, slice: &[u8] ) -> Result< (), C::Error > {
         self.size += slice.len();
         Ok(())
     }
 
     #[inline]
-    fn write_u8( &mut self, _: u8 ) -> io::Result< () > {
+    fn write_u8( &mut self, _: u8 ) -> Result< (), C::Error > {
         self.size += 1;
         Ok(())
     }
 
     #[inline]
-    fn write_u16( &mut self, _: u16 ) -> io::Result< () > {
+    fn write_u16( &mut self, _: u16 ) -> Result< (), C::Error > {
         self.size += 2;
         Ok(())
     }
 
     #[inline]
-    fn write_u32( &mut self, _: u32 ) -> io::Result< () > {
+    fn write_u32( &mut self, _: u32 ) -> Result< (), C::Error > {
         self.size += 4;
         Ok(())
     }
 
     #[inline]
-    fn write_u64( &mut self, _: u64 ) -> io::Result< () > {
+    fn write_u64( &mut self, _: u64 ) -> Result< (), C::Error > {
         self.size += 8;
         Ok(())
     }
@@ -117,10 +121,10 @@ impl< C: Context > Writer< C > for SizeCalculatorCollector {
 }
 
 pub trait Writable< C: Context > {
-    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () >;
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error >;
 
     #[inline]
-    fn write_to_buffer( &self, context: C, buffer: &mut [u8] ) -> io::Result< () > {
+    fn write_to_buffer( &self, context: C, buffer: &mut [u8] ) -> Result< (), C::Error > {
         let buffer = buffer.get_mut( 0..self.bytes_needed()? ).ok_or_else( error_end_of_output_buffer )?;
         let mut writer = BufferCollector {
             context,
@@ -133,7 +137,7 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn write_to_vec( &self, context: C ) -> io::Result< Vec< u8 > > {
+    fn write_to_vec( &self, context: C ) -> Result< Vec< u8 >, C::Error > {
         let capacity = self.bytes_needed()?;
         let mut vec = Vec::with_capacity( capacity );
         unsafe {
@@ -158,7 +162,7 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn write_to_stream< S: Write >( &self, context: C, stream: S ) -> io::Result< () > {
+    fn write_to_stream< S: Write >( &self, context: C, stream: S ) -> Result< (), C::Error > {
         let mut writer = WritingCollector {
             context,
             writer: stream
@@ -168,13 +172,17 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn write_to_file( &self, context: C, path: impl AsRef< Path > ) -> io::Result< () > {
-        let stream = io::BufWriter::new( File::create( path )? );
+    fn write_to_file( &self, context: C, path: impl AsRef< Path > ) -> Result< (), C::Error > {
+        let stream = File::create( path ).map_err( |error| {
+            let error = Error::from_io_error( error );
+            <C::Error as From< Error >>::from( error )
+        })?;
+        let stream = io::BufWriter::new( stream );
         self.write_to_stream( context, stream )
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> io::Result< usize > {
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
         let mut writer = SizeCalculatorCollector {
             size: 0
         };

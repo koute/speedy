@@ -2,7 +2,7 @@
 
 extern crate test;
 
-use std::io::{self, Write};
+use std::io::Write;
 use std::borrow::Cow;
 use test::{Bencher, black_box};
 use speedy::{Context, Readable, Reader, Writable, Endianness};
@@ -76,7 +76,7 @@ struct Byte( u8 );
 
 impl< 'a, C: Context > Readable< 'a, C > for Byte {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         Ok( Byte( reader.read_u8()? ) )
     }
 

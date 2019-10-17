@@ -1,6 +1,7 @@
 use {
     crate::{
         Context,
+        Error,
         Reader,
         Writer
     },
@@ -16,66 +17,75 @@ pub use crate::varint::VarInt64;
 
 #[inline(never)]
 #[cold]
-fn error_invalid_string_utf8( error: std::string::FromUtf8Error ) -> io::Error {
-    io::Error::new( io::ErrorKind::InvalidData, error )
+fn error_invalid_string_utf8< T >( error: std::string::FromUtf8Error ) -> T where T: From< Error > {
+    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, error ) );
+    T::from( error )
 }
 
 #[inline(never)]
 #[cold]
-fn error_invalid_str_utf8( error: std::str::Utf8Error ) -> io::Error {
-    io::Error::new( io::ErrorKind::InvalidData, error )
+fn error_invalid_str_utf8< T >( error: std::str::Utf8Error ) -> T where T: From< Error > {
+    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, error ) );
+    T::from( error )
 }
 
 #[inline(never)]
 #[cold]
-pub fn error_length_is_not_the_same_as_count( field_name: &str ) -> io::Error {
+pub fn error_length_is_not_the_same_as_count< T >( field_name: &str ) -> T where T: From< Error > {
     let error_message = format!( "the length of '{}' is not the same as its 'count' attribute", field_name );
-    std::io::Error::new( std::io::ErrorKind::InvalidData, error_message )
+    let error = Error::from_io_error( std::io::Error::new( std::io::ErrorKind::InvalidData, error_message ) );
+    T::from( error )
 }
 
 #[inline(never)]
 #[cold]
-pub fn error_out_of_range_length() -> io::Error {
-    io::Error::new( io::ErrorKind::InvalidData, "out of range length" )
+pub fn error_out_of_range_length< T >() -> T where T: From< Error > {
+    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "out of range length" ) );
+    T::from( error )
 }
 
 #[inline(never)]
 #[cold]
-pub fn error_invalid_enum_variant() -> io::Error {
-    io::Error::new( io::ErrorKind::InvalidData, "invalid enum variant" )
+pub fn error_invalid_enum_variant< T >() -> T where T: From< Error > {
+    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "invalid enum variant" ) );
+    T::from( error )
 }
 
 #[inline(never)]
 #[cold]
-pub(crate) fn error_out_of_range_char() -> io::Error {
-    io::Error::new( io::ErrorKind::InvalidData, "out of range char" )
+pub(crate) fn error_out_of_range_char< T >() -> T where T: From< Error > {
+    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "out of range char" ) );
+    T::from( error )
 }
 
 #[inline(never)]
 #[cold]
-pub(crate) fn error_too_big_usize_for_this_architecture() -> io::Error {
-    io::Error::new( io::ErrorKind::InvalidData, "value cannot fit into an usize on this architecture" )
+pub(crate) fn error_too_big_usize_for_this_architecture< T >() -> T where T: From< Error > {
+    let error = Error::from_io_error( io::Error::new( io::ErrorKind::InvalidData, "value cannot fit into an usize on this architecture" ) );
+    T::from( error )
 }
 
 #[inline(never)]
 #[cold]
-pub(crate) fn error_end_of_input() -> io::Error {
-    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input" )
+pub(crate) fn error_end_of_input< T >() -> T where T: From< Error > {
+    let error = Error::from_io_error( io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of input" ) );
+    T::from( error )
 }
 
 #[inline(never)]
 #[cold]
-pub(crate) fn error_end_of_output_buffer() -> io::Error {
-    io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of output buffer" )
+pub(crate) fn error_end_of_output_buffer< T >() -> T where T: From< Error > {
+    let error = Error::from_io_error( io::Error::new( io::ErrorKind::UnexpectedEof, "unexpected end of output buffer" ) );
+    T::from( error )
 }
 
 #[inline]
-pub fn vec_to_string( bytes: Vec< u8 > ) -> Result< String, io::Error > {
+pub fn vec_to_string< E >( bytes: Vec< u8 > ) -> Result< String, E > where E: From< Error > {
     String::from_utf8( bytes ).map_err( error_invalid_string_utf8 )
 }
 
 #[inline]
-pub fn cow_bytes_to_cow_str( bytes: Cow< [u8] > ) -> Result< Cow< str >, io::Error > {
+pub fn cow_bytes_to_cow_str< E >( bytes: Cow< [u8] > ) -> Result< Cow< str >, E > where E: From< Error > {
     match bytes {
         Cow::Borrowed( bytes ) => {
             std::str::from_utf8( bytes )
@@ -91,7 +101,7 @@ pub fn cow_bytes_to_cow_str( bytes: Cow< [u8] > ) -> Result< Cow< str >, io::Err
 }
 
 #[inline]
-pub fn write_length_u64< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+pub fn write_length_u64< C, W >( length: usize, writer: &mut W ) -> Result< (), C::Error >
     where C: Context,
           W: ?Sized + Writer< C >
 {
@@ -99,7 +109,7 @@ pub fn write_length_u64< C, W >( length: usize, writer: &mut W ) -> io::Result< 
 }
 
 #[inline]
-pub fn write_length_u32< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+pub fn write_length_u32< C, W >( length: usize, writer: &mut W ) -> Result< (), C::Error >
     where C: Context,
           W: ?Sized + Writer< C >
 {
@@ -111,7 +121,7 @@ pub fn write_length_u32< C, W >( length: usize, writer: &mut W ) -> io::Result< 
 }
 
 #[inline]
-pub fn write_length_u16< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+pub fn write_length_u16< C, W >( length: usize, writer: &mut W ) -> Result< (), C::Error >
     where C: Context,
           W: ?Sized + Writer< C >
 {
@@ -123,7 +133,7 @@ pub fn write_length_u16< C, W >( length: usize, writer: &mut W ) -> io::Result< 
 }
 
 #[inline]
-pub fn write_length_u8< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+pub fn write_length_u8< C, W >( length: usize, writer: &mut W ) -> Result< (), C::Error >
     where C: Context,
           W: ?Sized + Writer< C >
 {
@@ -135,7 +145,7 @@ pub fn write_length_u8< C, W >( length: usize, writer: &mut W ) -> io::Result< (
 }
 
 #[inline]
-pub fn write_length< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
+pub fn write_length< C, W >( length: usize, writer: &mut W ) -> Result< (), C::Error >
     where C: Context,
           W: ?Sized + Writer< C >
 {
@@ -143,7 +153,7 @@ pub fn write_length< C, W >( length: usize, writer: &mut W ) -> io::Result< () >
 }
 
 #[inline]
-pub fn read_length_u64< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+pub fn read_length_u64< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error >
     where C: Context,
           R: Reader< 'a, C >
 {
@@ -151,7 +161,7 @@ pub fn read_length_u64< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
 }
 
 #[inline]
-pub fn read_length_u32< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+pub fn read_length_u32< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error >
     where C: Context,
           R: Reader< 'a, C >
 {
@@ -159,7 +169,7 @@ pub fn read_length_u32< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
 }
 
 #[inline]
-pub fn read_length_u16< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+pub fn read_length_u16< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error >
     where C: Context,
           R: Reader< 'a, C >
 {
@@ -167,7 +177,7 @@ pub fn read_length_u16< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
 }
 
 #[inline]
-pub fn read_length_u8< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+pub fn read_length_u8< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error >
     where C: Context,
           R: Reader< 'a, C >
 {
@@ -175,7 +185,7 @@ pub fn read_length_u8< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
 }
 
 #[inline]
-pub fn read_length< 'a, C, R >( reader: &mut R ) -> io::Result< usize >
+pub fn read_length< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error >
     where C: Context,
           R: Reader< 'a, C >
 {

@@ -5,9 +5,6 @@ use {
         Reader,
         Writable,
         Writer
-    },
-    std::{
-        io
     }
 };
 
@@ -108,7 +105,7 @@ impl From< VarInt64 > for i64 {
 
 impl< 'a, C: Context > Readable< 'a, C > for VarInt64 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let first_byte = reader.read_u8()?;
         let length = (!first_byte).leading_zeros();
 
@@ -191,7 +188,7 @@ fn test_get_length() {
 
 impl< C: Context > Writable< C > for VarInt64 {
     #[inline]
-    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> io::Result< () > {
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
         let mut value = self.0;
         let length = get_length( value.leading_zeros() );
 
@@ -262,7 +259,7 @@ impl< C: Context > Writable< C > for VarInt64 {
     }
 
     #[inline]
-    fn bytes_needed( &self ) -> io::Result< usize > {
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
         Ok( get_length( self.0.leading_zeros() ) as usize + 1 )
     }
 }

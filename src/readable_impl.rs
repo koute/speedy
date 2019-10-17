@@ -1,4 +1,3 @@
-use std::io;
 use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
@@ -18,7 +17,7 @@ impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
           V: Readable< 'a, C >,
 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
         reader.read_collection( length )
     }
@@ -34,7 +33,7 @@ impl< 'a, C, T > Readable< 'a, C > for BTreeSet< T >
           T: Readable< 'a, C > + Ord
 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
         reader.read_collection( length )
     }
@@ -52,7 +51,7 @@ impl< 'a, C, K, V, S > Readable< 'a, C > for HashMap< K, V, S >
           S: BuildHasher + Default
 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
         reader.read_collection( length )
     }
@@ -69,7 +68,7 @@ impl< 'a, C, T, S > Readable< 'a, C > for HashSet< T, S >
           S: BuildHasher + Default
 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
         reader.read_collection( length )
     }
@@ -82,7 +81,7 @@ impl< 'a, C, T, S > Readable< 'a, C > for HashSet< T, S >
 
 impl< 'a, C: Context > Readable< 'a, C > for bool {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = reader.read_u8()?;
         if value == 0 {
             Ok( false )
@@ -99,7 +98,7 @@ impl< 'a, C: Context > Readable< 'a, C > for bool {
 
 impl< 'a, C: Context > Readable< 'a, C > for char {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = reader.read_u32()?;
         std::char::from_u32( value ).ok_or_else( crate::private::error_out_of_range_char )
     }
@@ -114,7 +113,7 @@ macro_rules! impl_for_primitive {
     ($type:ty, $getter:ident, $endianness_swap:ident) => {
         impl< 'a, C: Context > Readable< 'a, C > for $type {
             #[inline(always)]
-            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
                 reader.$getter()
             }
 
@@ -163,7 +162,7 @@ impl_for_primitive!( f64, read_f64, swap_slice_f64 );
 
 impl< 'a, C: Context > Readable< 'a, C > for usize {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = u64::read_from( reader )?;
         if value > std::usize::MAX as u64 {
             return Err( crate::private::error_too_big_usize_for_this_architecture() );
@@ -179,9 +178,10 @@ impl< 'a, C: Context > Readable< 'a, C > for usize {
 
 impl< 'a, C: Context > Readable< 'a, C > for String {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let bytes: Vec< u8 > = reader.read_value()?;
-        crate::private::vec_to_string( bytes )
+        let value = crate::private::vec_to_string( bytes )?;
+        Ok( value )
     }
 
     #[inline]
@@ -192,10 +192,11 @@ impl< 'a, C: Context > Readable< 'a, C > for String {
 
 impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
         let bytes: Cow< 'a, [u8] > = reader.read_cow( length )?;
-        crate::private::cow_bytes_to_cow_str( bytes )
+        let value = crate::private::cow_bytes_to_cow_str( bytes )?;
+        Ok( value )
     }
 
     #[inline]
@@ -206,7 +207,7 @@ impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
 
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
         reader.read_vec( length )
     }
@@ -219,7 +220,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
 
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] > where [T]: ToOwned< Owned = Vec< T > > {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
         reader.read_cow( length )
     }
@@ -232,7 +233,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] 
 
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Range< T > {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let start = reader.read_value()?;
         let end = reader.read_value()?;
         Ok( start..end )
@@ -246,7 +247,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Range< T > {
 
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Option< T > {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let flag = reader.read_value()?;
         let value = if flag {
             Some( reader.read_value()? )
@@ -265,7 +266,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Option< T > {
 
 impl< 'a, C: Context > Readable< 'a, C > for () {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( _: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( _: &mut R ) -> Result< Self, C::Error > {
         Ok(())
     }
 
@@ -279,7 +280,7 @@ macro_rules! impl_for_tuple {
     ($($name:ident),+) => {
         impl< 'a, C: Context, $($name: Readable< 'a, C >),+ > Readable< 'a, C > for ($($name,)+) {
             #[inline]
-            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
                 $(
                     #[allow(non_snake_case)]
                     let $name = reader.read_value()?;
@@ -314,7 +315,7 @@ impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 );
 
 impl< 'a, C: Context > Readable< 'a, C > for Endianness {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> io::Result< Self > {
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = reader.read_u8()?;
         match value {
             0 => Ok( Endianness::LittleEndian ),
