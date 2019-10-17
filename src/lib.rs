@@ -109,6 +109,47 @@ mod tests {
     }
 
     #[test]
+    fn read_from_buffer_owned_with_default_ctx() {
+        let data = vec![ 2, 0 ];
+        let value = u16::read_from_buffer_owned( &data ).unwrap();
+        assert_eq!( value, 2 );
+    }
+
+    #[test]
+    fn read_from_buffer_borrowed_with_default_ctx() {
+        let data = vec![ 2, 0 ];
+        let value = u16::read_from_buffer( &data ).unwrap();
+        assert_eq!( value, 2 );
+    }
+
+    #[test]
+    fn read_from_stream_with_default_ctx() {
+        let data = vec![ 2, 0 ];
+        let value = u16::read_from_stream( io::Cursor::new( data ) ).unwrap();
+        assert_eq!( value, 2 );
+    }
+
+    #[test]
+    fn write_to_buffer_with_default_ctx() {
+        let mut buffer = [0, 0];
+        2_u16.write_to_buffer( &mut buffer ).unwrap();
+        assert_eq!( buffer, [2, 0] );
+    }
+
+    #[test]
+    fn write_to_vec_with_default_ctx() {
+        let buffer = 2_u16.write_to_vec().unwrap();
+        assert_eq!( buffer, [2, 0] );
+    }
+
+    #[test]
+    fn write_to_stream_with_default_ctx() {
+        let mut buffer = [0, 0];
+        2_u16.write_to_stream( io::Cursor::new( &mut buffer[..] ) ).unwrap();
+        assert_eq!( buffer, [2, 0] );
+    }
+
+    #[test]
     fn read_write_u8_vec() {
         let original: Vec< u8 > = vec![ 1, 2, 3 ];
         let serialized = original.write_to_vec_with_ctx( Endianness::NATIVE ).unwrap();

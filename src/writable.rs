@@ -7,7 +7,7 @@ use std::fs::File;
 use std::path::Path;
 
 use crate::writer::Writer;
-use crate::context::Context;
+use crate::context::{Context, DefaultContext};
 use crate::endianness::Endianness;
 use crate::Error;
 
@@ -122,6 +122,26 @@ impl< C: Context > Writer< C > for SizeCalculatorCollector {
 
 pub trait Writable< C: Context > {
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error >;
+
+    #[inline]
+    fn write_to_buffer( &self, buffer: &mut [u8] ) -> Result< (), C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        self.write_to_buffer_with_ctx( Default::default(), buffer )
+    }
+
+    #[inline]
+    fn write_to_vec( &self) -> Result< Vec< u8 >, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        self.write_to_vec_with_ctx( Default::default() )
+    }
+
+    #[inline]
+    fn write_to_stream< S: Write >( &self, stream: S ) -> Result< (), C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        self.write_to_stream_with_ctx( Default::default(), stream )
+    }
+
+    #[inline]
+    fn write_to_file( &self, path: impl AsRef< Path > ) -> Result< (), C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        self.write_to_file_with_ctx( Default::default(), path )
+    }
 
     #[inline]
     fn write_to_buffer_with_ctx( &self, context: C, buffer: &mut [u8] ) -> Result< (), C::Error > {

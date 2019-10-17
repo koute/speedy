@@ -1,8 +1,3 @@
-use byteorder::{
-    LittleEndian,
-    BigEndian
-};
-
 use crate::endianness::Endianness;
 
 pub trait Context {
@@ -18,6 +13,12 @@ impl Context for Endianness {
         *self
     }
 }
+
+#[derive(Default)]
+pub struct LittleEndian {}
+
+#[derive(Default)]
+pub struct BigEndian {}
 
 impl Context for LittleEndian {
     type Error = crate::Error;
@@ -35,4 +36,12 @@ impl Context for BigEndian {
     fn endianness( &self ) -> Endianness {
         Endianness::BigEndian
     }
+}
+
+pub trait DefaultContext {
+    type Context;
+}
+
+impl< T > DefaultContext for T {
+    type Context = LittleEndian;
 }

@@ -8,7 +8,7 @@ use std::path::Path;
 use std::marker::PhantomData;
 
 use crate::reader::Reader;
-use crate::context::Context;
+use crate::context::{Context, DefaultContext};
 use crate::endianness::Endianness;
 use crate::Error;
 
@@ -170,6 +170,26 @@ pub trait Readable< 'a, C: Context >: Sized {
     #[inline]
     fn minimum_bytes_needed() -> usize {
         0
+    }
+
+    #[inline]
+    fn read_from_buffer( buffer: &'a [u8] ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        Self::read_from_buffer_with_ctx( Default::default(), buffer )
+    }
+
+    #[inline]
+    fn read_from_buffer_owned( buffer: &[u8] ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        Self::read_from_buffer_owned_with_ctx( Default::default(), buffer )
+    }
+
+    #[inline]
+    fn read_from_stream( stream: impl Read ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        Self::read_from_stream_with_ctx( Default::default(), stream )
+    }
+
+    #[inline]
+    fn read_from_file( path: impl AsRef< Path > ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        Self::read_from_file_with_ctx( Default::default(), path )
     }
 
     #[inline]
