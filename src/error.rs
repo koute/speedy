@@ -80,55 +80,46 @@ impl IsEof for Error {
     }
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_invalid_string_utf8< T >( _: std::string::FromUtf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_invalid_str_utf8< T >( _: std::str::Utf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_length_is_not_the_same_as_count< T >( field_name: &'static str ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::LengthIsNotTheSameAsCount { field_name } ) )
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_out_of_range_length< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::OutOfRangeLength ) )
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_invalid_enum_variant< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidEnumVariant ) )
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_out_of_range_char< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidChar ) )
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_too_big_usize_for_this_architecture< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::OutOfRangeUsize ) )
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_end_of_input< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::UnexpectedEndOfInput ) )
 }
 
-#[inline(never)]
 #[cold]
 pub fn error_end_of_output_buffer< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::UnexpectedEndOfOutputBuffer ) )
