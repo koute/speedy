@@ -12,7 +12,10 @@ use crate::context::{Context, DefaultContext};
 use crate::endianness::Endianness;
 use crate::Error;
 
-use crate::error::error_end_of_input;
+use crate::error::{
+    error_end_of_input,
+    error_input_buffer_is_too_small
+};
 
 struct BufferReader< 'a, C > where C: Context {
     context: C,
@@ -194,14 +197,16 @@ pub trait Readable< 'a, C: Context >: Sized {
 
     #[inline]
     fn read_from_buffer_with_ctx( context: C, buffer: &'a [u8] ) -> Result< Self, C::Error > {
-        if buffer.len() < Self::minimum_bytes_needed() {
-            return Err( error_end_of_input() );
+        let bytes_needed = Self::minimum_bytes_needed();
+        let buffer_length = buffer.len();
+        if buffer_length < bytes_needed {
+            return Err( error_input_buffer_is_too_small( buffer_length, bytes_needed ) );
         }
 
         let mut reader = BufferReader {
             context,
             ptr: buffer.as_ptr(),
-            end: unsafe { buffer.as_ptr().add( buffer.len() ) },
+            end: unsafe { buffer.as_ptr().add( buffer_length ) },
             phantom: PhantomData
         };
 
@@ -210,14 +215,16 @@ pub trait Readable< 'a, C: Context >: Sized {
 
     #[inline]
     fn read_from_buffer_owned_with_ctx( context: C, buffer: &[u8] ) -> Result< Self, C::Error > {
-        if buffer.len() < Self::minimum_bytes_needed() {
-            return Err( error_end_of_input() );
+        let bytes_needed = Self::minimum_bytes_needed();
+        let buffer_length = buffer.len();
+        if buffer_length < bytes_needed {
+            return Err( error_input_buffer_is_too_small( buffer_length, bytes_needed ) );
         }
 
         let mut reader = CopyingBufferReader {
             context,
             ptr: buffer.as_ptr(),
-            end: unsafe { buffer.as_ptr().add( buffer.len() ) },
+            end: unsafe { buffer.as_ptr().add( buffer_length ) },
             phantom: PhantomData
         };
 
