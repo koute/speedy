@@ -105,7 +105,12 @@ pub fn read_length_u64< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error 
     where C: Context,
           R: Reader< 'a, C >
 {
-    reader.read_u64().map( |value| value as usize )
+    let length = reader.read_u64()?;
+    if length > std::usize::MAX as u64 {
+        return Err( error_out_of_range_length() );
+    }
+
+    Ok( length as usize )
 }
 
 #[inline]
