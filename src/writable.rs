@@ -11,7 +11,10 @@ use crate::context::{Context, DefaultContext};
 use crate::endianness::Endianness;
 use crate::Error;
 
-use crate::error::error_end_of_output_buffer;
+use crate::error::{
+    error_end_of_output_buffer,
+    error_output_buffer_is_too_small
+};
 
 struct BufferCollector< 'a, C: Context > {
     context: C,
@@ -145,7 +148,9 @@ pub trait Writable< C: Context > {
 
     #[inline]
     fn write_to_buffer_with_ctx( &self, context: C, buffer: &mut [u8] ) -> Result< (), C::Error > {
-        let buffer = buffer.get_mut( 0..self.bytes_needed()? ).ok_or_else( error_end_of_output_buffer )?;
+        let bytes_needed = self.bytes_needed()?;
+        let buffer_length = buffer.len();
+        let buffer = buffer.get_mut( 0..bytes_needed ).ok_or_else( || error_output_buffer_is_too_small( buffer_length, bytes_needed ) )?;
         let mut writer = BufferCollector {
             context,
             buffer,

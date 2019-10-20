@@ -19,6 +19,10 @@ pub enum ErrorKind {
     OutOfRangeUsize,
     UnexpectedEndOfInput,
     UnexpectedEndOfOutputBuffer,
+    OutputBufferIsTooSmall {
+        actual_size: usize,
+        expected_size: usize
+    },
 
     LengthIsNotTheSameAsCount {
         field_name: &'static str
@@ -50,6 +54,7 @@ impl fmt::Display for Error {
             ErrorKind::OutOfRangeUsize => write!( fmt, "value cannot fit into an usize on this architecture" ),
             ErrorKind::UnexpectedEndOfInput => write!( fmt, "unexpected end of input" ),
             ErrorKind::UnexpectedEndOfOutputBuffer => write!( fmt, "unexpected end of output buffer" ),
+            ErrorKind::OutputBufferIsTooSmall { actual_size, expected_size } => write!( fmt, "output buffer is too small; expected at least {} bytes, got {}", expected_size, actual_size ),
             ErrorKind::LengthIsNotTheSameAsCount { field_name } => write!( fmt, "the length of '{}' is not the same as its 'count' attribute", field_name ),
             ErrorKind::IoError( ref error ) => write!( fmt, "{}", error )
         }
@@ -123,4 +128,9 @@ pub fn error_end_of_input< T >() -> T where T: From< Error > {
 #[cold]
 pub fn error_end_of_output_buffer< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::UnexpectedEndOfOutputBuffer ) )
+}
+
+#[cold]
+pub fn error_output_buffer_is_too_small< T >( actual_size: usize, expected_size: usize ) -> T where T: From< Error > {
+    T::from( Error::new( ErrorKind::OutputBufferIsTooSmall { actual_size, expected_size } ) )
 }
