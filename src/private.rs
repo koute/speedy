@@ -18,9 +18,13 @@ use {
 
 pub use crate::varint::VarInt64;
 pub use crate::error::{
+    ErrorKind,
+
     error_length_is_not_the_same_as_count,
     error_out_of_range_length,
-    error_invalid_enum_variant
+    error_invalid_enum_variant,
+
+    get_error_kind,
 };
 
 #[inline]

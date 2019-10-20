@@ -49,6 +49,11 @@ impl Error {
     }
 }
 
+#[inline]
+pub fn get_error_kind( error: &Error ) -> &ErrorKind {
+    &error.kind
+}
+
 impl fmt::Display for Error {
     fn fmt( &self, fmt: &mut fmt::Formatter ) -> fmt::Result {
         match self.kind {

@@ -20,7 +20,7 @@ speedy-derive = { version = "0.5", path = "speedy-derive", optional = true }
 panic = "abort"
 
 [workspace]
-members = [".", "speedy-derive"]
+members = [".", "speedy-derive", "static-tests"]
 
 [features]
 default = ["speedy-derive"]

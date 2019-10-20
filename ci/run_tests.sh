@@ -21,6 +21,7 @@ cargo build
 
 if [ "$IS_NIGHTLY" = "1" ]; then
     cargo test --features external_doc
+    cargo test -p static-tests --release
 else
     cargo test
 fi
