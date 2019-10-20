@@ -13,7 +13,6 @@ description = "A fast binary serialization framework"
 edition = "2018"
 
 [dependencies]
-byteorder = "1"
 speedy-derive = { version = "= 0.6.0", path = "speedy-derive", optional = true }
 
 [profile.release]

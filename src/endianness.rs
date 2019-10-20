@@ -1,11 +1,3 @@
-use std::slice;
-
-use byteorder::{
-    ByteOrder,
-    LittleEndian,
-    BigEndian
-};
-
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Endianness {
     LittleEndian,
@@ -34,39 +26,98 @@ impl Endianness {
 }
 
 macro_rules! emit_wrapper {
-    ($type:ty, $reader:ident, $swapper:ident, $slice_swapper:ident, $from_slice:ident, $write:ident) => {
+    ($type:ty, $reader:ident, $swapper:ident, $slice_swapper:ident) => {
         impl Endianness {
             #[inline]
             pub fn $reader( self, slice: &[u8] ) -> $type {
-                match self {
-                    Endianness::LittleEndian => LittleEndian::$reader( slice ),
-                    Endianness::BigEndian => BigEndian::$reader( slice )
+                assert!( slice.len() == core::mem::size_of::< $type >() );
+
+                let mut value: $type = 0;
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        slice.as_ptr(),
+                        &mut value as *mut $type as *mut u8,
+                        core::mem::size_of::< $type >()
+                    );
                 }
+
+                if self.conversion_necessary() {
+                    value = value.swap_bytes();
+                }
+
+                value
             }
 
             #[inline]
             pub fn $swapper( self, value: &mut $type ) {
-                let slice = unsafe { slice::from_raw_parts_mut( value as *mut $type, 1 ) };
-                self.$slice_swapper( slice );
+                if self.conversion_necessary() {
+                    *value = value.swap_bytes();
+                }
             }
 
             #[inline]
             pub fn $slice_swapper( self, slice: &mut [$type] ) {
-                match self {
-                    Endianness::LittleEndian => LittleEndian::$from_slice( slice ),
-                    Endianness::BigEndian => BigEndian::$from_slice( slice )
+                if self.conversion_necessary() {
+                    for value in slice {
+                        *value = value.swap_bytes();
+                    }
                 }
             }
-
         }
     }
 }
 
-emit_wrapper!( u16, read_u16, swap_u16, swap_slice_u16, from_slice_u16, write_u16 );
-emit_wrapper!( u32, read_u32, swap_u32, swap_slice_u32, from_slice_u32, write_u32 );
-emit_wrapper!( u64, read_u64, swap_u64, swap_slice_u64, from_slice_u64, write_u64 );
-emit_wrapper!( i16, read_i16, swap_i16, swap_slice_i16, from_slice_i16, write_i16 );
-emit_wrapper!( i32, read_i32, swap_i32, swap_slice_i32, from_slice_i32, write_i32 );
-emit_wrapper!( i64, read_i64, swap_i64, swap_slice_i64, from_slice_i64, write_i64 );
-emit_wrapper!( f32, read_f32, swap_f32, swap_slice_f32, from_slice_f32, write_f32 );
-emit_wrapper!( f64, read_f64, swap_f64, swap_slice_f64, from_slice_f64, write_f64 );
+emit_wrapper!( u16, read_u16, swap_u16, swap_slice_u16 );
+emit_wrapper!( u32, read_u32, swap_u32, swap_slice_u32 );
+emit_wrapper!( u64, read_u64, swap_u64, swap_slice_u64 );
+emit_wrapper!( i16, read_i16, swap_i16, swap_slice_i16 );
+emit_wrapper!( i32, read_i32, swap_i32, swap_slice_i32 );
+emit_wrapper!( i64, read_i64, swap_i64, swap_slice_i64 );
+
+impl Endianness {
+    #[inline]
+    pub fn read_f32( self, slice: &[u8] ) -> f32 {
+        f32::from_bits( self.read_u32( slice ) )
+    }
+
+    #[inline]
+    pub fn read_f64( self, slice: &[u8] ) -> f64 {
+        f64::from_bits( self.read_u64( slice ) )
+    }
+
+    #[inline]
+    pub fn swap_f32( self, value: &mut f32 ) {
+        let value = unsafe {
+            &mut *(value as *mut f32 as *mut u32)
+        };
+
+        self.swap_u32( value );
+    }
+
+    #[inline]
+    pub fn swap_f64( self, value: &mut f64 ) {
+        let value = unsafe {
+            &mut *(value as *mut f64 as *mut u64)
+        };
+
+        self.swap_u64( value );
+    }
+
+    #[inline]
+    pub fn swap_slice_f32( self, slice: &mut [f32] ) {
+        let slice = unsafe {
+            core::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut u32, slice.len() )
+        };
+
+        self.swap_slice_u32( slice );
+    }
+
+    #[inline]
+    pub fn swap_slice_f64( self, slice: &mut [f64] ) {
+        let slice = unsafe {
+            core::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut u64, slice.len() )
+        };
+
+        self.swap_slice_u64( slice );
+    }
+}
