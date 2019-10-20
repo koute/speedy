@@ -32,6 +32,7 @@ pub enum ErrorKind {
 }
 
 impl Error {
+    #[inline]
     fn new( kind: ErrorKind ) -> Self {
         Error { kind }
     }
