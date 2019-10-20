@@ -545,6 +545,18 @@ symmetric_tests! {
         be = [0, 0, 0, 0, 0, 0, 0, 33],
         minimum_bytes = 8
     }
+    f32 for f32 {
+        in = 8388610.0,
+        le = [2, 0, 0, 75],
+        be = [75, 0, 0, 2],
+        minimum_bytes = 4
+    }
+    f64 for f64 {
+        in = 8388610.0,
+        le = [0, 0, 0, 64, 0, 0, 96, 65],
+        be = [65, 96, 0, 0, 64, 0, 0, 0],
+        minimum_bytes = 8
+    }
     string for String {
         in = "Hello".to_owned(),
         le = [5, 0, 0, 0, 72, 101, 108, 108, 111],
