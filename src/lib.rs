@@ -2,6 +2,7 @@
 #![cfg_attr(feature = "external_doc", doc(include = "../README.md"))]
 
 mod error;
+#[macro_use]
 mod utils;
 mod readable;
 mod readable_impl;

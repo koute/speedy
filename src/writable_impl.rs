@@ -25,6 +25,8 @@ impl< C, K, V > Writable< C > for BTreeMap< K, V >
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        unsafe_is_length!( self.len() );
+
         let mut count = mem::size_of::< u32 >();
         for (key, value) in self {
             count += key.bytes_needed()? + value.bytes_needed()?;
@@ -46,6 +48,8 @@ impl< C, T > Writable< C > for BTreeSet< T >
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        unsafe_is_length!( self.len() );
+
         let mut count = mem::size_of::< u32 >();
         for value in self {
             count += value.bytes_needed()?;
@@ -68,6 +72,8 @@ impl< C, K, V, S > Writable< C > for HashMap< K, V, S >
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        unsafe_is_length!( self.len() );
+
         let mut count = mem::size_of::< u32 >();
         for (key, value) in self {
             count += key.bytes_needed()? + value.bytes_needed()?;
@@ -89,6 +95,8 @@ impl< C, T, S > Writable< C > for HashSet< T, S >
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        unsafe_is_length!( self.len() );
+
         let mut count = mem::size_of::< u32 >();
         for value in self {
             count += value.bytes_needed()?;
@@ -218,6 +226,8 @@ impl< C: Context, T: Writable< C > > Writable< C > for [T] {
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        unsafe_is_length!( self.len() );
+
         if T::speedy_is_primitive() {
             return Ok( 4 + self.len() * mem::size_of::< T >() );
         }
