@@ -43,6 +43,7 @@ mod kw {
     syn::custom_keyword!( default_on_eof );
     syn::custom_keyword!( tag_type );
     syn::custom_keyword!( length_type );
+    syn::custom_keyword!( tag );
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -187,8 +188,10 @@ impl syn::parse::Parse for BasicType {
 }
 
 enum VariantAttribute {
-    // This is necessary to workaround an ICE in rustc.
-    _Empty
+    Tag {
+        key_token: kw::tag,
+        tag: u64
+    }
 }
 
 enum StructAttribute {
@@ -207,11 +210,27 @@ enum VariantOrStructAttribute {
 }
 
 fn parse_variant_attribute(
-    _input: &syn::parse::ParseStream,
-    _lookahead: &syn::parse::Lookahead1
+    input: &syn::parse::ParseStream,
+    lookahead: &syn::parse::Lookahead1
 ) -> syn::parse::Result< Option< VariantAttribute > >
 {
-    Ok( None )
+    let attribute = if lookahead.peek( kw::tag ) {
+        let key_token = input.parse::< kw::tag >()?;
+        let _: Token![=] = input.parse()?;
+        let raw_tag: syn::LitInt = input.parse()?;
+        let tag = raw_tag.base10_parse::< u64 >().map_err( |err| {
+            syn::Error::new( raw_tag.span(), err )
+        })?;
+
+        VariantAttribute::Tag {
+            key_token,
+            tag
+        }
+    } else {
+        return Ok( None )
+    };
+
+    Ok( Some( attribute ) )
 }
 
 fn parse_struct_attribute(
@@ -273,6 +292,7 @@ impl syn::parse::Parse for VariantOrStructAttribute {
 }
 
 struct VariantAttributes {
+    tag: Option< u64 >
 }
 
 struct StructAttributes {
@@ -310,10 +330,21 @@ fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::E
 }
 
 fn collect_variant_attributes( attrs: Vec< VariantAttribute > ) -> Result< VariantAttributes, syn::Error > {
-    for _attr in attrs {
+    let mut variant_tag = None;
+    for attr in attrs {
+        match attr {
+            VariantAttribute::Tag { key_token, tag } => {
+                if variant_tag.is_some() {
+                    let message = "Duplicate 'tag'";
+                    return Err( syn::Error::new( key_token.span(), message ) );
+                }
+                variant_tag = Some( tag );
+            }
+        }
     }
 
     Ok( VariantAttributes {
+        tag: variant_tag
     })
 }
 
@@ -907,41 +938,59 @@ impl< 'a > Enum< 'a > {
         let mut tag_to_full_name = HashMap::new();
         let mut variants = Vec::new();
         for variant in raw_variants {
+            let mut struct_attrs = Vec::new();
+            let mut variant_attrs = Vec::new();
+            for attr in parse_attributes::< VariantOrStructAttribute >( &variant.attrs )? {
+                match attr {
+                    VariantOrStructAttribute::Struct( attr ) => struct_attrs.push( attr ),
+                    VariantOrStructAttribute::Variant( attr ) => variant_attrs.push( attr )
+                }
+            }
+
+            let variant_attrs = collect_variant_attributes( variant_attrs )?;
+
             let full_name = format!( "{}::{}", ident, variant.ident );
-            let tag = match variant.discriminant {
-                None => {
-                    let tag = if let Some( previous_tag ) = previous_tag {
-                        if previous_tag >= max {
+            let tag = if let Some( tag ) = variant_attrs.tag {
+                if tag > max {
+                    let message = format!( "Enum discriminant `{}` is too big!", full_name );
+                    return Err( syn::Error::new( variant.span(), message ) );
+                }
+                tag
+            } else {
+                match variant.discriminant {
+                    None => {
+                        let tag = if let Some( previous_tag ) = previous_tag {
+                            if previous_tag >= max {
+                                let message = format!( "Enum discriminant `{}` is too big!", full_name );
+                                return Err( syn::Error::new( variant.span(), message ) );
+                            }
+
+                            previous_tag + 1
+                        } else {
+                            0
+                        };
+
+                        tag
+                    },
+                    Some( (_, syn::Expr::Lit( syn::ExprLit { lit: syn::Lit::Int( ref raw_value ), .. } )) ) => {
+                        let tag = raw_value.base10_parse::< u64 >().map_err( |err| {
+                            syn::Error::new( raw_value.span(), err )
+                        })?;
+                        if tag > max {
                             let message = format!( "Enum discriminant `{}` is too big!", full_name );
-                            return Err( syn::Error::new( variant.span(), message ) );
+                            return Err( syn::Error::new( raw_value.span(), message ) );
                         }
 
-                        previous_tag + 1
-                    } else {
-                        0
-                    };
-
-                    previous_tag = Some( tag );
-                    tag
-                },
-                Some( (_, syn::Expr::Lit( syn::ExprLit { lit: syn::Lit::Int( ref raw_value ), .. } )) ) => {
-                    let tag = raw_value.base10_parse::< u64 >().map_err( |err| {
-                        syn::Error::new( raw_value.span(), err )
-                    })?;
-                    if tag > max {
-                        let message = format!( "Enum discriminant `{}` is too big!", full_name );
-                        return Err( syn::Error::new( raw_value.span(), message ) );
+                        tag
+                    },
+                    Some((_, ref expr)) => {
+                        let message = format!( "Enum discriminant `{}` is currently unsupported!", full_name );
+                        return Err( syn::Error::new( expr.span(), message ) );
                     }
-
-                    previous_tag = Some( tag );
-                    tag
-                },
-                Some((_, ref expr)) => {
-                    let message = format!( "Enum discriminant `{}` is currently unsupported!", full_name );
-                    return Err( syn::Error::new( expr.span(), message ) );
                 }
             };
 
+            previous_tag = Some( tag );
             if let Some( other_full_name ) = tag_to_full_name.get( &tag ) {
                 let message = format!( "Two discriminants with the same value of '{}': `{}`, `{}`", tag, full_name, other_full_name );
                 return Err( syn::Error::new( variant.span(), message ) );
@@ -967,17 +1016,7 @@ impl< 'a > Enum< 'a > {
                 }
             };
 
-            let mut struct_attrs = Vec::new();
-            let mut variant_attrs = Vec::new();
-            for attr in parse_attributes::< VariantOrStructAttribute >( &variant.attrs )? {
-                match attr {
-                    VariantOrStructAttribute::Struct( attr ) => struct_attrs.push( attr ),
-                    VariantOrStructAttribute::Variant( attr ) => variant_attrs.push( attr )
-                }
-            }
-
             let structure = Struct::new( &variant.fields, struct_attrs )?;
-            let _ = collect_variant_attributes( variant_attrs )?;
             variants.push( Variant {
                 tag_expr,
                 ident: &variant.ident,

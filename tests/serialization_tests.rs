@@ -348,6 +348,14 @@ struct DerivedStructWithVecWithLengthTypeVarInt64 {
     data: Vec< u8 >
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u8)]
+enum DerivedEnumWithCustomTag {
+    #[speedy(tag = 20)]
+    A = 10,
+    B
+}
+
 mod inner {
     use speedy::{Readable, Writable};
 
@@ -888,6 +896,18 @@ symmetric_tests! {
         in = DerivedStructWithVecWithLengthTypeVarInt64 { data: vec![ 100, 101 ] },
         le = [2, 100, 101],
         be = [2, 100, 101],
+        minimum_bytes = 1
+    }
+    derived_enum_with_custom_tag_a for DerivedEnumWithCustomTag {
+        in = DerivedEnumWithCustomTag::A,
+        le = [20],
+        be = [20],
+        minimum_bytes = 1
+    }
+    derived_enum_with_custom_tag_b for DerivedEnumWithCustomTag {
+        in = DerivedEnumWithCustomTag::B,
+        le = [21],
+        be = [21],
         minimum_bytes = 1
     }
 }
