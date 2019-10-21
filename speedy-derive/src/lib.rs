@@ -186,6 +186,11 @@ impl syn::parse::Parse for BasicType {
     }
 }
 
+enum VariantAttribute {
+    // This is necessary to workaround an ICE in rustc.
+    _Empty
+}
+
 enum StructAttribute {
 }
 
@@ -196,50 +201,78 @@ enum EnumAttribute {
     }
 }
 
+enum VariantOrStructAttribute {
+    Variant( VariantAttribute ),
+    Struct( StructAttribute )
+}
+
+fn parse_variant_attribute(
+    _input: &syn::parse::ParseStream,
+    _lookahead: &syn::parse::Lookahead1
+) -> syn::parse::Result< Option< VariantAttribute > >
+{
+    Ok( None )
+}
+
+fn parse_struct_attribute(
+    _input: &syn::parse::ParseStream,
+    _lookahead: &syn::parse::Lookahead1
+) -> syn::parse::Result< Option< StructAttribute > >
+{
+    Ok( None )
+}
+
+fn parse_enum_attribute(
+    input: &syn::parse::ParseStream,
+    lookahead: &syn::parse::Lookahead1
+) -> syn::parse::Result< Option< EnumAttribute > >
+{
+    let attribute = if lookahead.peek( kw::tag_type ) {
+        let key_token = input.parse::< kw::tag_type >()?;
+        let _: Token![=] = input.parse()?;
+        let ty: BasicType = input.parse()?;
+
+        EnumAttribute::TagType {
+            key_token,
+            ty
+        }
+    } else {
+        return Ok( None )
+    };
+
+    Ok( Some( attribute ) )
+}
+
 impl syn::parse::Parse for StructAttribute {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let lookahead = input.lookahead1();
-        return Err( lookahead.error() )
+        parse_struct_attribute( &input, &lookahead )?.ok_or_else( || lookahead.error() )
     }
 }
 
 impl syn::parse::Parse for EnumAttribute {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let lookahead = input.lookahead1();
-        let value = if lookahead.peek( kw::tag_type ) {
-            let key_token = input.parse::< kw::tag_type >()?;
-            let _: Token![=] = input.parse()?;
-            let ty: BasicType = input.parse()?;
-
-            EnumAttribute::TagType {
-                key_token,
-                ty
-            }
-        } else {
-            return Err( lookahead.error() )
-        };
-
-        Ok( value )
+        parse_enum_attribute( &input, &lookahead )?.ok_or_else( || lookahead.error() )
     }
 }
 
-struct RawStructAttributes( syn::punctuated::Punctuated< StructAttribute, Token![,] > );
-struct RawEnumAttributes( syn::punctuated::Punctuated< EnumAttribute, Token![,] > );
-
-impl syn::parse::Parse for RawStructAttributes {
+impl syn::parse::Parse for VariantOrStructAttribute {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
-        let content;
-        parenthesized!( content in input );
-        Ok( RawStructAttributes( content.parse_terminated( StructAttribute::parse )? ) )
+        let lookahead = input.lookahead1();
+        if let Some( attr ) = parse_variant_attribute( &input, &lookahead )? {
+            return Ok( VariantOrStructAttribute::Variant( attr ) );
+        }
+
+        if let Some( attr ) = parse_struct_attribute( &input, &lookahead )? {
+            return Ok( VariantOrStructAttribute::Struct( attr ) );
+        }
+
+        Err( lookahead.error() )
     }
 }
 
-impl syn::parse::Parse for RawEnumAttributes {
-    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
-        let content;
-        parenthesized!( content in input );
-        Ok( RawEnumAttributes( content.parse_terminated( EnumAttribute::parse )? ) )
-    }
+struct VariantAttributes {
 }
 
 struct StructAttributes {
@@ -249,43 +282,59 @@ struct EnumAttributes {
     tag_type: Option< BasicType >
 }
 
-fn parse_struct_attributes( attrs: &[syn::Attribute] ) -> Result< StructAttributes, syn::Error > {
+fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::Error > where T: syn::parse::Parse {
+    struct RawAttributes< T >( syn::punctuated::Punctuated< T, Token![,] > );
+
+    impl< T > syn::parse::Parse for RawAttributes< T > where T: syn::parse::Parse {
+        fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+            let content;
+            parenthesized!( content in input );
+            Ok( RawAttributes( content.parse_terminated( T::parse )? ) )
+        }
+    }
+
+    let mut output = Vec::new();
     for raw_attr in attrs {
         let path = raw_attr.path.clone().into_token_stream().to_string();
         if path != "speedy" {
             continue;
         }
 
-        let parsed_attrs: RawStructAttributes = syn::parse2( raw_attr.tokens.clone() )?;
+        let parsed_attrs: RawAttributes< T > = syn::parse2( raw_attr.tokens.clone() )?;
         for attr in parsed_attrs.0 {
-            match attr {
-            }
+            output.push( attr );
         }
+    }
+
+    Ok( output )
+}
+
+fn collect_variant_attributes( attrs: Vec< VariantAttribute > ) -> Result< VariantAttributes, syn::Error > {
+    for _attr in attrs {
+    }
+
+    Ok( VariantAttributes {
+    })
+}
+
+fn collect_struct_attributes( attrs: Vec< StructAttribute > ) -> Result< StructAttributes, syn::Error > {
+    for _attr in attrs {
     }
 
     Ok( StructAttributes {
     })
 }
 
-fn parse_enum_attributes( attrs: &[syn::Attribute] ) -> Result< EnumAttributes, syn::Error > {
+fn collect_enum_attributes( attrs: Vec< EnumAttribute > ) -> Result< EnumAttributes, syn::Error > {
     let mut tag_type = None;
-    for raw_attr in attrs {
-        let path = raw_attr.path.clone().into_token_stream().to_string();
-        if path != "speedy" {
-            continue;
-        }
-
-        let parsed_attrs: RawEnumAttributes = syn::parse2( raw_attr.tokens.clone() )?;
-        for attr in parsed_attrs.0 {
-            match attr {
-                EnumAttribute::TagType { key_token, ty } => {
-                    if tag_type.is_some() {
-                        let message = "Duplicate 'tag_type'";
-                        return Err( syn::Error::new( key_token.span(), message ) );
-                    }
-
-                    tag_type = Some( ty );
+    for attr in attrs {
+        match attr {
+            EnumAttribute::TagType { key_token, ty } => {
+                if tag_type.is_some() {
+                    let message = "Duplicate 'tag_type'";
+                    return Err( syn::Error::new( key_token.span(), message ) );
                 }
+                tag_type = Some( ty );
             }
         }
     }
@@ -308,8 +357,8 @@ struct Struct< 'a > {
 }
 
 impl< 'a > Struct< 'a > {
-    fn new( fields: &'a syn::Fields, attrs: &[syn::Attribute] ) -> Result< Self, syn::Error > {
-        parse_struct_attributes( attrs )?;
+    fn new( fields: &'a syn::Fields, attrs: Vec< StructAttribute > ) -> Result< Self, syn::Error > {
+        collect_struct_attributes( attrs )?;
         let structure = match fields {
             syn::Fields::Unit => {
                 Struct {
@@ -842,7 +891,8 @@ impl< 'a > Enum< 'a > {
         attrs: &[syn::Attribute],
         raw_variants: &'a syn::punctuated::Punctuated< syn::Variant, syn::token::Comma >
     ) -> Result< Self, syn::Error > {
-        let attrs = parse_enum_attributes( attrs )?;
+        let attrs = parse_attributes::< EnumAttribute >( attrs )?;
+        let attrs = collect_enum_attributes( attrs )?;
         let tag_type = attrs.tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE );
         let max = match tag_type {
             BasicType::U7 => 0b01111111 as u64,
@@ -917,7 +967,17 @@ impl< 'a > Enum< 'a > {
                 }
             };
 
-            let structure = Struct::new( &variant.fields, &variant.attrs )?;
+            let mut struct_attrs = Vec::new();
+            let mut variant_attrs = Vec::new();
+            for attr in parse_attributes::< VariantOrStructAttribute >( &variant.attrs )? {
+                match attr {
+                    VariantOrStructAttribute::Struct( attr ) => struct_attrs.push( attr ),
+                    VariantOrStructAttribute::Variant( attr ) => variant_attrs.push( attr )
+                }
+            }
+
+            let structure = Struct::new( &variant.fields, struct_attrs )?;
+            let _ = collect_variant_attributes( variant_attrs )?;
             variants.push( Variant {
                 tag_expr,
                 ident: &variant.ident,
@@ -994,7 +1054,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let mut types = Vec::new();
     let (reader_body, minimum_bytes_needed_body) = match &input.data {
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
-            let structure = Struct::new( fields, &input.attrs )?;
+            let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
+            let structure = Struct::new( fields, attrs )?;
             let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
                 #body
@@ -1087,7 +1148,8 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let mut types = Vec::new();
     let writer_body = match input.data {
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
-            let st = Struct::new( fields, &input.attrs )?;
+            let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
+            let st = Struct::new( fields, attrs )?;
             let assignments = assign_to_variables( &st.fields );
             let (body, _) = writable_body( &mut types, &st );
             quote! {
