@@ -941,6 +941,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
 
                 match variant.fields {
                     syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
+                        parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
                         let st = Struct::new( named )?;
                         let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
                         variant_matches.push( quote! {
@@ -952,6 +953,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         variant_minimum_sizes.push( minimum_bytes );
                     },
                     syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
+                        parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
                         let st = Struct::new( unnamed )?;
                         let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
                         variant_matches.push( quote! {
@@ -963,6 +965,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         variant_minimum_sizes.push( minimum_bytes );
                     },
                     syn::Fields::Unit => {
+                        parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
                         variant_matches.push( quote! {
                             #kind => {
                                 Ok( #variant_path )
@@ -1087,6 +1090,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     let variant_path = quote! { #name::#unqualified_ident };
                     let snippet = match variant.fields {
                         syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
+                            parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
                             let st = Struct::new( named )?;
                             let (body, identifiers) = writable_body( &mut types, st );
                             quote! {
@@ -1097,6 +1101,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                             }
                         },
                         syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
+                            parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
                             let st = Struct::new( unnamed )?;
                             let (body, identifiers) = writable_body( &mut types, st );
                             quote! {
@@ -1107,6 +1112,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                             }
                         },
                         syn::Fields::Unit => {
+                            parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
                             quote! { #variant_path => {
                                 _writer_.#tag_writer( #kind )?;
                             }}
