@@ -5,6 +5,7 @@ use std::iter::FromIterator;
 use crate::endianness::Endianness;
 use crate::readable::Readable;
 use crate::context::Context;
+use crate::varint::VarInt64;
 
 use crate::error::error_end_of_input;
 
@@ -218,5 +219,11 @@ pub trait Reader< 'a, C: Context >: Sized {
               T: Readable< 'a, C >
     {
         (0..length).into_iter().map( |_| self.read_value::< T >() ).collect()
+    }
+
+    #[inline]
+    fn read_u64_varint( &mut self ) -> Result< u64, C::Error > {
+        let value = VarInt64::read_from( self )?;
+        Ok( value.into() )
     }
 }
