@@ -2,7 +2,9 @@ use {
     crate::{
         Context,
         Error,
+        Readable,
         Reader,
+        Writable,
         Writer,
         error::{
             error_invalid_string_utf8,
@@ -46,6 +48,15 @@ pub fn cow_bytes_to_cow_str< E >( bytes: Cow< [u8] > ) -> Result< Cow< str >, E 
                 .map_err( error_invalid_string_utf8 )
         }
     }
+}
+
+#[inline]
+pub fn write_length_u64_varint< C, W >( length: usize, writer: &mut W ) -> Result< (), C::Error >
+    where C: Context,
+          W: ?Sized + Writer< C >
+{
+    let length = VarInt64::from( length as u64 );
+    length.write_to( writer )
 }
 
 #[inline]
@@ -98,6 +109,19 @@ pub fn write_length< C, W >( length: usize, writer: &mut W ) -> Result< (), C::E
           W: ?Sized + Writer< C >
 {
     write_length_u32( length, writer )
+}
+
+#[inline]
+pub fn read_length_u64_varint< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error >
+    where C: Context,
+          R: Reader< 'a, C >
+{
+    let length: u64 = VarInt64::read_from( reader )?.into();
+    if length > std::usize::MAX as u64 {
+        return Err( error_out_of_range_length() );
+    }
+
+    Ok( length as usize )
 }
 
 #[inline]

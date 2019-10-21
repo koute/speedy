@@ -48,6 +48,7 @@ mod kw {
     syn::custom_keyword!( u16 );
     syn::custom_keyword!( u32 );
     syn::custom_keyword!( u64 );
+    syn::custom_keyword!( u64_varint );
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -152,10 +153,12 @@ enum BasicType {
     U8,
     U16,
     U32,
-    U64
+    U64,
+    VarInt64
 }
 
 const DEFAULT_LENGTH_TYPE: BasicType = BasicType::U32;
+const DEFAULT_ENUM_TAG_TYPE: BasicType = BasicType::U32;
 
 impl syn::parse::Parse for BasicType {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
@@ -172,6 +175,9 @@ impl syn::parse::Parse for BasicType {
         } else if lookahead.peek( kw::u64 ) {
             input.parse::< kw::u64 >()?;
             BasicType::U64
+        } else if lookahead.peek( kw::u64_varint ) {
+            input.parse::< kw::u64_varint >()?;
+            BasicType::VarInt64
         } else {
             return Err( lookahead.error() );
         };
@@ -584,7 +590,8 @@ fn read_field_body( field: &Field ) -> TokenStream {
                 BasicType::U8 => quote! { read_length_u8 },
                 BasicType::U16 => quote! { read_length_u16 },
                 BasicType::U32 => quote! { read_length_u32 },
-                BasicType::U64 => quote! { read_length_u64 }
+                BasicType::U64 => quote! { read_length_u64 },
+                BasicType::VarInt64 => quote! { read_length_u64_varint },
             };
 
             let body = quote! {
@@ -685,7 +692,8 @@ fn write_field_body( field: &Field ) -> TokenStream {
                 BasicType::U8 => quote! { write_length_u8 },
                 BasicType::U16 => quote! { write_length_u16 },
                 BasicType::U32 => quote! { write_length_u32 },
-                BasicType::U64 => quote! { write_length_u64 }
+                BasicType::U64 => quote! { write_length_u64 },
+                BasicType::VarInt64 => quote! { write_length_u64_varint }
             };
 
             quote! { speedy::private::#write_length_fn( #name.len(), _writer_ )?; }
@@ -756,7 +764,7 @@ impl EnumCtx {
             ident: ident.clone(),
             previous_kind: None,
             kind_to_full_name: HashMap::new(),
-            tag_type: tag_type.unwrap_or( BasicType::U32 )
+            tag_type: tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE )
         }
     }
 
@@ -765,7 +773,8 @@ impl EnumCtx {
             BasicType::U8 => std::u8::MAX as u64,
             BasicType::U16 => std::u16::MAX as u64,
             BasicType::U32 => std::u32::MAX as u64,
-            BasicType::U64 => std::u64::MAX
+            BasicType::U64 => std::u64::MAX,
+            BasicType::VarInt64 => std::u64::MAX
         };
 
         let full_name = format!( "{}::{}", self.ident, variant.ident );
@@ -822,7 +831,7 @@ impl EnumCtx {
                 let kind = kind as u32;
                 quote! { #kind }
             },
-            BasicType::U64 => {
+            BasicType::U64 | BasicType::VarInt64 => {
                 let kind = kind as u64;
                 quote! { #kind }
             }
@@ -845,11 +854,11 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
             | Some( SpecialTy::BTreeMap( .. ) )
             | Some( SpecialTy::BTreeSet( .. ) )
             => {
-                let size: usize = match field.length_type {
-                    Some( BasicType::U8 ) => 1,
-                    Some( BasicType::U16 ) => 2,
-                    None | Some( BasicType::U32 ) => 4,
-                    Some( BasicType::U64 ) => 8
+                let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
+                    BasicType::U8 | BasicType::VarInt64 => 1,
+                    BasicType::U16 => 2,
+                    BasicType::U32 => 4,
+                    BasicType::U64 => 8
                 };
 
                 Some( quote! { #size } )
@@ -959,7 +968,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 BasicType::U64 => (quote! { read_u64 }, 8_usize),
                 BasicType::U32 => (quote! { read_u32 }, 4_usize),
                 BasicType::U16 => (quote! { read_u16 }, 2_usize),
-                BasicType::U8 => (quote! { read_u8 }, 1_usize)
+                BasicType::U8 => (quote! { read_u8 }, 1_usize),
+                BasicType::VarInt64 => (quote! { read_u64_varint }, 1_usize),
             };
 
             let reader_body = quote! {
@@ -1056,7 +1066,8 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 BasicType::U64 => quote! { write_u64 },
                 BasicType::U32 => quote! { write_u32 },
                 BasicType::U16 => quote! { write_u16 },
-                BasicType::U8 => quote! { write_u8 }
+                BasicType::U8 => quote! { write_u8 },
+                BasicType::VarInt64 => quote! { write_u64_varint },
             };
 
             let variants: Result< Vec< _ >, syn::Error > = variants.iter()

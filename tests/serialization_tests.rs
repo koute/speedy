@@ -171,6 +171,13 @@ enum DerivedSimpleEnumTagTypeU64 {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u64_varint)]
+enum DerivedSimpleEnumTagTypeVarInt64 {
+    A,
+    B = 0x1234
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
 enum DerivedEnum {
     A,
     B( u8, u16, u32 ),
@@ -318,6 +325,12 @@ struct DerivedStructWithVecWithLengthTypeU32 {
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithLengthTypeU64 {
     #[speedy(length_type = u64)]
+    data: Vec< u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithLengthTypeVarInt64 {
+    #[speedy(length_type = u64_varint)]
     data: Vec< u8 >
 }
 
@@ -701,6 +714,18 @@ symmetric_tests! {
         be = [0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89],
         minimum_bytes = 8
     }
+    derived_simple_enum_tag_type_varint64_a for DerivedSimpleEnumTagTypeVarInt64 {
+        in = DerivedSimpleEnumTagTypeVarInt64::A,
+        le = [0x00],
+        be = [0x00],
+        minimum_bytes = 1
+    }
+    derived_simple_enum_tag_type_varint64_b for DerivedSimpleEnumTagTypeVarInt64 {
+        in = DerivedSimpleEnumTagTypeVarInt64::B,
+        le = [0b10000000 | 0x12, 0x34],
+        be = [0b10000000 | 0x12, 0x34],
+        minimum_bytes = 1
+    }
     derived_enum_unit_variant for DerivedEnum {
         in = DerivedEnum::A,
         le = [0, 0, 0, 0],
@@ -832,6 +857,12 @@ symmetric_tests! {
         le = [2, 0, 0, 0, 0, 0, 0, 0, 100, 101],
         be = [0, 0, 0, 0, 0, 0, 0, 2, 100, 101],
         minimum_bytes = 8
+    }
+    derived_struct_with_vec_with_length_type_varint64 for DerivedStructWithVecWithLengthTypeVarInt64 {
+        in = DerivedStructWithVecWithLengthTypeVarInt64 { data: vec![ 100, 101 ] },
+        le = [2, 100, 101],
+        be = [2, 100, 101],
+        minimum_bytes = 1
     }
 }
 
