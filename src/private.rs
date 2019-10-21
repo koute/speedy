@@ -104,6 +104,18 @@ pub fn write_length_u8< C, W >( length: usize, writer: &mut W ) -> Result< (), C
 }
 
 #[inline]
+pub fn write_length_u7< C, W >( length: usize, writer: &mut W ) -> Result< (), C::Error >
+    where C: Context,
+          W: ?Sized + Writer< C >
+{
+    if length > 0b01111111 {
+         return Err( error_out_of_range_length() );
+    }
+
+    writer.write_u8( length as u8 )
+}
+
+#[inline]
 pub fn write_length< C, W >( length: usize, writer: &mut W ) -> Result< (), C::Error >
     where C: Context,
           W: ?Sized + Writer< C >
@@ -159,6 +171,18 @@ pub fn read_length_u8< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error >
           R: Reader< 'a, C >
 {
     reader.read_u8().map( |value| value as usize )
+}
+
+#[inline]
+pub fn read_length_u7< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error >
+    where C: Context,
+          R: Reader< 'a, C >
+{
+    let length = reader.read_u8()?;
+    if length > 0b01111111 {
+        return Err( error_out_of_range_length() );
+    }
+    Ok( length as usize )
 }
 
 #[inline]

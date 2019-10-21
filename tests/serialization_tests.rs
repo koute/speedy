@@ -138,6 +138,14 @@ enum DerivedSimpleEnum {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u7)]
+enum DerivedSimpleEnumTagTypeU7 {
+    A,
+    B,
+    C = 0x7f
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
 #[speedy(tag_type = u8)]
 enum DerivedSimpleEnumTagTypeU8 {
     A,
@@ -301,6 +309,12 @@ struct DerivedStructWithVecWithDefaultOnEof {
 struct DerivedStructWithVecWithCountWithDefaultOnEof {
     length: u8,
     #[speedy(count = length, default_on_eof)]
+    data: Vec< u8 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithVecWithLengthTypeU7 {
+    #[speedy(length_type = u7)]
     data: Vec< u8 >
 }
 
@@ -690,6 +704,12 @@ symmetric_tests! {
         be = [0, 0, 0, 11],
         minimum_bytes = 4
     }
+    derived_simple_enum_tag_type_u7 for DerivedSimpleEnumTagTypeU7 {
+        in = DerivedSimpleEnumTagTypeU7::C,
+        le = [0x7f],
+        be = [0x7f],
+        minimum_bytes = 1
+    }
     derived_simple_enum_tag_type_u8 for DerivedSimpleEnumTagTypeU8 {
         in = DerivedSimpleEnumTagTypeU8::B,
         le = [0xab],
@@ -834,6 +854,12 @@ symmetric_tests! {
         be = [2, 1, 0, 0, 1],
         minimum_bytes = 1
     }
+    derived_struct_with_vec_with_length_type_u7 for DerivedStructWithVecWithLengthTypeU7 {
+        in = DerivedStructWithVecWithLengthTypeU7 { data: vec![ 100, 101 ] },
+        le = [2, 100, 101],
+        be = [2, 100, 101],
+        minimum_bytes = 1
+    }
     derived_struct_with_vec_with_length_type_u8 for DerivedStructWithVecWithLengthTypeU8 {
         in = DerivedStructWithVecWithLengthTypeU8 { data: vec![ 100, 101 ] },
         le = [2, 100, 101],
@@ -908,6 +934,15 @@ fn test_length_mismatch_with_count_attribute() {
         err.to_string(),
         "the length of 'data' is not the same as its 'count' attribute"
     );
+}
+
+#[test]
+fn test_vec_with_length_type_u7_read_out_of_range_length() {
+    let error = DerivedStructWithVecWithLengthTypeU7::read_from_buffer( &[0x80] ).unwrap_err();
+    match speedy::private::get_error_kind( &error ) {
+        speedy::private::ErrorKind::OutOfRangeLength => {},
+        error => panic!( "Unexpected error: {:?}", error )
+    }
 }
 
 #[test]

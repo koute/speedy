@@ -44,6 +44,7 @@ mod kw {
     syn::custom_keyword!( tag_type );
     syn::custom_keyword!( length_type );
 
+    syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
     syn::custom_keyword!( u16 );
     syn::custom_keyword!( u32 );
@@ -150,6 +151,7 @@ enum ItemKind {
 
 #[derive(Copy, Clone)]
 enum BasicType {
+    U7,
     U8,
     U16,
     U32,
@@ -163,7 +165,10 @@ const DEFAULT_ENUM_TAG_TYPE: BasicType = BasicType::U32;
 impl syn::parse::Parse for BasicType {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let lookahead = input.lookahead1();
-        let ty = if lookahead.peek( kw::u8 ) {
+        let ty = if lookahead.peek( kw::u7 ) {
+            input.parse::< kw::u7 >()?;
+            BasicType::U7
+        } else if lookahead.peek( kw::u8 ) {
             input.parse::< kw::u8 >()?;
             BasicType::U8
         } else if lookahead.peek( kw::u16 ) {
@@ -587,6 +592,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Some( ref count ) => quote! { ((#count) as usize) },
         None => {
             let read_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
+                BasicType::U7 => quote! { read_length_u7 },
                 BasicType::U8 => quote! { read_length_u8 },
                 BasicType::U16 => quote! { read_length_u16 },
                 BasicType::U32 => quote! { read_length_u32 },
@@ -689,6 +695,7 @@ fn write_field_body( field: &Field ) -> TokenStream {
         },
         None => {
             let write_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
+                BasicType::U7 => quote! { write_length_u7 },
                 BasicType::U8 => quote! { write_length_u8 },
                 BasicType::U16 => quote! { write_length_u16 },
                 BasicType::U32 => quote! { write_length_u32 },
@@ -770,6 +777,7 @@ impl EnumCtx {
 
     fn next( &mut self, variant: &syn::Variant ) -> Result< TokenStream, syn::Error > {
         let max = match self.tag_type {
+            BasicType::U7 => 0b01111111 as u64,
             BasicType::U8 => std::u8::MAX as u64,
             BasicType::U16 => std::u16::MAX as u64,
             BasicType::U32 => std::u32::MAX as u64,
@@ -819,7 +827,7 @@ impl EnumCtx {
 
         self.kind_to_full_name.insert( kind, full_name );
         let kind = match self.tag_type {
-            BasicType::U8 => {
+            BasicType::U7 | BasicType::U8 => {
                 let kind = kind as u8;
                 quote! { #kind }
             },
@@ -855,7 +863,7 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
             | Some( SpecialTy::BTreeSet( .. ) )
             => {
                 let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
-                    BasicType::U8 | BasicType::VarInt64 => 1,
+                    BasicType::U7 | BasicType::U8 | BasicType::VarInt64 => 1,
                     BasicType::U16 => 2,
                     BasicType::U32 => 4,
                     BasicType::U64 => 8
@@ -969,6 +977,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 BasicType::U32 => (quote! { read_u32 }, 4_usize),
                 BasicType::U16 => (quote! { read_u16 }, 2_usize),
                 BasicType::U8 => (quote! { read_u8 }, 1_usize),
+                BasicType::U7 => (quote! { read_u8 }, 1_usize),
                 BasicType::VarInt64 => (quote! { read_u64_varint }, 1_usize),
             };
 
@@ -1067,6 +1076,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 BasicType::U32 => quote! { write_u32 },
                 BasicType::U16 => quote! { write_u16 },
                 BasicType::U8 => quote! { write_u8 },
+                BasicType::U7 => quote! { write_u8 },
                 BasicType::VarInt64 => quote! { write_u64_varint },
             };
 
