@@ -53,7 +53,7 @@ mod kw {
 }
 
 #[derive(Copy, Clone, PartialEq)]
-enum Variant {
+enum Trait {
     Readable,
     Writable
 }
@@ -88,7 +88,7 @@ fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> 
     }
 }
 
-fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant ) -> (TokenStream, TokenStream, TokenStream) {
+fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], trait_variant: Trait ) -> (TokenStream, TokenStream, TokenStream) {
     let impl_params = {
         let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
         let type_params = ast.generics.type_params().map( |ty| quote! { #ty } );
@@ -113,11 +113,11 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
     let where_clause = {
         let constraints = types.iter().filter_map( |&ty| {
             let possibly_generic = possibly_uses_generic_ty( &generics, ty );
-            match (variant, possibly_generic) {
-                (Variant::Readable, true) => Some( quote! { #ty: speedy::Readable< 'a_, C_ > } ),
-                (Variant::Readable, false) => None,
-                (Variant::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
-                (Variant::Writable, false) => None
+            match (trait_variant, possibly_generic) {
+                (Trait::Readable, true) => Some( quote! { #ty: speedy::Readable< 'a_, C_ > } ),
+                (Trait::Readable, false) => None,
+                (Trait::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
+                (Trait::Writable, false) => None
             }
         });
 
@@ -126,7 +126,7 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
             predicates = where_clause.predicates.iter().map( |pred| quote! { #pred } ).collect();
         }
 
-        if variant == Variant::Readable {
+        if trait_variant == Trait::Readable {
             for lifetime in ast.generics.lifetimes() {
                 predicates.push( quote! { 'a_: #lifetime } );
                 predicates.push( quote! { #lifetime: 'a_ } );
@@ -142,11 +142,6 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], variant: Variant
     };
 
     (impl_params, ty_params, where_clause)
-}
-
-enum ItemKind {
-    Struct,
-    Enum
 }
 
 #[derive(Copy, Clone)]
@@ -191,14 +186,24 @@ impl syn::parse::Parse for BasicType {
     }
 }
 
-enum ItemAttribute {
+enum StructAttribute {
+}
+
+enum EnumAttribute {
     TagType {
         key_token: kw::tag_type,
         ty: BasicType
     }
 }
 
-impl syn::parse::Parse for ItemAttribute {
+impl syn::parse::Parse for StructAttribute {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let lookahead = input.lookahead1();
+        return Err( lookahead.error() )
+    }
+}
+
+impl syn::parse::Parse for EnumAttribute {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let lookahead = input.lookahead1();
         let value = if lookahead.peek( kw::tag_type ) {
@@ -206,7 +211,7 @@ impl syn::parse::Parse for ItemAttribute {
             let _: Token![=] = input.parse()?;
             let ty: BasicType = input.parse()?;
 
-            ItemAttribute::TagType {
+            EnumAttribute::TagType {
                 key_token,
                 ty
             }
@@ -218,21 +223,51 @@ impl syn::parse::Parse for ItemAttribute {
     }
 }
 
-struct RawItemAttributes( syn::punctuated::Punctuated< ItemAttribute, Token![,] > );
+struct RawStructAttributes( syn::punctuated::Punctuated< StructAttribute, Token![,] > );
+struct RawEnumAttributes( syn::punctuated::Punctuated< EnumAttribute, Token![,] > );
 
-impl syn::parse::Parse for RawItemAttributes {
+impl syn::parse::Parse for RawStructAttributes {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let content;
         parenthesized!( content in input );
-        Ok( RawItemAttributes( content.parse_terminated( ItemAttribute::parse )? ) )
+        Ok( RawStructAttributes( content.parse_terminated( StructAttribute::parse )? ) )
     }
 }
 
-struct ItemAttributes {
+impl syn::parse::Parse for RawEnumAttributes {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let content;
+        parenthesized!( content in input );
+        Ok( RawEnumAttributes( content.parse_terminated( EnumAttribute::parse )? ) )
+    }
+}
+
+struct StructAttributes {
+}
+
+struct EnumAttributes {
     tag_type: Option< BasicType >
 }
 
-fn parse_item_attributes( kind: ItemKind, attrs: &[syn::Attribute] ) -> Result< ItemAttributes, syn::Error > {
+fn parse_struct_attributes( attrs: &[syn::Attribute] ) -> Result< StructAttributes, syn::Error > {
+    for raw_attr in attrs {
+        let path = raw_attr.path.clone().into_token_stream().to_string();
+        if path != "speedy" {
+            continue;
+        }
+
+        let parsed_attrs: RawStructAttributes = syn::parse2( raw_attr.tokens.clone() )?;
+        for attr in parsed_attrs.0 {
+            match attr {
+            }
+        }
+    }
+
+    Ok( StructAttributes {
+    })
+}
+
+fn parse_enum_attributes( attrs: &[syn::Attribute] ) -> Result< EnumAttributes, syn::Error > {
     let mut tag_type = None;
     for raw_attr in attrs {
         let path = raw_attr.path.clone().into_token_stream().to_string();
@@ -240,20 +275,13 @@ fn parse_item_attributes( kind: ItemKind, attrs: &[syn::Attribute] ) -> Result< 
             continue;
         }
 
-        let parsed_attrs: RawItemAttributes = syn::parse2( raw_attr.tokens.clone() )?;
+        let parsed_attrs: RawEnumAttributes = syn::parse2( raw_attr.tokens.clone() )?;
         for attr in parsed_attrs.0 {
             match attr {
-                ItemAttribute::TagType { key_token, ty } => {
+                EnumAttribute::TagType { key_token, ty } => {
                     if tag_type.is_some() {
                         let message = "Duplicate 'tag_type'";
                         return Err( syn::Error::new( key_token.span(), message ) );
-                    }
-                    match kind {
-                        ItemKind::Enum => {},
-                        ItemKind::Struct => {
-                            let message = "The 'tag_type' attribute can only be used on enums";
-                            return Err( syn::Error::new( key_token.span(), message ) );
-                        }
                     }
 
                     tag_type = Some( ty );
@@ -262,21 +290,48 @@ fn parse_item_attributes( kind: ItemKind, attrs: &[syn::Attribute] ) -> Result< 
         }
     }
 
-    Ok( ItemAttributes {
+    Ok( EnumAttributes {
         tag_type
     })
 }
 
+#[derive(PartialEq)]
+enum StructKind {
+    Unit,
+    Named,
+    Unnamed
+}
+
 struct Struct< 'a > {
-    fields: Vec< Field< 'a > >
+    fields: Vec< Field< 'a > >,
+    kind: StructKind
 }
 
 impl< 'a > Struct< 'a > {
-    fn new( fields: impl IntoIterator< Item = &'a syn::Field > + 'a ) -> Result< Self, syn::Error > {
-        let fields = get_fields( fields.into_iter() )?;
-        Ok( Struct {
-            fields
-        })
+    fn new( fields: &'a syn::Fields, attrs: &[syn::Attribute] ) -> Result< Self, syn::Error > {
+        parse_struct_attributes( attrs )?;
+        let structure = match fields {
+            syn::Fields::Unit => {
+                Struct {
+                    fields: Vec::new(),
+                    kind: StructKind::Unit
+                }
+            },
+            syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
+                Struct {
+                    fields: get_fields( named.into_iter() )?,
+                    kind: StructKind::Named
+                }
+            },
+            syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
+                Struct {
+                    fields: get_fields( unnamed.into_iter() )?,
+                    kind: StructKind::Unnamed
+                }
+            }
+        };
+
+        Ok( structure )
     }
 }
 
@@ -659,12 +714,12 @@ fn read_field_body( field: &Field ) -> TokenStream {
     }
 }
 
-fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> (TokenStream, TokenStream, TokenStream) {
+fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_readers = Vec::new();
     let mut minimum_bytes_needed = Vec::new();
-    for field in st.fields {
-        let read_value = read_field_body( &field );
+    for field in &st.fields {
+        let read_value = read_field_body( field );
         let name = field.var_name();
         let ty = field.ty;
         field_readers.push( quote! { let #name: #ty = #read_value; } );
@@ -678,6 +733,12 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
 
     let body = quote! { #(#field_readers)* };
     let initializer = quote! { #(#field_names),* };
+    let initializer = match st.kind {
+        StructKind::Unit => initializer,
+        StructKind::Unnamed => quote! { ( #initializer ) },
+        StructKind::Named => quote! { { #initializer } }
+    };
+
     let minimum_bytes_needed = sum( minimum_bytes_needed );
     (body, initializer, minimum_bytes_needed)
 }
@@ -743,10 +804,10 @@ fn write_field_body( field: &Field ) -> TokenStream {
     }
 }
 
-fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> (TokenStream, TokenStream) {
+fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
-    for field in st.fields {
+    for field in &st.fields {
         let write_value = write_field_body( &field );
         types.push( field.ty );
         field_names.push( field.var_name().clone() );
@@ -755,28 +816,35 @@ fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: Struct< 'a > ) -> 
 
     let body = quote! { #(#field_writers)* };
     let initializer = quote! { #(ref #field_names),* };
+    let initializer = match st.kind {
+        StructKind::Unit => initializer,
+        StructKind::Unnamed => quote! { ( #initializer ) },
+        StructKind::Named => quote! { { #initializer } }
+    };
+
     (body, initializer)
 }
 
-struct EnumCtx {
-    ident: syn::Ident,
-    previous_kind: Option< u64 >,
-    kind_to_full_name: HashMap< u64, String >,
-    tag_type: BasicType
+struct Variant< 'a > {
+    tag_expr: TokenStream,
+    ident: &'a syn::Ident,
+    structure: Struct< 'a >
 }
 
-impl EnumCtx {
-    fn new( ident: &syn::Ident, tag_type: Option< BasicType > ) -> Self {
-        EnumCtx {
-            ident: ident.clone(),
-            previous_kind: None,
-            kind_to_full_name: HashMap::new(),
-            tag_type: tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE )
-        }
-    }
+struct Enum< 'a > {
+    tag_type: BasicType,
+    variants: Vec< Variant< 'a > >
+}
 
-    fn next( &mut self, variant: &syn::Variant ) -> Result< TokenStream, syn::Error > {
-        let max = match self.tag_type {
+impl< 'a > Enum< 'a > {
+    fn new(
+        ident: &syn::Ident,
+        attrs: &[syn::Attribute],
+        raw_variants: &'a syn::punctuated::Punctuated< syn::Variant, syn::token::Comma >
+    ) -> Result< Self, syn::Error > {
+        let attrs = parse_enum_attributes( attrs )?;
+        let tag_type = attrs.tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE );
+        let max = match tag_type {
             BasicType::U7 => 0b01111111 as u64,
             BasicType::U8 => std::u8::MAX as u64,
             BasicType::U16 => std::u16::MAX as u64,
@@ -785,66 +853,82 @@ impl EnumCtx {
             BasicType::VarInt64 => std::u64::MAX
         };
 
-        let full_name = format!( "{}::{}", self.ident, variant.ident );
-        let kind = match variant.discriminant {
-            None => {
-                let kind = if let Some( previous_kind ) = self.previous_kind {
-                    if previous_kind >= max {
+        let mut previous_tag = None;
+        let mut tag_to_full_name = HashMap::new();
+        let mut variants = Vec::new();
+        for variant in raw_variants {
+            let full_name = format!( "{}::{}", ident, variant.ident );
+            let tag = match variant.discriminant {
+                None => {
+                    let tag = if let Some( previous_tag ) = previous_tag {
+                        if previous_tag >= max {
+                            let message = format!( "Enum discriminant `{}` is too big!", full_name );
+                            return Err( syn::Error::new( variant.span(), message ) );
+                        }
+
+                        previous_tag + 1
+                    } else {
+                        0
+                    };
+
+                    previous_tag = Some( tag );
+                    tag
+                },
+                Some( (_, syn::Expr::Lit( syn::ExprLit { lit: syn::Lit::Int( ref raw_value ), .. } )) ) => {
+                    let tag = raw_value.base10_parse::< u64 >().map_err( |err| {
+                        syn::Error::new( raw_value.span(), err )
+                    })?;
+                    if tag > max {
                         let message = format!( "Enum discriminant `{}` is too big!", full_name );
-                        return Err( syn::Error::new( variant.span(), message ) );
+                        return Err( syn::Error::new( raw_value.span(), message ) );
                     }
 
-                    previous_kind + 1
-                } else {
-                    0
-                };
-
-                self.previous_kind = Some( kind );
-                kind
-            },
-            Some( (_, syn::Expr::Lit( syn::ExprLit { lit: syn::Lit::Int( ref raw_value ), .. } )) ) => {
-                let value = raw_value.base10_parse::< u64 >().map_err( |err| {
-                    syn::Error::new( raw_value.span(), err )
-                })?;
-                if value > max {
-                    let message = format!( "Enum discriminant `{}` is too big!", full_name );
-                    return Err( syn::Error::new( raw_value.span(), message ) );
+                    previous_tag = Some( tag );
+                    tag
+                },
+                Some((_, ref expr)) => {
+                    let message = format!( "Enum discriminant `{}` is currently unsupported!", full_name );
+                    return Err( syn::Error::new( expr.span(), message ) );
                 }
+            };
 
-                self.previous_kind = Some( value );
-                value
-            },
-            Some((_, ref expr)) => {
-                let message = format!( "Enum discriminant `{}` is currently unsupported!", full_name );
-                return Err( syn::Error::new( expr.span(), message ) );
+            if let Some( other_full_name ) = tag_to_full_name.get( &tag ) {
+                let message = format!( "Two discriminants with the same value of '{}': `{}`, `{}`", tag, full_name, other_full_name );
+                return Err( syn::Error::new( variant.span(), message ) );
             }
-        };
 
-        if let Some( other_full_name ) = self.kind_to_full_name.get( &kind ) {
-            let message = format!( "Two discriminants with the same value of '{}': `{}`, `{}`", kind, full_name, other_full_name );
-            return Err( syn::Error::new( variant.span(), message ) );
+            tag_to_full_name.insert( tag, full_name );
+            let tag_expr = match tag_type {
+                BasicType::U7 | BasicType::U8 => {
+                    let tag = tag as u8;
+                    quote! { #tag }
+                },
+                BasicType::U16 => {
+                    let tag = tag as u16;
+                    quote! { #tag }
+                },
+                BasicType::U32 => {
+                    let tag = tag as u32;
+                    quote! { #tag }
+                },
+                BasicType::U64 | BasicType::VarInt64 => {
+                    let tag = tag as u64;
+                    quote! { #tag }
+                }
+            };
+
+            let structure = Struct::new( &variant.fields, &variant.attrs )?;
+            variants.push( Variant {
+                tag_expr,
+                ident: &variant.ident,
+                structure
+            });
         }
 
-        self.kind_to_full_name.insert( kind, full_name );
-        let kind = match self.tag_type {
-            BasicType::U7 | BasicType::U8 => {
-                let kind = kind as u8;
-                quote! { #kind }
-            },
-            BasicType::U16 => {
-                let kind = kind as u16;
-                quote! { #kind }
-            },
-            BasicType::U32 => {
-                let kind = kind as u32;
-                quote! { #kind }
-            },
-            BasicType::U64 | BasicType::VarInt64 => {
-                let kind = kind as u64;
-                quote! { #kind }
-            }
-        };
-        Ok( kind )
+        Ok( Enum {
+            tag_type,
+            variants
+        })
     }
 }
 
@@ -909,73 +993,37 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let name = &input.ident;
     let mut types = Vec::new();
     let (reader_body, minimum_bytes_needed_body) = match &input.data {
-        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { named, .. } ), .. } ) => {
-            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
-            let st = Struct::new( named )?;
-            let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
+        syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
+            let structure = Struct::new( fields, &input.attrs )?;
+            let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
                 #body
-                Ok( #name { #initializer } )
-            };
-            (reader_body, minimum_bytes)
-        },
-        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { unnamed, .. } ), .. } ) => {
-            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
-            let st = Struct::new( unnamed )?;
-            let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
-            let reader_body = quote! {
-                #body
-                Ok( #name( #initializer ) )
+                Ok( #name #initializer )
             };
             (reader_body, minimum_bytes)
         },
         syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
-            let item_attrs = parse_item_attributes( ItemKind::Enum, &input.attrs )?;
-            let mut ctx = EnumCtx::new( &name, item_attrs.tag_type );
+            let enumeration = Enum::new( &name, &input.attrs, &variants )?;
             let mut variant_matches = Vec::with_capacity( variants.len() );
             let mut variant_minimum_sizes = Vec::with_capacity( variants.len() );
-            for variant in variants {
-                let kind = ctx.next( &variant )?;
+            for variant in enumeration.variants {
+                let tag = variant.tag_expr;
                 let unqualified_ident = &variant.ident;
                 let variant_path = quote! { #name::#unqualified_ident };
-
-                match variant.fields {
-                    syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
-                        parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
-                        let st = Struct::new( named )?;
-                        let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
-                        variant_matches.push( quote! {
-                            #kind => {
-                                #body
-                                Ok( #variant_path { #initializer } )
-                            }
-                        });
-                        variant_minimum_sizes.push( minimum_bytes );
-                    },
-                    syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
-                        parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
-                        let st = Struct::new( unnamed )?;
-                        let (body, initializer, minimum_bytes) = readable_body( &mut types, st );
-                        variant_matches.push( quote! {
-                            #kind => {
-                                #body
-                                Ok( #variant_path( #initializer ) )
-                            }
-                        });
-                        variant_minimum_sizes.push( minimum_bytes );
-                    },
-                    syn::Fields::Unit => {
-                        parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
-                        variant_matches.push( quote! {
-                            #kind => {
-                                Ok( #variant_path )
-                            }
-                        });
+                let (body, initializer, minimum_bytes) = readable_body( &mut types, &variant.structure );
+                variant_matches.push( quote! {
+                    #tag => {
+                        #body
+                        Ok( #variant_path #initializer )
                     }
+                });
+
+                if variant.structure.kind != StructKind::Unit {
+                    variant_minimum_sizes.push( minimum_bytes );
                 }
             }
 
-            let (tag_reader, tag_size) = match ctx.tag_type {
+            let (tag_reader, tag_size) = match enumeration.tag_type {
                 BasicType::U64 => (quote! { read_u64 }, 8_usize),
                 BasicType::U32 => (quote! { read_u32 }, 4_usize),
                 BasicType::U16 => (quote! { read_u16 }, 2_usize),
@@ -995,22 +1043,13 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let minimum_bytes_needed_body = quote! { (#minimum_bytes_needed_body) + #tag_size };
             (reader_body, minimum_bytes_needed_body)
         },
-        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unit, .. } ) => {
-            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
-            let reader_body = quote! {
-                Ok( #name )
-            };
-
-            let minimum_bytes_needed_body = quote! { 0 };
-            (reader_body, minimum_bytes_needed_body)
-        },
         syn::Data::Union( syn::DataUnion { union_token, .. } ) => {
             let message = "Unions are not supported!";
             return Err( syn::Error::new( union_token.span(), message ) );
         }
     };
 
-    let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Variant::Readable );
+    let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Trait::Readable );
     let output = quote! {
         impl< 'a_, #impl_params C_: speedy::Context > speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
             #[inline]
@@ -1047,34 +1086,18 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let name = &input.ident;
     let mut types = Vec::new();
     let writer_body = match input.data {
-        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unit, .. } ) => {
-            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
-            quote! {}
-        },
-        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Named( syn::FieldsNamed { ref named, .. } ), .. } ) => {
-            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
-            let st = Struct::new( named )?;
+        syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
+            let st = Struct::new( fields, &input.attrs )?;
             let assignments = assign_to_variables( &st.fields );
-            let (body, _) = writable_body( &mut types, st );
-            quote! {
-                #assignments
-                #body
-            }
-        },
-        syn::Data::Struct( syn::DataStruct { fields: syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ), .. } ) => {
-            parse_item_attributes( ItemKind::Struct, &input.attrs )?;
-            let st = Struct::new( unnamed )?;
-            let assignments = assign_to_variables( &st.fields );
-            let (body, _) = writable_body( &mut types, st );
+            let (body, _) = writable_body( &mut types, &st );
             quote! {
                 #assignments
                 #body
             }
         },
         syn::Data::Enum( syn::DataEnum { ref variants, .. } ) => {
-            let item_attrs = parse_item_attributes( ItemKind::Enum, &input.attrs )?;
-            let mut ctx = EnumCtx::new( &name, item_attrs.tag_type );
-            let tag_writer = match ctx.tag_type {
+            let enumeration = Enum::new( &name, &input.attrs, &variants )?;
+            let tag_writer = match enumeration.tag_type {
                 BasicType::U64 => quote! { write_u64 },
                 BasicType::U32 => quote! { write_u32 },
                 BasicType::U16 => quote! { write_u16 },
@@ -1083,40 +1106,17 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 BasicType::VarInt64 => quote! { write_u64_varint },
             };
 
-            let variants: Result< Vec< _ >, syn::Error > = variants.iter()
+            let variants: Result< Vec< _ >, syn::Error > = enumeration.variants.iter()
                 .map( |variant| {
-                    let kind = ctx.next( &variant )?;
                     let unqualified_ident = &variant.ident;
+                    let tag_expr = &variant.tag_expr;
                     let variant_path = quote! { #name::#unqualified_ident };
-                    let snippet = match variant.fields {
-                        syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
-                            parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
-                            let st = Struct::new( named )?;
-                            let (body, identifiers) = writable_body( &mut types, st );
-                            quote! {
-                                #variant_path { #identifiers } => {
-                                    _writer_.#tag_writer( #kind )?;
-                                    #body
-                                }
-                            }
-                        },
-                        syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
-                            parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
-                            let st = Struct::new( unnamed )?;
-                            let (body, identifiers) = writable_body( &mut types, st );
-                            quote! {
-                                #variant_path( #identifiers ) => {
-                                    _writer_.#tag_writer( #kind )?;
-                                    #body
-                                }
-                            }
-                        },
-                        syn::Fields::Unit => {
-                            parse_item_attributes( ItemKind::Struct, &variant.attrs )?;
-                            quote! { #variant_path => {
-                                _writer_.#tag_writer( #kind )?;
-                            }}
-                        },
+                    let (body, initializer) = writable_body( &mut types, &variant.structure );
+                    let snippet = quote! {
+                        #variant_path #initializer => {
+                            _writer_.#tag_writer( #tag_expr )?;
+                            #body
+                        }
                     };
 
                     Ok( snippet )
@@ -1131,7 +1131,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
         }
     };
 
-    let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Variant::Writable );
+    let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Trait::Writable );
     let output = quote! {
         impl< #impl_params C_: speedy::Context > speedy::Writable< C_ > for #name #ty_params #where_clause {
             #[inline]
