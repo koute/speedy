@@ -3,6 +3,7 @@ use std::mem;
 use crate::context::Context;
 use crate::endianness::Endianness;
 use crate::writable::Writable;
+use crate::varint::VarInt64;
 
 pub trait Writer< C: Context > {
     fn write_bytes( &mut self, slice: &[u8] ) -> Result< (), C::Error >;
@@ -108,5 +109,10 @@ pub trait Writer< C: Context > {
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn write_u64_varint( &mut self, value: u64 ) -> Result< (), C::Error > {
+        VarInt64::from( value ).write_to( self )
     }
 }
