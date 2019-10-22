@@ -444,13 +444,15 @@ impl< 'a > Field< 'a > {
 }
 
 enum FieldAttribute {
-    DefaultOnEof,
+    DefaultOnEof {
+        key_span: Span
+    },
     Count {
-        key_token: kw::count,
+        key_span: Span,
         expr: syn::Expr
     },
     LengthType {
-        key_token: kw::length_type,
+        key_span: Span,
         ty: BasicType
     }
 }
@@ -459,14 +461,16 @@ impl syn::parse::Parse for FieldAttribute {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let lookahead = input.lookahead1();
         let value = if lookahead.peek( kw::default_on_eof ) {
-            input.parse::< kw::default_on_eof >()?;
-            FieldAttribute::DefaultOnEof
+            let key_token = input.parse::< kw::default_on_eof >()?;
+            FieldAttribute::DefaultOnEof {
+                key_span: key_token.span()
+            }
         } else if lookahead.peek( kw::count ) {
             let key_token = input.parse::< kw::count >()?;
             let _: Token![=] = input.parse()?;
             let expr: syn::Expr = input.parse()?;
             FieldAttribute::Count {
-                key_token,
+                key_span: key_token.span(),
                 expr
             }
         } else if lookahead.peek( kw::length_type ) {
@@ -474,7 +478,7 @@ impl syn::parse::Parse for FieldAttribute {
             let _: Token![=] = input.parse()?;
             let ty: BasicType = input.parse()?;
             FieldAttribute::LengthType {
-                key_token,
+                key_span: key_token.span(),
                 ty
             }
         } else {
@@ -482,16 +486,6 @@ impl syn::parse::Parse for FieldAttribute {
         };
 
         Ok( value )
-    }
-}
-
-struct FieldAttributes( syn::punctuated::Punctuated< FieldAttribute, Token![,] > );
-
-impl syn::parse::Parse for FieldAttributes {
-    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
-        let content;
-        parenthesized!( content in input );
-        Ok( FieldAttributes( content.parse_terminated( FieldAttribute::parse )? ) )
     }
 }
 
@@ -620,45 +614,42 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
     let iter = fields.into_iter()
         .enumerate()
         .map( |(index, field)| {
-            let mut default_on_eof = false;
+            let mut default_on_eof = None;
             let mut count = None;
             let mut length_type = None;
-            for attr in &field.attrs {
-                let path = attr.path.clone().into_token_stream().to_string();
-                if path == "speedy" {
-                    let parsed_attrs: FieldAttributes = syn::parse2( attr.tokens.clone() )?;
-                    for attr in parsed_attrs.0 {
-                        match attr {
-                            FieldAttribute::DefaultOnEof => default_on_eof = true,
-                            FieldAttribute::Count { key_token, expr } => {
-                                if count.is_some() {
-                                    let message = "Duplicate 'count'";
-                                    return Err( syn::Error::new( key_token.span(), message ) );
-                                }
-
-                                if length_type.is_some() {
-                                    let message = "You cannot have both 'length_type' and 'count' on the same field";
-                                    return Err( syn::Error::new( field.ty.span(), message ) );
-                                }
-
-                                count = Some( expr );
-                            }
-                            FieldAttribute::LengthType { key_token, ty } => {
-                                if length_type.is_some() {
-                                    let message = "Duplicate 'length_type'";
-                                    return Err( syn::Error::new( key_token.span(), message ) );
-                                }
-
-                                if count.is_some() {
-                                    let message = "You cannot have both 'length_type' and 'count' on the same field";
-                                    return Err( syn::Error::new( field.ty.span(), message ) );
-                                }
-
-                                length_type = Some( ty );
-                            }
+            for attr in parse_attributes::< FieldAttribute >( &field.attrs )? {
+                match attr {
+                    FieldAttribute::DefaultOnEof { key_span } => {
+                        if default_on_eof.is_some() {
+                            let message = "Duplicate 'default_on_eof'";
+                            return Err( syn::Error::new( key_span, message ) );
                         }
+
+                        default_on_eof = Some( key_span );
+                    }
+                    FieldAttribute::Count { key_span, expr } => {
+                        if count.is_some() {
+                            let message = "Duplicate 'count'";
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+
+                        count = Some( (key_span, expr) );
+                    }
+                    FieldAttribute::LengthType { key_span, ty } => {
+                        if length_type.is_some() {
+                            let message = "Duplicate 'length_type'";
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+
+                        length_type = Some( (key_span, ty) );
                     }
                 }
+            }
+
+            if length_type.is_some() && count.is_some() {
+                let (key_span, _) = length_type.unwrap();
+                let message = "You cannot have both 'length_type' and 'count' on the same field";
+                return Err( syn::Error::new( key_span, message ) );
             }
 
             let special_ty = parse_special_ty( &field.ty );
@@ -698,13 +689,17 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 }
             }
 
+            fn snd< T, U >( (_, b): (T, U) ) -> U {
+                b
+            }
+
             Ok( Field {
                 index,
                 name: field.ident.as_ref(),
                 ty: &field.ty,
-                default_on_eof,
-                count,
-                length_type,
+                default_on_eof: default_on_eof.is_some(),
+                count: count.map( snd ),
+                length_type: length_type.map( snd ),
                 special_ty
             })
         });
