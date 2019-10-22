@@ -349,6 +349,12 @@ struct DerivedStructWithVecWithLengthTypeVarInt64 {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithOptionVecWithLengthTypeU16 {
+    #[speedy(length_type = u16)]
+    data: Option< Vec< u8 > >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
 #[speedy(tag_type = u8)]
 enum DerivedEnumWithCustomTag {
     #[speedy(tag = 20)]
@@ -896,6 +902,24 @@ symmetric_tests! {
         in = DerivedStructWithVecWithLengthTypeVarInt64 { data: vec![ 100, 101 ] },
         le = [2, 100, 101],
         be = [2, 100, 101],
+        minimum_bytes = 1
+    }
+    derived_struct_with_option_vec_with_length_type_u16_none for DerivedStructWithOptionVecWithLengthTypeU16 {
+        in = DerivedStructWithOptionVecWithLengthTypeU16 { data: None },
+        le = [0],
+        be = [0],
+        minimum_bytes = 1
+    }
+    derived_struct_with_option_vec_with_length_type_u16_some_empty for DerivedStructWithOptionVecWithLengthTypeU16 {
+        in = DerivedStructWithOptionVecWithLengthTypeU16 { data: Some( vec![] ) },
+        le = [1, 0, 0],
+        be = [1, 0, 0],
+        minimum_bytes = 1
+    }
+    derived_struct_with_option_vec_with_length_type_u16_some_non_empty for DerivedStructWithOptionVecWithLengthTypeU16 {
+        in = DerivedStructWithOptionVecWithLengthTypeU16 { data: Some( vec![ 100, 101 ] ) },
+        le = [1, 2, 0, 100, 101],
+        be = [1, 0, 2, 100, 101],
         minimum_bytes = 1
     }
     derived_enum_with_custom_tag_a for DerivedEnumWithCustomTag {

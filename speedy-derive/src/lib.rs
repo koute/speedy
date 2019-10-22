@@ -422,7 +422,7 @@ struct Field< 'a > {
     default_on_eof: bool,
     count: Option< syn::Expr >,
     length_type: Option< BasicType >,
-    special_ty: Option< SpecialTy >
+    special_ty: Option< Opt< SpecialTy > >
 }
 
 impl< 'a > Field< 'a > {
@@ -486,6 +486,20 @@ impl syn::parse::Parse for FieldAttribute {
         };
 
         Ok( value )
+    }
+}
+
+enum Opt< T > {
+    Plain( T ),
+    Option( T )
+}
+
+impl< T > Opt< T > {
+    fn inner( &self ) -> &T {
+        match *self {
+            Opt::Option( ref inner ) => inner,
+            Opt::Plain( ref inner ) => inner
+        }
     }
 }
 
@@ -562,6 +576,25 @@ fn is_bare_ty( ty: &syn::Type, name: &str ) -> bool {
             segments[ 0 ].ident == name && segments[ 0 ].arguments.is_empty()
         },
         _ => false
+    }
+}
+
+fn extract_option_inner_ty( ty: &syn::Type ) -> Option< &syn::Type > {
+    match *ty {
+        syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } )
+            if segments.len() == 1 && segments[ 0 ].ident == "Option" =>
+        {
+            match segments[ 0 ].arguments {
+                syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { colon2_token: None, ref args, .. } ) if args.len() == 1 => {
+                    match args[ 0 ] {
+                        syn::GenericArgument::Type( ref ty ) => Some( ty ),
+                        _ => None
+                    }
+                },
+                _ => None
+            }
+        },
+        _ => None
     }
 }
 
@@ -652,20 +685,34 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 return Err( syn::Error::new( key_span, message ) );
             }
 
-            let special_ty = parse_special_ty( &field.ty );
+            let special_ty = if let Some( ty ) = extract_option_inner_ty( &field.ty ) {
+                parse_special_ty( ty ).map( Opt::Option )
+            } else {
+                parse_special_ty( &field.ty ).map( Opt::Plain )
+            };
+
             if count.is_some() {
                 match special_ty {
-                    | Some( SpecialTy::String )
-                    | Some( SpecialTy::Vec( .. ) )
-                    | Some( SpecialTy::CowSlice( .. ) )
-                    | Some( SpecialTy::CowStr( .. ) )
-                    | Some( SpecialTy::HashMap( .. ) )
-                    | Some( SpecialTy::HashSet( .. ) )
-                    | Some( SpecialTy::BTreeMap( .. ) )
-                    | Some( SpecialTy::BTreeSet( .. ) )
+                    | Some( Opt::Plain( SpecialTy::String ) )
+                    | Some( Opt::Plain( SpecialTy::Vec( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::CowSlice( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::CowStr( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::HashMap( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::HashSet( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::BTreeMap( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::BTreeSet( .. ) ) )
                         => {},
 
-                    None => {
+                    | Some( Opt::Option( SpecialTy::String ) )
+                    | Some( Opt::Option( SpecialTy::Vec( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::CowSlice( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::CowStr( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::HashMap( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::HashSet( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::BTreeMap( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::BTreeSet( .. ) ) )
+                    | None
+                    => {
                         return Err( syn::Error::new( field.ty.span(), "The 'count' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`" ) );
                     }
                 }
@@ -673,18 +720,26 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
 
             if length_type.is_some() {
                 match special_ty {
-                    | Some( SpecialTy::String )
-                    | Some( SpecialTy::Vec( .. ) )
-                    | Some( SpecialTy::CowSlice( .. ) )
-                    | Some( SpecialTy::CowStr( .. ) )
-                    | Some( SpecialTy::HashMap( .. ) )
-                    | Some( SpecialTy::HashSet( .. ) )
-                    | Some( SpecialTy::BTreeMap( .. ) )
-                    | Some( SpecialTy::BTreeSet( .. ) )
+                    | Some( Opt::Plain( SpecialTy::String ) )
+                    | Some( Opt::Plain( SpecialTy::Vec( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::CowSlice( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::CowStr( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::HashMap( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::HashSet( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::BTreeMap( .. ) ) )
+                    | Some( Opt::Plain( SpecialTy::BTreeSet( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::String ) )
+                    | Some( Opt::Option( SpecialTy::Vec( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::CowSlice( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::CowStr( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::HashMap( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::HashSet( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::BTreeMap( .. ) ) )
+                    | Some( Opt::Option( SpecialTy::BTreeSet( .. ) ) )
                         => {},
 
                     None => {
-                        return Err( syn::Error::new( field.ty.span(), "The 'length_type' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`" ) );
+                        return Err( syn::Error::new( field.ty.span(), "The 'length_type' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet` and for `Option<T>` where `T` is one of these types" ) );
                     }
                 }
             }
@@ -742,39 +797,63 @@ fn read_field_body( field: &Field ) -> TokenStream {
         }
     };
 
+    let read_string = ||
+        quote! {{
+            let _count_ = #read_count_body;
+            _reader_.read_vec( _count_ ).and_then( speedy::private::vec_to_string )
+        }};
+
+    let read_vec = ||
+        quote! {{
+            let _count_ = #read_count_body;
+            _reader_.read_vec( _count_ )
+        }};
+
+    let read_cow_slice = ||
+        quote! {{
+            let _count_ = #read_count_body;
+            _reader_.read_cow( _count_ )
+        }};
+
+    let read_cow_str = ||
+        quote! {{
+            let _count_ = #read_count_body;
+            _reader_.read_cow( _count_ ).and_then( speedy::private::cow_bytes_to_cow_str )
+        }};
+
+    let read_collection = ||
+        quote! {{
+            let _count_ = #read_count_body;
+            _reader_.read_collection( _count_ )
+        }};
+
+    let read_option = |tokens: TokenStream|
+        quote! {{
+            _reader_.read_u8().and_then( |_flag_| {
+                if _flag_ != 0 {
+                    Ok( Some( #tokens? ) )
+                } else {
+                    Ok( None )
+                }
+            })
+        }};
+
     let body = match field.special_ty {
-        Some( SpecialTy::String ) => {
-            quote! {{
-                let _count_ = #read_count_body;
-                _reader_.read_vec( _count_ ).and_then( speedy::private::vec_to_string )
-            }}
-        },
-        Some( SpecialTy::Vec( .. ) ) => {
-            quote! {{
-                let _count_ = #read_count_body;
-                _reader_.read_vec( _count_ )
-            }}
-        },
-        Some( SpecialTy::CowSlice( .. ) ) => {
-            quote! {{
-                let _count_ = #read_count_body;
-                _reader_.read_cow( _count_ )
-            }}
-        },
-        Some( SpecialTy::CowStr( .. ) ) => {
-            quote! {{
-                let _count_ = #read_count_body;
-                _reader_.read_cow( _count_ ).and_then( speedy::private::cow_bytes_to_cow_str )
-            }}
-        },
-        Some( SpecialTy::HashMap( .. ) ) |
-        Some( SpecialTy::HashSet( .. ) ) |
-        Some( SpecialTy::BTreeMap( .. ) ) |
-        Some( SpecialTy::BTreeSet( .. ) ) => {
-            quote! {{
-                let _count_ = #read_count_body;
-                _reader_.read_collection( _count_ )
-            }}
+        Some( ref special_ty ) => {
+            let body = match special_ty.inner() {
+                SpecialTy::String => read_string(),
+                SpecialTy::Vec( .. ) => read_vec(),
+                SpecialTy::CowSlice( .. ) => read_cow_slice(),
+                SpecialTy::CowStr( .. ) => read_cow_str(),
+                SpecialTy::HashMap( .. ) |
+                SpecialTy::HashSet( .. ) |
+                SpecialTy::BTreeMap( .. ) |
+                SpecialTy::BTreeSet( .. ) => read_collection()
+            };
+            match special_ty {
+                Opt::Plain( _ ) => body,
+                Opt::Option( _ ) => read_option( body )
+            }
         },
         None => {
             assert!( field.count.is_none() );
@@ -843,34 +922,50 @@ fn write_field_body( field: &Field ) -> TokenStream {
         }
     };
 
+    let write_str = ||
+        quote! {{
+            #write_length_body
+            _writer_.write_slice( #name.as_bytes() )?;
+        }};
+
+    let write_slice = ||
+        quote! {{
+            #write_length_body
+            _writer_.write_slice( &#name )?;
+        }};
+
+    let write_collection = ||
+        quote! {{
+            #write_length_body
+            _writer_.write_collection( #name.iter() )?;
+        }};
+
+    let write_option = |tokens: TokenStream|
+        quote! {{
+            if let Some( ref #name ) = #name {
+                _writer_.write_u8( 1 )?;
+                #tokens
+            } else {
+                _writer_.write_u8( 0 )?;
+            }
+        }};
+
     match field.special_ty {
-        Some( SpecialTy::String ) |
-        Some( SpecialTy::CowStr( .. ) ) => {
-            quote! {{
-                #write_length_body
-                _writer_.write_slice( #name.as_bytes() )?;
-            }}
-        },
-        Some( SpecialTy::Vec( .. ) ) => {
-            quote! {{
-                #write_length_body
-                _writer_.write_slice( &#name )?;
-            }}
-        },
-        Some( SpecialTy::CowSlice( .. ) ) => {
-            quote! {{
-                #write_length_body
-                _writer_.write_slice( &#name )?;
-            }}
-        },
-        Some( SpecialTy::HashMap( .. ) ) |
-        Some( SpecialTy::HashSet( .. ) ) |
-        Some( SpecialTy::BTreeMap( .. ) ) |
-        Some( SpecialTy::BTreeSet( .. ) ) => {
-            quote! {{
-                #write_length_body
-                _writer_.write_collection( #name.iter() )?;
-            }}
+        Some( ref special_ty ) => {
+            let body = match special_ty.inner() {
+                SpecialTy::String |
+                SpecialTy::CowStr( .. ) => write_str(),
+                SpecialTy::Vec( .. ) |
+                SpecialTy::CowSlice( .. ) => write_slice(),
+                SpecialTy::HashMap( .. ) |
+                SpecialTy::HashSet( .. ) |
+                SpecialTy::BTreeMap( .. ) |
+                SpecialTy::BTreeSet( .. ) => write_collection(),
+            };
+            match special_ty {
+                Opt::Plain( _ ) => body,
+                Opt::Option( _ ) => write_option( body )
+            }
         },
         None => {
             assert!( field.count.is_none() );
@@ -1031,23 +1126,30 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
         None
     } else {
         match field.special_ty {
-            | Some( SpecialTy::String )
-            | Some( SpecialTy::Vec( .. ) )
-            | Some( SpecialTy::CowSlice( .. ) )
-            | Some( SpecialTy::CowStr( .. ) )
-            | Some( SpecialTy::HashMap( .. ) )
-            | Some( SpecialTy::HashSet( .. ) )
-            | Some( SpecialTy::BTreeMap( .. ) )
-            | Some( SpecialTy::BTreeSet( .. ) )
-            => {
-                let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
-                    BasicType::U7 | BasicType::U8 | BasicType::VarInt64 => 1,
-                    BasicType::U16 => 2,
-                    BasicType::U32 => 4,
-                    BasicType::U64 => 8
-                };
+            Some( Opt::Option( .. ) ) => {
+                Some( quote! { 1 } )
+            },
+            Some( Opt::Plain( ref special_ty ) ) => {
+                match special_ty {
+                    | SpecialTy::String
+                    | SpecialTy::Vec( .. )
+                    | SpecialTy::CowSlice( .. )
+                    | SpecialTy::CowStr( .. )
+                    | SpecialTy::HashMap( .. )
+                    | SpecialTy::HashSet( .. )
+                    | SpecialTy::BTreeMap( .. )
+                    | SpecialTy::BTreeSet( .. )
+                    => {
+                        let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
+                            BasicType::U7 | BasicType::U8 | BasicType::VarInt64 => 1,
+                            BasicType::U16 => 2,
+                            BasicType::U32 => 4,
+                            BasicType::U64 => 8
+                        };
 
-                Some( quote! { #size } )
+                        Some( quote! { #size } )
+                    },
+                }
             },
             None => {
                 let ty = &field.ty;
