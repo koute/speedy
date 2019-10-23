@@ -418,11 +418,11 @@ impl< 'a > Struct< 'a > {
 struct Field< 'a > {
     index: usize,
     name: Option< &'a syn::Ident >,
-    ty: &'a syn::Type,
+    raw_ty: &'a syn::Type,
     default_on_eof: bool,
     count: Option< syn::Expr >,
     length_type: Option< BasicType >,
-    special_ty: Option< Opt< SpecialTy > >
+    ty: Opt< Ty >
 }
 
 impl< 'a > Field< 'a > {
@@ -503,7 +503,7 @@ impl< T > Opt< T > {
     }
 }
 
-enum SpecialTy {
+enum Ty {
     String,
     Vec( syn::Type ),
     CowSlice( syn::Lifetime, syn::Type ),
@@ -511,7 +511,9 @@ enum SpecialTy {
     HashMap( syn::Type, syn::Type ),
     HashSet( syn::Type ),
     BTreeMap( syn::Type, syn::Type ),
-    BTreeSet( syn::Type )
+    BTreeSet( syn::Type ),
+
+    Ty( syn::Type )
 }
 
 fn extract_inner_ty( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< &syn::Type > {
@@ -598,40 +600,44 @@ fn extract_option_inner_ty( ty: &syn::Type ) -> Option< &syn::Type > {
     }
 }
 
-fn parse_special_ty( ty: &syn::Type ) -> Option< SpecialTy > {
+fn parse_ty( ty: &syn::Type ) -> Ty {
+    parse_special_ty( ty ).unwrap_or_else( || Ty::Ty( ty.clone() ) )
+}
+
+fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
     match *ty {
         syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
             let name = &segments[ 0 ].ident;
             match segments[ 0 ].arguments {
                 syn::PathArguments::None => {
                     if name == "String" {
-                        Some( SpecialTy::String )
+                        Some( Ty::String )
                     } else {
                         None
                     }
                 },
                 syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { colon2_token: None, ref args, .. } ) => {
                     if name == "Vec" {
-                        Some( SpecialTy::Vec( extract_inner_ty( args )?.clone() ) )
+                        Some( Ty::Vec( extract_inner_ty( args )?.clone() ) )
                     } else if name == "HashSet" {
-                        Some( SpecialTy::HashSet( extract_inner_ty( args )?.clone() ) )
+                        Some( Ty::HashSet( extract_inner_ty( args )?.clone() ) )
                     } else if name == "BTreeSet" {
-                        Some( SpecialTy::BTreeSet( extract_inner_ty( args )?.clone() ) )
+                        Some( Ty::BTreeSet( extract_inner_ty( args )?.clone() ) )
                     } else if name == "Cow" {
                         let (lifetime, ty) = extract_lifetime_and_inner_ty( args )?;
                         if let Some( inner_ty ) = extract_slice_inner_ty( ty ) {
-                            Some( SpecialTy::CowSlice( lifetime.clone(), inner_ty.clone() ) )
+                            Some( Ty::CowSlice( lifetime.clone(), inner_ty.clone() ) )
                         } else if is_bare_ty( ty, "str" ) {
-                            Some( SpecialTy::CowStr( lifetime.clone() ) )
+                            Some( Ty::CowStr( lifetime.clone() ) )
                         } else {
                             None
                         }
                     } else if name == "HashMap" {
                         let (key_ty, value_ty) = extract_inner_ty_2( args )?;
-                        Some( SpecialTy::HashMap( key_ty.clone(), value_ty.clone() ) )
+                        Some( Ty::HashMap( key_ty.clone(), value_ty.clone() ) )
                     } else if name == "BTreeMap" {
                         let (key_ty, value_ty) = extract_inner_ty_2( args )?;
-                        Some( SpecialTy::BTreeMap( key_ty.clone(), value_ty.clone() ) )
+                        Some( Ty::BTreeMap( key_ty.clone(), value_ty.clone() ) )
                     } else {
                         None
                     }
@@ -685,33 +691,34 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 return Err( syn::Error::new( key_span, message ) );
             }
 
-            let special_ty = if let Some( ty ) = extract_option_inner_ty( &field.ty ) {
-                parse_special_ty( ty ).map( Opt::Option )
+            let ty = if let Some( ty ) = extract_option_inner_ty( &field.ty ) {
+                Opt::Option( parse_ty( ty ) )
             } else {
-                parse_special_ty( &field.ty ).map( Opt::Plain )
+                Opt::Plain( parse_ty( &field.ty ) )
             };
 
             if count.is_some() {
-                match special_ty {
-                    | Some( Opt::Plain( SpecialTy::String ) )
-                    | Some( Opt::Plain( SpecialTy::Vec( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::CowSlice( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::CowStr( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::HashMap( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::HashSet( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::BTreeMap( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::BTreeSet( .. ) ) )
+                match ty {
+                    | Opt::Plain( Ty::String )
+                    | Opt::Plain( Ty::Vec( .. ) )
+                    | Opt::Plain( Ty::CowSlice( .. ) )
+                    | Opt::Plain( Ty::CowStr( .. ) )
+                    | Opt::Plain( Ty::HashMap( .. ) )
+                    | Opt::Plain( Ty::HashSet( .. ) )
+                    | Opt::Plain( Ty::BTreeMap( .. ) )
+                    | Opt::Plain( Ty::BTreeSet( .. ) )
                         => {},
 
-                    | Some( Opt::Option( SpecialTy::String ) )
-                    | Some( Opt::Option( SpecialTy::Vec( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::CowSlice( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::CowStr( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::HashMap( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::HashSet( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::BTreeMap( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::BTreeSet( .. ) ) )
-                    | None
+                    | Opt::Option( Ty::String )
+                    | Opt::Option( Ty::Vec( .. ) )
+                    | Opt::Option( Ty::CowSlice( .. ) )
+                    | Opt::Option( Ty::CowStr( .. ) )
+                    | Opt::Option( Ty::HashMap( .. ) )
+                    | Opt::Option( Ty::HashSet( .. ) )
+                    | Opt::Option( Ty::BTreeMap( .. ) )
+                    | Opt::Option( Ty::BTreeSet( .. ) )
+                    | Opt::Plain( Ty::Ty( .. ) )
+                    | Opt::Option( Ty::Ty( .. ) )
                     => {
                         return Err( syn::Error::new( field.ty.span(), "The 'count' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`" ) );
                     }
@@ -719,26 +726,28 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             }
 
             if length_type.is_some() {
-                match special_ty {
-                    | Some( Opt::Plain( SpecialTy::String ) )
-                    | Some( Opt::Plain( SpecialTy::Vec( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::CowSlice( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::CowStr( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::HashMap( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::HashSet( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::BTreeMap( .. ) ) )
-                    | Some( Opt::Plain( SpecialTy::BTreeSet( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::String ) )
-                    | Some( Opt::Option( SpecialTy::Vec( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::CowSlice( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::CowStr( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::HashMap( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::HashSet( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::BTreeMap( .. ) ) )
-                    | Some( Opt::Option( SpecialTy::BTreeSet( .. ) ) )
+                match ty {
+                    | Opt::Plain( Ty::String )
+                    | Opt::Plain( Ty::Vec( .. ) )
+                    | Opt::Plain( Ty::CowSlice( .. ) )
+                    | Opt::Plain( Ty::CowStr( .. ) )
+                    | Opt::Plain( Ty::HashMap( .. ) )
+                    | Opt::Plain( Ty::HashSet( .. ) )
+                    | Opt::Plain( Ty::BTreeMap( .. ) )
+                    | Opt::Plain( Ty::BTreeSet( .. ) )
+                    | Opt::Option( Ty::String )
+                    | Opt::Option( Ty::Vec( .. ) )
+                    | Opt::Option( Ty::CowSlice( .. ) )
+                    | Opt::Option( Ty::CowStr( .. ) )
+                    | Opt::Option( Ty::HashMap( .. ) )
+                    | Opt::Option( Ty::HashSet( .. ) )
+                    | Opt::Option( Ty::BTreeMap( .. ) )
+                    | Opt::Option( Ty::BTreeSet( .. ) )
                         => {},
 
-                    None => {
+                    | Opt::Plain( Ty::Ty( .. ) )
+                    | Opt::Option( Ty::Ty( .. ) )
+                    => {
                         return Err( syn::Error::new( field.ty.span(), "The 'length_type' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet` and for `Option<T>` where `T` is one of these types" ) );
                     }
                 }
@@ -751,11 +760,11 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             Ok( Field {
                 index,
                 name: field.ident.as_ref(),
-                ty: &field.ty,
+                raw_ty: &field.ty,
                 default_on_eof: default_on_eof.is_some(),
                 count: count.map( snd ),
                 length_type: length_type.map( snd ),
-                special_ty
+                ty
             })
         });
 
@@ -838,27 +847,24 @@ fn read_field_body( field: &Field ) -> TokenStream {
             })
         }};
 
-    let body = match field.special_ty {
-        Some( ref special_ty ) => {
-            let body = match special_ty.inner() {
-                SpecialTy::String => read_string(),
-                SpecialTy::Vec( .. ) => read_vec(),
-                SpecialTy::CowSlice( .. ) => read_cow_slice(),
-                SpecialTy::CowStr( .. ) => read_cow_str(),
-                SpecialTy::HashMap( .. ) |
-                SpecialTy::HashSet( .. ) |
-                SpecialTy::BTreeMap( .. ) |
-                SpecialTy::BTreeSet( .. ) => read_collection()
-            };
-            match special_ty {
-                Opt::Plain( _ ) => body,
-                Opt::Option( _ ) => read_option( body )
-            }
-        },
-        None => {
+    let body = match field.ty.inner() {
+        Ty::String => read_string(),
+        Ty::Vec( .. ) => read_vec(),
+        Ty::CowSlice( .. ) => read_cow_slice(),
+        Ty::CowStr( .. ) => read_cow_str(),
+        Ty::HashMap( .. ) |
+        Ty::HashSet( .. ) |
+        Ty::BTreeMap( .. ) |
+        Ty::BTreeSet( .. ) => read_collection(),
+        Ty::Ty( .. ) => {
             assert!( field.count.is_none() );
             quote! { _reader_.read_value() }
         }
+    };
+
+    let body = match field.ty {
+        Opt::Plain( _ ) => body,
+        Opt::Option( _ ) => read_option( body )
     };
 
     if field.default_on_eof {
@@ -875,10 +881,10 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: &Struct< 'a > ) ->
     for field in &st.fields {
         let read_value = read_field_body( field );
         let name = field.var_name();
-        let ty = field.ty;
-        field_readers.push( quote! { let #name: #ty = #read_value; } );
+        let raw_ty = field.raw_ty;
+        field_readers.push( quote! { let #name: #raw_ty = #read_value; } );
         field_names.push( name );
-        types.push( ty );
+        types.push( raw_ty );
 
         if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
             minimum_bytes_needed.push( minimum_bytes );
@@ -950,27 +956,24 @@ fn write_field_body( field: &Field ) -> TokenStream {
             }
         }};
 
-    match field.special_ty {
-        Some( ref special_ty ) => {
-            let body = match special_ty.inner() {
-                SpecialTy::String |
-                SpecialTy::CowStr( .. ) => write_str(),
-                SpecialTy::Vec( .. ) |
-                SpecialTy::CowSlice( .. ) => write_slice(),
-                SpecialTy::HashMap( .. ) |
-                SpecialTy::HashSet( .. ) |
-                SpecialTy::BTreeMap( .. ) |
-                SpecialTy::BTreeSet( .. ) => write_collection(),
-            };
-            match special_ty {
-                Opt::Plain( _ ) => body,
-                Opt::Option( _ ) => write_option( body )
-            }
-        },
-        None => {
+    let body = match field.ty.inner() {
+        Ty::String |
+        Ty::CowStr( .. ) => write_str(),
+        Ty::Vec( .. ) |
+        Ty::CowSlice( .. ) => write_slice(),
+        Ty::HashMap( .. ) |
+        Ty::HashSet( .. ) |
+        Ty::BTreeMap( .. ) |
+        Ty::BTreeSet( .. ) => write_collection(),
+        Ty::Ty( .. ) => {
             assert!( field.count.is_none() );
             quote! { _writer_.write_value( #name )?; }
         }
+    };
+
+    match field.ty {
+        Opt::Plain( _ ) => body,
+        Opt::Option( _ ) => write_option( body )
     }
 }
 
@@ -979,7 +982,7 @@ fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: &Struct< 'a > ) ->
     let mut field_writers = Vec::new();
     for field in &st.fields {
         let write_value = write_field_body( &field );
-        types.push( field.ty );
+        types.push( field.raw_ty );
         field_names.push( field.var_name().clone() );
         field_writers.push( write_value );
     }
@@ -1125,20 +1128,20 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
     if field.default_on_eof || field.count.is_some() {
         None
     } else {
-        match field.special_ty {
-            Some( Opt::Option( .. ) ) => {
+        match field.ty {
+            Opt::Option( .. ) => {
                 Some( quote! { 1 } )
             },
-            Some( Opt::Plain( ref special_ty ) ) => {
-                match special_ty {
-                    | SpecialTy::String
-                    | SpecialTy::Vec( .. )
-                    | SpecialTy::CowSlice( .. )
-                    | SpecialTy::CowStr( .. )
-                    | SpecialTy::HashMap( .. )
-                    | SpecialTy::HashSet( .. )
-                    | SpecialTy::BTreeMap( .. )
-                    | SpecialTy::BTreeSet( .. )
+            Opt::Plain( ref ty ) => {
+                match ty {
+                    | Ty::String
+                    | Ty::Vec( .. )
+                    | Ty::CowSlice( .. )
+                    | Ty::CowStr( .. )
+                    | Ty::HashMap( .. )
+                    | Ty::HashSet( .. )
+                    | Ty::BTreeMap( .. )
+                    | Ty::BTreeSet( .. )
                     => {
                         let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
                             BasicType::U7 | BasicType::U8 | BasicType::VarInt64 => 1,
@@ -1149,11 +1152,11 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
 
                         Some( quote! { #size } )
                     },
+                    | Ty::Ty( .. ) => {
+                        let raw_ty = &field.raw_ty;
+                        Some( quote! { <#raw_ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() } )
+                    }
                 }
-            },
-            None => {
-                let ty = &field.ty;
-                Some( quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() } )
             }
         }
     }

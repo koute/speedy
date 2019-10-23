@@ -362,6 +362,11 @@ enum DerivedEnumWithCustomTag {
     B
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithOptionU16 {
+    data: Option< u16 >
+}
+
 mod inner {
     use speedy::{Readable, Writable};
 
@@ -642,6 +647,18 @@ symmetric_tests! {
     }
     option_u16_none for Option< u16 > {
         in = None,
+        le = [0],
+        be = [0],
+        minimum_bytes = 1
+    }
+    derived_struct_with_option_u16_some for DerivedStructWithOptionU16 {
+        in = DerivedStructWithOptionU16 { data: Some( 10 ) },
+        le = [1, 10, 0],
+        be = [1, 0, 10],
+        minimum_bytes = 1
+    }
+    derived_struct_with_option_u16_none for DerivedStructWithOptionU16 {
+        in = DerivedStructWithOptionU16 { data: None },
         le = [0],
         be = [0],
         minimum_bytes = 1
