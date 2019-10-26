@@ -49,6 +49,23 @@ impl Error {
     }
 }
 
+impl From< Error > for io::Error {
+    fn from( error: Error ) -> Self {
+        if let ErrorKind::IoError( error ) = error.kind {
+            return error;
+        }
+
+        let is_eof = error.is_eof();
+        let kind = if is_eof {
+            io::ErrorKind::UnexpectedEof
+        } else {
+            io::ErrorKind::InvalidData
+        };
+
+        io::Error::new( kind, format!( "{}", error ) )
+    }
+}
+
 #[inline]
 pub fn get_error_kind( error: &Error ) -> &ErrorKind {
     &error.kind
