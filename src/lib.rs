@@ -14,6 +14,9 @@ mod context;
 mod endianness;
 mod varint;
 
+#[cfg(feature = "chrono")]
+mod ext_chrono;
+
 #[doc(hidden)]
 pub mod private;
 

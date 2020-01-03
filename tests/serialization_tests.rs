@@ -953,6 +953,16 @@ symmetric_tests! {
     }
 }
 
+#[cfg(feature = "chrono")]
+symmetric_tests! {
+    chrono_datetime_utc for chrono::DateTime< chrono::Utc > {
+        in = chrono::offset::TimeZone::timestamp( &chrono::Utc, 123, 222 ),
+        le = [123, 0, 0, 0, 0, 0, 0, 0, 222, 0, 0, 0],
+        be = [0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 222],
+        minimum_bytes = 12
+    }
+}
+
 #[test]
 fn test_derived_struct_with_default_on_eof() {
     use speedy::{
