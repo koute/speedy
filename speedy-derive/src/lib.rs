@@ -89,7 +89,7 @@ fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> 
     }
 }
 
-fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], trait_variant: Trait ) -> (TokenStream, TokenStream, TokenStream) {
+fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Trait ) -> (TokenStream, TokenStream, TokenStream) {
     let impl_params = {
         let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
         let type_params = ast.generics.type_params().map( |ty| quote! { #ty } );
@@ -112,7 +112,7 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[&syn::Type], trait_variant: T
 
     let generics: Vec< _ > = ast.generics.type_params().map( |ty| &ty.ident ).collect();
     let where_clause = {
-        let constraints = types.iter().filter_map( |&ty| {
+        let constraints = types.iter().filter_map( |ty| {
             let possibly_generic = possibly_uses_generic_ty( &generics, ty );
             match (trait_variant, possibly_generic) {
                 (Trait::Readable, true) => Some( quote! { #ty: speedy::Readable< 'a_, C_ > } ),
@@ -513,6 +513,8 @@ enum Ty {
     BTreeMap( syn::Type, syn::Type ),
     BTreeSet( syn::Type ),
 
+    Array( syn::Type, u32 ),
+
     Ty( syn::Type )
 }
 
@@ -645,6 +647,20 @@ fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
                 _ => None
             }
         },
+        syn::Type::Array( syn::TypeArray {
+            ref elem,
+            len: syn::Expr::Lit( syn::ExprLit {
+                ref attrs,
+                lit: syn::Lit::Int( ref literal )
+            }),
+            ..
+        }) if attrs.is_empty() => {
+            if let Ok( length ) = literal.base10_parse::< u32 >() {
+                Some( Ty::Array( (**elem).clone(), length ) )
+            } else {
+                None
+            }
+        },
         _ => None
     }
 }
@@ -717,6 +733,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::HashSet( .. ) )
                     | Opt::Option( Ty::BTreeMap( .. ) )
                     | Opt::Option( Ty::BTreeSet( .. ) )
+                    | Opt::Plain( Ty::Array( .. ) )
+                    | Opt::Option( Ty::Array( .. ) )
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
@@ -745,6 +763,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::BTreeSet( .. ) )
                         => {},
 
+                    | Opt::Plain( Ty::Array( .. ) )
+                    | Opt::Option( Ty::Array( .. ) )
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
@@ -836,6 +856,20 @@ fn read_field_body( field: &Field ) -> TokenStream {
             _reader_.read_collection( _count_ )
         }};
 
+    let read_array = |length: u32| {
+        // TODO: This is quite inefficient; for primitive types we can do better.
+        let readers = (0..length).map( |_| quote! {
+            match _reader_.read_value() {
+                Ok( value ) => value,
+                Err( error ) => return Err( error )
+            }
+        });
+
+        quote! { (|| { Ok([
+            #(#readers),*
+        ])})() }
+    };
+
     let read_option = |tokens: TokenStream|
         quote! {{
             _reader_.read_u8().and_then( |_flag_| {
@@ -856,6 +890,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Ty::HashSet( .. ) |
         Ty::BTreeMap( .. ) |
         Ty::BTreeSet( .. ) => read_collection(),
+        Ty::Array( _, length ) => read_array( *length ),
         Ty::Ty( .. ) => {
             assert!( field.count.is_none() );
             quote! { _reader_.read_value() }
@@ -874,7 +909,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     }
 }
 
-fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream, TokenStream) {
+fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_readers = Vec::new();
     let mut minimum_bytes_needed = Vec::new();
@@ -884,7 +919,10 @@ fn readable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: &Struct< 'a > ) ->
         let raw_ty = field.raw_ty;
         field_readers.push( quote! { let #name: #raw_ty = #read_value; } );
         field_names.push( name );
-        types.push( raw_ty );
+        match field.ty.inner() {
+            Ty::Array( inner_ty, .. ) => types.push( inner_ty.clone() ),
+            _ => types.push( raw_ty.clone() )
+        }
 
         if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
             minimum_bytes_needed.push( minimum_bytes );
@@ -946,6 +984,11 @@ fn write_field_body( field: &Field ) -> TokenStream {
             _writer_.write_collection( #name.iter() )?;
         }};
 
+    let write_array = ||
+        quote! {{
+            _writer_.write_slice( &#name[..] )?;
+        }};
+
     let write_option = |tokens: TokenStream|
         quote! {{
             if let Some( ref #name ) = #name {
@@ -965,6 +1008,7 @@ fn write_field_body( field: &Field ) -> TokenStream {
         Ty::HashSet( .. ) |
         Ty::BTreeMap( .. ) |
         Ty::BTreeSet( .. ) => write_collection(),
+        Ty::Array( .. ) => write_array(),
         Ty::Ty( .. ) => {
             assert!( field.count.is_none() );
             quote! { _writer_.write_value( #name )?; }
@@ -977,12 +1021,15 @@ fn write_field_body( field: &Field ) -> TokenStream {
     }
 }
 
-fn writable_body< 'a >( types: &mut Vec< &'a syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream) {
+fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
     for field in &st.fields {
         let write_value = write_field_body( &field );
-        types.push( field.raw_ty );
+        match field.ty.inner() {
+            Ty::Array( inner_ty, .. ) => types.push( inner_ty.clone() ),
+            _ => types.push( field.raw_ty.clone() )
+        }
         field_names.push( field.var_name().clone() );
         field_writers.push( write_value );
     }
@@ -1151,6 +1198,10 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
                         };
 
                         Some( quote! { #size } )
+                    },
+                    | Ty::Array( ty, length ) => {
+                        let length = *length as usize;
+                        Some( quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() * #length } )
                     },
                     | Ty::Ty( .. ) => {
                         let raw_ty = &field.raw_ty;

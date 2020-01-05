@@ -384,6 +384,11 @@ mod inner {
 #[derive(Clone, PartialEq, Debug, Readable, Writable)]
 struct Newtype( u16 );
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithArray< T > {
+    data: [T; 4]
+}
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -950,6 +955,12 @@ symmetric_tests! {
         le = [21],
         be = [21],
         minimum_bytes = 1
+    }
+    derived_struct_with_array for DerivedStructWithArray< u8 > {
+        in = DerivedStructWithArray { data: [1, 2, 3, 4] },
+        le = [1, 2, 3, 4],
+        be = [1, 2, 3, 4],
+        minimum_bytes = 4
     }
 }
 
