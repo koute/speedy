@@ -28,7 +28,7 @@ pub enum ErrorKind {
         expected_size: usize
     },
 
-    LengthIsNotTheSameAsCount {
+    LengthIsNotTheSameAsLengthAttribute {
         field_name: &'static str
     },
 
@@ -83,7 +83,7 @@ impl fmt::Display for Error {
             ErrorKind::UnexpectedEndOfOutputBuffer => write!( fmt, "unexpected end of output buffer" ),
             ErrorKind::InputBufferIsTooSmall { actual_size, expected_size } => write!( fmt, "input buffer is too small; expected at least {} bytes, got {}", expected_size, actual_size ),
             ErrorKind::OutputBufferIsTooSmall { actual_size, expected_size } => write!( fmt, "output buffer is too small; expected at least {} bytes, got {}", expected_size, actual_size ),
-            ErrorKind::LengthIsNotTheSameAsCount { field_name } => write!( fmt, "the length of '{}' is not the same as its 'count' attribute", field_name ),
+            ErrorKind::LengthIsNotTheSameAsLengthAttribute { field_name } => write!( fmt, "the length of '{}' is not the same as its 'length' attribute", field_name ),
             ErrorKind::IoError( ref error ) => write!( fmt, "{}", error )
         }
     }
@@ -124,8 +124,8 @@ pub fn error_invalid_str_utf8< T >( _: std::str::Utf8Error ) -> T where T: From<
 }
 
 #[cold]
-pub fn error_length_is_not_the_same_as_count< T >( field_name: &'static str ) -> T where T: From< Error > {
-    T::from( Error::new( ErrorKind::LengthIsNotTheSameAsCount { field_name } ) )
+pub fn error_length_is_not_the_same_as_length_attribute< T >( field_name: &'static str ) -> T where T: From< Error > {
+    T::from( Error::new( ErrorKind::LengthIsNotTheSameAsLengthAttribute { field_name } ) )
 }
 
 #[cold]

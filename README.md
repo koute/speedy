@@ -86,7 +86,7 @@ These are stable and will not change in the future.
 
 ## Attributes
 
-### `#[speedy(count = ...)]`
+### `#[speedy(length = ...)]`
 
 Can be used on a `Vec<T>` or on a `Cow<'a, [T]>` to specify
 the field's length. Can refer to any of the previous fields.
@@ -99,12 +99,12 @@ use speedy::{Readable, Writable};
 #[derive(Readable, Writable)]
 struct Struct {
     byte_count: u8,
-    #[speedy(count = byte_count / 4)]
+    #[speedy(length = byte_count / 4)]
     data: Vec< u32 >
 }
 ```
 
-Before serializing you need to make sure that whatever is set as `count`
+Before serializing you need to make sure that whatever is set as `length`
 is equal to the `.len()` of the field; if it's not then you will get
 an error when trying to serialize it.
 

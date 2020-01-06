@@ -22,7 +22,7 @@ pub use crate::varint::VarInt64;
 pub use crate::error::{
     ErrorKind,
 
-    error_length_is_not_the_same_as_count,
+    error_length_is_not_the_same_as_length_attribute,
     error_out_of_range_length,
     error_invalid_enum_variant,
 

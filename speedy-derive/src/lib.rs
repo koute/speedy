@@ -39,7 +39,7 @@ pub fn writable( input: proc_macro::TokenStream ) -> proc_macro::TokenStream {
 }
 
 mod kw {
-    syn::custom_keyword!( count );
+    syn::custom_keyword!( length );
     syn::custom_keyword!( default_on_eof );
     syn::custom_keyword!( tag_type );
     syn::custom_keyword!( length_type );
@@ -420,7 +420,7 @@ struct Field< 'a > {
     name: Option< &'a syn::Ident >,
     raw_ty: &'a syn::Type,
     default_on_eof: bool,
-    count: Option< syn::Expr >,
+    length: Option< syn::Expr >,
     length_type: Option< BasicType >,
     ty: Opt< Ty >
 }
@@ -447,7 +447,7 @@ enum FieldAttribute {
     DefaultOnEof {
         key_span: Span
     },
-    Count {
+    Length {
         key_span: Span,
         expr: syn::Expr
     },
@@ -465,11 +465,11 @@ impl syn::parse::Parse for FieldAttribute {
             FieldAttribute::DefaultOnEof {
                 key_span: key_token.span()
             }
-        } else if lookahead.peek( kw::count ) {
-            let key_token = input.parse::< kw::count >()?;
+        } else if lookahead.peek( kw::length ) {
+            let key_token = input.parse::< kw::length >()?;
             let _: Token![=] = input.parse()?;
             let expr: syn::Expr = input.parse()?;
-            FieldAttribute::Count {
+            FieldAttribute::Length {
                 key_span: key_token.span(),
                 expr
             }
@@ -670,7 +670,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
         .enumerate()
         .map( |(index, field)| {
             let mut default_on_eof = None;
-            let mut count = None;
+            let mut length = None;
             let mut length_type = None;
             for attr in parse_attributes::< FieldAttribute >( &field.attrs )? {
                 match attr {
@@ -682,13 +682,13 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
 
                         default_on_eof = Some( key_span );
                     }
-                    FieldAttribute::Count { key_span, expr } => {
-                        if count.is_some() {
-                            let message = "Duplicate 'count'";
+                    FieldAttribute::Length { key_span, expr } => {
+                        if length.is_some() {
+                            let message = "Duplicate 'length'";
                             return Err( syn::Error::new( key_span, message ) );
                         }
 
-                        count = Some( (key_span, expr) );
+                        length = Some( (key_span, expr) );
                     }
                     FieldAttribute::LengthType { key_span, ty } => {
                         if length_type.is_some() {
@@ -701,9 +701,9 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 }
             }
 
-            if length_type.is_some() && count.is_some() {
+            if length_type.is_some() && length.is_some() {
                 let (key_span, _) = length_type.unwrap();
-                let message = "You cannot have both 'length_type' and 'count' on the same field";
+                let message = "You cannot have both 'length_type' and 'length' on the same field";
                 return Err( syn::Error::new( key_span, message ) );
             }
 
@@ -713,7 +713,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 Opt::Plain( parse_ty( &field.ty ) )
             };
 
-            if count.is_some() {
+            if length.is_some() {
                 match ty {
                     | Opt::Plain( Ty::String )
                     | Opt::Plain( Ty::Vec( .. ) )
@@ -738,7 +738,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
-                        return Err( syn::Error::new( field.ty.span(), "The 'count' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`" ) );
+                        return Err( syn::Error::new( field.ty.span(), "The 'length' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`" ) );
                     }
                 }
             }
@@ -782,7 +782,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 name: field.ident.as_ref(),
                 raw_ty: &field.ty,
                 default_on_eof: default_on_eof.is_some(),
-                count: count.map( snd ),
+                length: length.map( snd ),
                 length_type: length_type.map( snd ),
                 ty
             })
@@ -802,8 +802,8 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
 }
 
 fn read_field_body( field: &Field ) -> TokenStream {
-    let read_count_body = match field.count {
-        Some( ref count ) => quote! { ((#count) as usize) },
+    let read_length_body = match field.length {
+        Some( ref length ) => quote! { ((#length) as usize) },
         None => {
             let read_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
                 BasicType::U7 => quote! { read_length_u7 },
@@ -828,32 +828,32 @@ fn read_field_body( field: &Field ) -> TokenStream {
 
     let read_string = ||
         quote! {{
-            let _count_ = #read_count_body;
-            _reader_.read_vec( _count_ ).and_then( speedy::private::vec_to_string )
+            let _length_ = #read_length_body;
+            _reader_.read_vec( _length_ ).and_then( speedy::private::vec_to_string )
         }};
 
     let read_vec = ||
         quote! {{
-            let _count_ = #read_count_body;
-            _reader_.read_vec( _count_ )
+            let _length_ = #read_length_body;
+            _reader_.read_vec( _length_ )
         }};
 
     let read_cow_slice = ||
         quote! {{
-            let _count_ = #read_count_body;
-            _reader_.read_cow( _count_ )
+            let _length_ = #read_length_body;
+            _reader_.read_cow( _length_ )
         }};
 
     let read_cow_str = ||
         quote! {{
-            let _count_ = #read_count_body;
-            _reader_.read_cow( _count_ ).and_then( speedy::private::cow_bytes_to_cow_str )
+            let _length_ = #read_length_body;
+            _reader_.read_cow( _length_ ).and_then( speedy::private::cow_bytes_to_cow_str )
         }};
 
     let read_collection = ||
         quote! {{
-            let _count_ = #read_count_body;
-            _reader_.read_collection( _count_ )
+            let _length_ = #read_length_body;
+            _reader_.read_collection( _length_ )
         }};
 
     let read_array = |length: u32| {
@@ -892,7 +892,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Ty::BTreeSet( .. ) => read_collection(),
         Ty::Array( _, length ) => read_array( *length ),
         Ty::Ty( .. ) => {
-            assert!( field.count.is_none() );
+            assert!( field.length.is_none() );
             quote! { _reader_.read_value() }
         }
     };
@@ -943,12 +943,12 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
 
 fn write_field_body( field: &Field ) -> TokenStream {
     let name = field.var_name();
-    let write_length_body = match field.count {
-        Some( ref count ) => {
+    let write_length_body = match field.length {
+        Some( ref length ) => {
             let field_name = format!( "{}", name );
             quote! {
-                if !speedy::private::are_lengths_the_same( #name.len(), #count ) {
-                    return Err( speedy::private::error_length_is_not_the_same_as_count( #field_name ) );
+                if !speedy::private::are_lengths_the_same( #name.len(), #length ) {
+                    return Err( speedy::private::error_length_is_not_the_same_as_length_attribute( #field_name ) );
                 }
             }
         },
@@ -1010,7 +1010,7 @@ fn write_field_body( field: &Field ) -> TokenStream {
         Ty::BTreeSet( .. ) => write_collection(),
         Ty::Array( .. ) => write_array(),
         Ty::Ty( .. ) => {
-            assert!( field.count.is_none() );
+            assert!( field.length.is_none() );
             quote! { _writer_.write_value( #name )?; }
         }
     };
@@ -1172,7 +1172,7 @@ impl< 'a > Enum< 'a > {
 }
 
 fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
-    if field.default_on_eof || field.count.is_some() {
+    if field.default_on_eof || field.length.is_some() {
         None
     } else {
         match field.ty {
