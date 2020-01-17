@@ -1,7 +1,6 @@
 use std::slice;
 use std::mem;
 
-#[macro_export]
 macro_rules! unsafe_is_length {
     ($expr:expr) => {
         if $expr as u64 >= 0x7FFFFFFF_FFFFFFFF {
