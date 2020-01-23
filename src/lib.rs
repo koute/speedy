@@ -30,7 +30,7 @@ pub use crate::writable::Writable;
 pub use crate::writer::Writer;
 
 pub use crate::endianness::Endianness;
-pub use crate::context::Context;
+pub use crate::context::{BigEndian, Context, LittleEndian};
 
 pub use crate::error::{Error, IsEof};
 
