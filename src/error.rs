@@ -41,6 +41,14 @@ impl Error {
         Error { kind }
     }
 
+    pub fn custom( message: impl fmt::Display ) -> Self {
+        // The LLVM optimizer doesn't like us adding a new variant,
+        // so instead we reuse the `IoError` one.
+        Error {
+            kind: ErrorKind::IoError( io::Error::new( io::ErrorKind::Other, message.to_string() ) )
+        }
+    }
+
     #[inline]
     pub(crate) fn from_io_error( error: io::Error ) -> Self {
         Error {
