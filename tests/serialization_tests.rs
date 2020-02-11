@@ -974,6 +974,22 @@ symmetric_tests! {
     }
 }
 
+#[cfg(feature = "smallvec")]
+symmetric_tests! {
+    smallvec_u8_smaller for smallvec::SmallVec< [u8; 2] > {
+        in = vec![ 111 ].into(),
+        le = [1, 0, 0, 0, 111],
+        be = [0, 0, 0, 1, 111],
+        minimum_bytes = 4
+    }
+    smallvec_u8_bigger for smallvec::SmallVec< [u8; 2] > {
+        in = vec![ 111, 112, 113 ].into(),
+        le = [3, 0, 0, 0, 111, 112, 113],
+        be = [0, 0, 0, 3, 111, 112, 113],
+        minimum_bytes = 4
+    }
+}
+
 #[test]
 fn test_derived_struct_with_default_on_eof() {
     use speedy::{

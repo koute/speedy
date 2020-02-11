@@ -17,6 +17,9 @@ mod varint;
 #[cfg(feature = "chrono")]
 mod ext_chrono;
 
+#[cfg(feature = "smallvec")]
+mod ext_smallvec;
+
 #[doc(hidden)]
 pub mod private;
 
