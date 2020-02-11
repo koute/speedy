@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
+use std::num::NonZeroU32;
 
 #[allow(unused_imports)]
 use speedy::{Readable, Writable, Endianness};
@@ -962,6 +963,12 @@ symmetric_tests! {
         be = [1, 2, 3, 4],
         minimum_bytes = 4
     }
+    non_zero_u32 for NonZeroU32 {
+        in = NonZeroU32::new( 33 ).unwrap(),
+        le = [33, 0, 0, 0],
+        be = [0, 0, 0, 33],
+        minimum_bytes = 4
+    }
 }
 
 #[cfg(feature = "chrono")]
@@ -1032,6 +1039,15 @@ fn test_length_mismatch_with_length_attribute() {
         err.to_string(),
         "the length of 'data' is not the same as its 'length' attribute"
     );
+}
+
+#[test]
+fn test_zero_non_zero() {
+    let error = NonZeroU32::read_from_buffer( &[0, 0, 0, 0] ).unwrap_err();
+    match speedy::private::get_error_kind( &error ) {
+        speedy::private::ErrorKind::ZeroNonZero => {},
+        error => panic!( "Unexpected error: {:?}", error )
+    }
 }
 
 #[test]

@@ -3,6 +3,7 @@ use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash};
+use std::num::NonZeroU32;
 
 use crate::readable::Readable;
 use crate::reader::Reader;
@@ -327,5 +328,18 @@ impl< 'a, C: Context > Readable< 'a, C > for Endianness {
     #[inline]
     fn minimum_bytes_needed() -> usize {
         1
+    }
+}
+
+impl< 'a, C: Context > Readable< 'a, C > for NonZeroU32 {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let value = reader.read_u32()?;
+        NonZeroU32::new( value ).ok_or_else( crate::error::error_zero_non_zero )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        4
     }
 }

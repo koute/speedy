@@ -2,6 +2,7 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::num::NonZeroU32;
 
 use crate::endianness::Endianness;
 use crate::writable::Writable;
@@ -388,5 +389,17 @@ impl< 'a, C, T > Writable< C > for &'a mut T where C: Context, T: Writable< C > 
     #[inline(always)]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
         (**self).bytes_needed()
+    }
+}
+
+impl< C > Writable< C > for NonZeroU32 where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        self.get().write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 4 )
     }
 }
