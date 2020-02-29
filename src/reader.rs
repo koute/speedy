@@ -214,6 +214,12 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline]
+    fn read_string( &mut self, length: usize ) -> Result< String, C::Error > {
+        let bytes = self.read_vec( length )?;
+        crate::private::vec_to_string( bytes )
+    }
+
+    #[inline]
     fn read_collection< T, U >( &mut self, length: usize ) -> Result< U, C::Error >
         where U: FromIterator< T >,
               T: Readable< 'a, C >
