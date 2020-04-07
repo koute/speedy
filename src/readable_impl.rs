@@ -343,3 +343,30 @@ impl< 'a, C: Context > Readable< 'a, C > for NonZeroU32 {
         4
     }
 }
+
+macro_rules! impl_for_atomic {
+    ($type:ident, $base_type:ty) => {
+        impl< 'a, C: Context > Readable< 'a, C > for std::sync::atomic::$type {
+            #[inline(always)]
+            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+                let value: $base_type = reader.read_value()?;
+                Ok( value.into() )
+            }
+
+            #[inline]
+            fn minimum_bytes_needed() -> usize {
+                mem::size_of::< $base_type >()
+            }
+        }
+    }
+}
+
+impl_for_atomic!( AtomicI8, i8 );
+impl_for_atomic!( AtomicI16, i16 );
+impl_for_atomic!( AtomicI32, i32 );
+impl_for_atomic!( AtomicI64, i64 );
+
+impl_for_atomic!( AtomicU8, u8 );
+impl_for_atomic!( AtomicU16, u16 );
+impl_for_atomic!( AtomicU32, u32 );
+impl_for_atomic!( AtomicU64, u64 );

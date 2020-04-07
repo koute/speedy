@@ -398,6 +398,35 @@ struct DerivedStructWithArray< T > {
     data: [T; 4]
 }
 
+macro_rules! atomic_wrapper {
+    ($name:ident, $base_ty:ident) => {
+        #[derive(Debug, Readable, Writable)]
+        struct $name( std::sync::atomic::$name );
+
+        impl $name {
+            pub fn new( value: $base_ty ) -> Self {
+                $name( value.into() )
+            }
+        }
+
+        impl PartialEq for $name {
+            fn eq( &self, rhs: &$name ) -> bool {
+                self.0.load( std::sync::atomic::Ordering::SeqCst ) ==
+                rhs.0.load( std::sync::atomic::Ordering::SeqCst )
+            }
+        }
+    }
+}
+
+atomic_wrapper!( AtomicI8, i8 );
+atomic_wrapper!( AtomicU8, u8 );
+atomic_wrapper!( AtomicI16, i16 );
+atomic_wrapper!( AtomicU16, u16 );
+atomic_wrapper!( AtomicI32, i32 );
+atomic_wrapper!( AtomicU32, u32 );
+atomic_wrapper!( AtomicI64, i64 );
+atomic_wrapper!( AtomicU64, u64 );
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -615,6 +644,54 @@ symmetric_tests! {
         in = 8388610.0,
         le = [0, 0, 0, 64, 0, 0, 96, 65],
         be = [65, 96, 0, 0, 64, 0, 0, 0],
+        minimum_bytes = 8
+    }
+    atomic_u8 for AtomicU8 {
+        in = AtomicU8::new( 33 ),
+        le = [33],
+        be = [33],
+        minimum_bytes = 1
+    }
+    atomic_i8 for AtomicI8 {
+        in = AtomicI8::new( -33 ),
+        le = [223],
+        be = [223],
+        minimum_bytes = 1
+    }
+    atomic_u16 for AtomicU16 {
+        in = AtomicU16::new( 33 ),
+        le = [33, 0],
+        be = [0, 33],
+        minimum_bytes = 2
+    }
+    atomic_i16 for AtomicI16 {
+        in = AtomicI16::new( -33 ),
+        le = [223, 255],
+        be = [255, 223],
+        minimum_bytes = 2
+    }
+    atomic_u32 for AtomicU32 {
+        in = AtomicU32::new( 33 ),
+        le = [33, 0, 0, 0],
+        be = [0, 0, 0, 33],
+        minimum_bytes = 4
+    }
+    atomic_i32 for AtomicI32 {
+        in = AtomicI32::new( -33 ),
+        le = [223, 255, 255, 255],
+        be = [255, 255,255, 223],
+        minimum_bytes = 4
+    }
+    atomic_u64 for AtomicU64 {
+        in = AtomicU64::new( 33 ),
+        le = [33, 0, 0, 0, 0, 0, 0, 0],
+        be = [0, 0, 0, 0, 0, 0, 0, 33],
+        minimum_bytes = 8
+    }
+    atomic_i64 for AtomicI64 {
+        in = AtomicI64::new( -33 ),
+        le = [223, 255, 255, 255, 255, 255, 255, 255],
+        be = [255, 255, 255, 255, 255, 255, 255, 223],
         minimum_bytes = 8
     }
     string for String {

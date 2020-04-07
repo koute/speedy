@@ -403,3 +403,29 @@ impl< C > Writable< C > for NonZeroU32 where C: Context {
         Ok( 4 )
     }
 }
+
+macro_rules! impl_for_atomic {
+    ($type:ident, $base_type:ty) => {
+        impl< C: Context > Writable< C > for std::sync::atomic::$type {
+            #[inline(always)]
+            fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
+                writer.write_value( &self.load( std::sync::atomic::Ordering::SeqCst ) )
+            }
+
+            #[inline]
+            fn bytes_needed( &self ) -> Result< usize, C::Error > {
+                Ok( mem::size_of::< $base_type >() )
+            }
+        }
+    }
+}
+
+impl_for_atomic!( AtomicI8, i8 );
+impl_for_atomic!( AtomicI16, i16 );
+impl_for_atomic!( AtomicI32, i32 );
+impl_for_atomic!( AtomicI64, i64 );
+
+impl_for_atomic!( AtomicU8, u8 );
+impl_for_atomic!( AtomicU16, u16 );
+impl_for_atomic!( AtomicU32, u32 );
+impl_for_atomic!( AtomicU64, u64 );
