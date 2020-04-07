@@ -418,3 +418,30 @@ impl< 'a, C > Readable< 'a, C > for std::net::IpAddr where C: Context {
         5
     }
 }
+
+impl< 'a, C > Readable< 'a, C > for std::time::Duration where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let secs = reader.read_u64()?;
+        let nanos = reader.read_u32()?;
+        Ok( std::time::Duration::new( secs, nanos ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        12
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for std::time::SystemTime where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let duration = std::time::Duration::read_from( reader )?;
+        std::time::SystemTime::UNIX_EPOCH.checked_add( duration ).ok_or_else( crate::error::error_invalid_system_time )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        12
+    }
+}

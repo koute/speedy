@@ -808,6 +808,30 @@ symmetric_tests! {
         be = [1, 0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00],
         minimum_bytes = 5
     }
+    duration for std::time::Duration {
+        in = std::time::Duration::new( 1, 2 ),
+        le = [
+            1, 0, 0, 0, 0, 0, 0, 0,
+            2, 0, 0, 0
+        ],
+        be = [
+            0, 0, 0, 0, 0, 0, 0, 1,
+            0, 0, 0, 2
+        ],
+        minimum_bytes = 12
+    }
+    system_time for std::time::SystemTime {
+        in = std::time::SystemTime::UNIX_EPOCH,
+        le = [
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0
+        ],
+        be = [
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0
+        ],
+        minimum_bytes = 12
+    }
     derived_struct for DerivedStruct {
         in = DerivedStruct { a: 1, b: 2, c: 3 },
         le = [1, 2, 0, 3, 0, 0, 0],

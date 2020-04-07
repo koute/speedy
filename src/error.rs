@@ -15,6 +15,7 @@ pub enum ErrorKind {
     InvalidChar,
     InvalidEnumVariant,
     InvalidUtf8,
+    InvalidSystemTime,
     ZeroNonZero,
     OutOfRangeLength,
     OutOfRangeUsize,
@@ -86,6 +87,7 @@ impl fmt::Display for Error {
             ErrorKind::InvalidChar => write!( fmt, "out of range char" ),
             ErrorKind::InvalidEnumVariant => write!( fmt, "invalid enum variant" ),
             ErrorKind::InvalidUtf8 => write!( fmt, "encountered invalid utf-8" ),
+            ErrorKind::InvalidSystemTime => write!( fmt, "encountered invalid system time object" ),
             ErrorKind::ZeroNonZero => write!( fmt, "a field which is supposed to be non-zero is zero" ),
             ErrorKind::OutOfRangeLength => write!( fmt, "out of range length" ),
             ErrorKind::OutOfRangeUsize => write!( fmt, "value cannot fit into an usize on this architecture" ),
@@ -181,4 +183,9 @@ pub fn error_output_buffer_is_too_small< T >( actual_size: usize, expected_size:
 #[cold]
 pub fn error_zero_non_zero< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::ZeroNonZero ) )
+}
+
+#[cold]
+pub fn error_invalid_system_time< T >() -> T where T: From< Error > {
+    T::from( Error::new( ErrorKind::InvalidSystemTime ) )
 }

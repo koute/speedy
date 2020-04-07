@@ -483,3 +483,29 @@ impl< C > Writable< C > for std::net::IpAddr where C: Context {
         }
     }
 }
+
+impl< C > Writable< C > for std::time::Duration where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        writer.write_u64( self.as_secs() )?;
+        writer.write_u32( self.subsec_nanos() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 12 )
+    }
+}
+
+impl< C > Writable< C > for std::time::SystemTime where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        let duration = self.duration_since( std::time::SystemTime::UNIX_EPOCH ).map_err( |_| crate::error::error_invalid_system_time() )?;
+        writer.write_value( &duration )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 12 )
+    }
+}
