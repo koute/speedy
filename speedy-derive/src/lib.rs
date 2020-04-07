@@ -44,6 +44,7 @@ mod kw {
     syn::custom_keyword!( tag_type );
     syn::custom_keyword!( length_type );
     syn::custom_keyword!( tag );
+    syn::custom_keyword!( skip );
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -422,7 +423,8 @@ struct Field< 'a > {
     default_on_eof: bool,
     length: Option< syn::Expr >,
     length_type: Option< BasicType >,
-    ty: Opt< Ty >
+    ty: Opt< Ty >,
+    skip: bool
 }
 
 impl< 'a > Field< 'a > {
@@ -454,6 +456,9 @@ enum FieldAttribute {
     LengthType {
         key_span: Span,
         ty: BasicType
+    },
+    Skip {
+        key_span: Span
     }
 }
 
@@ -480,6 +485,11 @@ impl syn::parse::Parse for FieldAttribute {
             FieldAttribute::LengthType {
                 key_span: key_token.span(),
                 ty
+            }
+        } else if lookahead.peek( kw::skip ) {
+            let key_token = input.parse::< kw::skip >()?;
+            FieldAttribute::Skip {
+                key_span: key_token.span()
             }
         } else {
             return Err( lookahead.error() )
@@ -672,6 +682,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             let mut default_on_eof = None;
             let mut length = None;
             let mut length_type = None;
+            let mut skip = false;
             for attr in parse_attributes::< FieldAttribute >( &field.attrs )? {
                 match attr {
                     FieldAttribute::DefaultOnEof { key_span } => {
@@ -697,6 +708,9 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                         }
 
                         length_type = Some( (key_span, ty) );
+                    },
+                    FieldAttribute::Skip { key_span: _key_span } => {
+                        skip = true;
                     }
                 }
             }
@@ -784,7 +798,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 default_on_eof: default_on_eof.is_some(),
                 length: length.map( snd ),
                 length_type: length_type.map( snd ),
-                ty
+                ty,
+                skip
             })
         });
 
@@ -802,6 +817,12 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
 }
 
 fn read_field_body( field: &Field ) -> TokenStream {
+    if field.skip {
+        return quote! {
+            std::default::Default::default()
+        };
+    }
+
     let read_length_body = match field.length {
         Some( ref length ) => quote! { ((#length) as usize) },
         None => {
@@ -1025,6 +1046,10 @@ fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
     for field in &st.fields {
+        if field.skip {
+            continue;
+        }
+
         let write_value = write_field_body( &field );
         match field.ty.inner() {
             Ty::Array( inner_ty, .. ) => types.push( inner_ty.clone() ),
@@ -1172,7 +1197,7 @@ impl< 'a > Enum< 'a > {
 }
 
 fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
-    if field.default_on_eof || field.length.is_some() {
+    if field.default_on_eof || field.length.is_some() || field.skip {
         None
     } else {
         match field.ty {

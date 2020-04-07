@@ -368,6 +368,14 @@ struct DerivedStructWithOptionU16 {
     data: Option< u16 >
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithSkippedField {
+    a: u8,
+    #[speedy(skip)]
+    _b: u8,
+    c: u8
+}
+
 mod inner {
     use speedy::{Readable, Writable};
 
@@ -968,6 +976,12 @@ symmetric_tests! {
         le = [33, 0, 0, 0],
         be = [0, 0, 0, 33],
         minimum_bytes = 4
+    }
+    derived_struct_with_skipped_field for DerivedStructWithSkippedField {
+        in =  DerivedStructWithSkippedField { a: 1, _b: 0, c: 3 },
+        le = [1, 3],
+        be = [1, 3],
+        minimum_bytes = 2
     }
 }
 
