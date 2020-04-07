@@ -370,3 +370,51 @@ impl_for_atomic!( AtomicU8, u8 );
 impl_for_atomic!( AtomicU16, u16 );
 impl_for_atomic!( AtomicU32, u32 );
 impl_for_atomic!( AtomicU64, u64 );
+
+impl< 'a, C > Readable< 'a, C > for std::net::Ipv4Addr where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let value = reader.read_u32()?;
+        Ok( value.into() )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        4
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for std::net::Ipv6Addr where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let mut octets = [0; 16];
+        reader.read_bytes( &mut octets )?;
+        if !reader.endianness().conversion_necessary() {
+            octets.reverse();
+        }
+
+        Ok( octets.into() )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        16
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for std::net::IpAddr where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let kind = reader.read_u8()?;
+        match kind {
+            0 => Ok( std::net::IpAddr::V4( reader.read_value()? ) ),
+            1 => Ok( std::net::IpAddr::V6( reader.read_value()? ) ),
+            _ => Err( crate::error::error_invalid_enum_variant() )
+        }
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        5
+    }
+}

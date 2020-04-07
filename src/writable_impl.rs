@@ -429,3 +429,57 @@ impl_for_atomic!( AtomicU8, u8 );
 impl_for_atomic!( AtomicU16, u16 );
 impl_for_atomic!( AtomicU32, u32 );
 impl_for_atomic!( AtomicU64, u64 );
+
+impl< C > Writable< C > for std::net::Ipv4Addr where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        let raw: u32 = (*self).into();
+        writer.write_u32( raw )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 4 )
+    }
+}
+
+impl< C > Writable< C > for std::net::Ipv6Addr where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        let mut octets = self.octets();
+        if !writer.endianness().conversion_necessary() {
+            octets.reverse();
+        }
+
+        writer.write_bytes( &octets )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 16 )
+    }
+}
+
+impl< C > Writable< C > for std::net::IpAddr where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        match self {
+            std::net::IpAddr::V4( address ) => {
+                writer.write_u8( 0 )?;
+                address.write_to( writer )
+            },
+            std::net::IpAddr::V6( address ) => {
+                writer.write_u8( 1 )?;
+                address.write_to( writer )
+            }
+        }
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        match self {
+            std::net::IpAddr::V4( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 ),
+            std::net::IpAddr::V6( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 )
+        }
+    }
+}

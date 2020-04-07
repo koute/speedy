@@ -784,6 +784,30 @@ symmetric_tests! {
         be = [0, 0, 0x59, 0xb9],
         minimum_bytes = 4
     }
+    ipv4 for std::net::Ipv4Addr {
+        in = std::net::Ipv4Addr::new( 127, 0, 0, 1 ),
+        le = [1, 0, 0, 127],
+        be = [127, 0, 0, 1],
+        minimum_bytes = 4
+    }
+    ipv6 for std::net::Ipv6Addr {
+        in = std::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ),
+        le = [0x00, 0xa1, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x15, 0x20, 0x07, 0x01, 0x20],
+        be = [0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00],
+        minimum_bytes = 16
+    }
+    ipaddr_v4 for std::net::IpAddr {
+        in = std::net::IpAddr::V4( std::net::Ipv4Addr::new( 127, 0, 0, 1 ) ),
+        le = [0, 1, 0, 0, 127],
+        be = [0, 127, 0, 0, 1],
+        minimum_bytes = 5
+    }
+    ipaddr_v6 for std::net::IpAddr {
+        in = std::net::IpAddr::V6( std::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ) ),
+        le = [1, 0x00, 0xa1, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x15, 0x20, 0x07, 0x01, 0x20],
+        be = [1, 0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00],
+        minimum_bytes = 5
+    }
     derived_struct for DerivedStruct {
         in = DerivedStruct { a: 1, b: 2, c: 3 },
         le = [1, 2, 0, 3, 0, 0, 0],
