@@ -181,6 +181,11 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
+    fn read_with_length_from_buffer( buffer: &'a [u8] ) -> (Result< Self, C::Error >, usize) where Self: DefaultContext< Context = C >, C: Default {
+        Self::read_with_length_from_buffer_with_ctx( Default::default(), buffer )
+    }
+
+    #[inline]
     fn read_from_buffer_owned( buffer: &[u8] ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
         Self::read_from_buffer_owned_with_ctx( Default::default(), buffer )
     }
@@ -197,10 +202,15 @@ pub trait Readable< 'a, C: Context >: Sized {
 
     #[inline]
     fn read_from_buffer_with_ctx( context: C, buffer: &'a [u8] ) -> Result< Self, C::Error > {
+        Self::read_with_length_from_buffer_with_ctx( context, buffer ).0
+    }
+
+    #[inline]
+    fn read_with_length_from_buffer_with_ctx( context: C, buffer: &'a [u8] ) -> (Result< Self, C::Error >, usize) {
         let bytes_needed = Self::minimum_bytes_needed();
         let buffer_length = buffer.len();
         if buffer_length < bytes_needed {
-            return Err( error_input_buffer_is_too_small( buffer_length, bytes_needed ) );
+            return (Err( error_input_buffer_is_too_small( buffer_length, bytes_needed ) ), 0);
         }
 
         let mut reader = BufferReader {
@@ -210,7 +220,9 @@ pub trait Readable< 'a, C: Context >: Sized {
             phantom: PhantomData
         };
 
-        Self::read_from( &mut reader )
+        let value = Self::read_from( &mut reader );
+        let bytes_read = reader.ptr as usize - buffer.as_ptr() as usize;
+        (value, bytes_read)
     }
 
     #[inline]
