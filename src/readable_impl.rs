@@ -445,3 +445,40 @@ impl< 'a, C > Readable< 'a, C > for std::time::SystemTime where C: Context {
         12
     }
 }
+
+macro_rules! repeat {
+    (1, $expr:expr) => { [$expr] };
+    (2, $expr:expr) => { [$expr, $expr] };
+    (3, $expr:expr) => { [$expr, $expr, $expr] };
+    (4, $expr:expr) => { [$expr, $expr, $expr, $expr] };
+    (5, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr] };
+    (6, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr] };
+    (7, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (8, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+}
+
+macro_rules! impl_for_array {
+    ($count:tt) => {
+        impl< 'a, C, T > Readable< 'a, C > for [T; $count] where C: Context, T: Readable< 'a, C > {
+            #[inline(always)]
+            fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
+                let array = repeat!( $count, reader.read_value()? );
+                Ok( array )
+            }
+
+            #[inline]
+            fn minimum_bytes_needed() -> usize {
+                T::minimum_bytes_needed() * $count
+            }
+        }
+    }
+}
+
+impl_for_array!( 1 );
+impl_for_array!( 2 );
+impl_for_array!( 3 );
+impl_for_array!( 4 );
+impl_for_array!( 5 );
+impl_for_array!( 6 );
+impl_for_array!( 7 );
+impl_for_array!( 8 );
