@@ -45,6 +45,7 @@ mod kw {
     syn::custom_keyword!( length_type );
     syn::custom_keyword!( tag );
     syn::custom_keyword!( skip );
+    syn::custom_keyword!( constant_prefix );
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -424,7 +425,8 @@ struct Field< 'a > {
     length: Option< syn::Expr >,
     length_type: Option< BasicType >,
     ty: Opt< Ty >,
-    skip: bool
+    skip: bool,
+    constant_prefix: Option< syn::LitByteStr >
 }
 
 impl< 'a > Field< 'a > {
@@ -459,6 +461,10 @@ enum FieldAttribute {
     },
     Skip {
         key_span: Span
+    },
+    ConstantPrefix {
+        key_span: Span,
+        prefix: syn::LitByteStr
     }
 }
 
@@ -490,6 +496,61 @@ impl syn::parse::Parse for FieldAttribute {
             let key_token = input.parse::< kw::skip >()?;
             FieldAttribute::Skip {
                 key_span: key_token.span()
+            }
+        } else if lookahead.peek( kw::constant_prefix ) {
+            let key_token = input.parse::< kw::constant_prefix >()?;
+            let _: Token![=] = input.parse()?;
+            let expr: syn::Expr = input.parse()?;
+            let value_span = expr.span();
+            let generic_error = || {
+                Err( syn::Error::new( value_span, "unsupported expression; only basic literals are supported" ) )
+            };
+
+            let prefix = match expr {
+                syn::Expr::Lit( literal ) => {
+                    let literal = literal.lit;
+                    match literal {
+                        syn::Lit::Str( literal ) => literal.value().into_bytes(),
+                        syn::Lit::ByteStr( literal ) => literal.value(),
+                        syn::Lit::Byte( literal ) => vec![ literal.value() ],
+                        syn::Lit::Char( literal ) => format!( "{}", literal.value() ).into_bytes(),
+                        syn::Lit::Bool( literal ) => vec![ if literal.value { 1 } else { 0 } ],
+                        syn::Lit::Int( literal ) => {
+                            if literal.suffix() == "u8" {
+                                vec![ literal.base10_parse::< u8 >().unwrap() ]
+                            } else {
+                                return Err( syn::Error::new( value_span, "integers are not supported; if you want to use a single byte constant then append either 'u8' or 'i8' to it" ) );
+                            }
+                        },
+                        syn::Lit::Float( _ ) => return Err( syn::Error::new( value_span, "floats are not supported" ) ),
+                        syn::Lit::Verbatim( _ ) => return Err( syn::Error::new( value_span, "verbatim literals are not supported" ) )
+                    }
+                },
+                syn::Expr::Unary( syn::ExprUnary { op: syn::UnOp::Neg(_), expr, .. } ) => {
+                    match *expr {
+                        syn::Expr::Lit( syn::ExprLit { lit: literal, .. } ) => {
+                            match literal {
+                                syn::Lit::Int( literal ) => {
+                                    if literal.suffix() == "i8" {
+                                        vec![ (literal.base10_parse::< i8 >().unwrap() * -1) as u8 ]
+                                    } else if literal.suffix() == "u8" {
+                                        return generic_error()
+                                    } else {
+                                        return Err( syn::Error::new( value_span, "integers are not supported; if you want to use a single byte constant then append either 'u8' or 'i8' to it" ) );
+                                    }
+                                },
+                                _ => return generic_error()
+                            }
+                        },
+                        _ => return generic_error()
+                    }
+                },
+                _ => return generic_error()
+            };
+
+            FieldAttribute::ConstantPrefix {
+                key_span: key_token.span(),
+                prefix: syn::LitByteStr::new( &prefix, value_span )
             }
         } else {
             return Err( lookahead.error() )
@@ -683,6 +744,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             let mut length = None;
             let mut length_type = None;
             let mut skip = false;
+            let mut constant_prefix = None;
             for attr in parse_attributes::< FieldAttribute >( &field.attrs )? {
                 match attr {
                     FieldAttribute::DefaultOnEof { key_span } => {
@@ -711,7 +773,20 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     },
                     FieldAttribute::Skip { key_span: _key_span } => {
                         skip = true;
+                    },
+                    FieldAttribute::ConstantPrefix { key_span, prefix } => {
+                        if constant_prefix.is_some() {
+                            let message = "Duplicate 'constant_prefix'";
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+                        constant_prefix = Some( prefix );
                     }
+                }
+            }
+
+            if let Some( ref value ) = constant_prefix {
+                if value.value().is_empty() {
+                    constant_prefix = None;
                 }
             }
 
@@ -799,7 +874,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 length: length.map( snd ),
                 length_type: length_type.map( snd ),
                 ty,
-                skip
+                skip,
+                constant_prefix
             })
         });
 
@@ -923,6 +999,14 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Opt::Option( _ ) => read_option( body )
     };
 
+    let body = if let Some( ref constant_prefix ) = field.constant_prefix {
+        quote! {{
+            speedy::private::read_constant( _reader_, #constant_prefix ).and_then( |_| #body )
+        }}
+    } else {
+        body
+    };
+
     if field.default_on_eof {
         default_on_eof_body( body )
     } else {
@@ -1036,10 +1120,21 @@ fn write_field_body( field: &Field ) -> TokenStream {
         }
     };
 
-    match field.ty {
+    let body = match field.ty {
         Opt::Plain( _ ) => body,
         Opt::Option( _ ) => write_option( body )
-    }
+    };
+
+    let body = if let Some( ref constant_prefix ) = field.constant_prefix {
+        quote! {{
+            _writer_.write_slice( #constant_prefix )?;
+            #body
+        }}
+    } else {
+        body
+    };
+
+    body
 }
 
 fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream) {
@@ -1200,9 +1295,9 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
     if field.default_on_eof || field.length.is_some() || field.skip {
         None
     } else {
-        match field.ty {
+        let mut length = match field.ty {
             Opt::Option( .. ) => {
-                Some( quote! { 1 } )
+                quote! { 1 }
             },
             Opt::Plain( ref ty ) => {
                 match ty {
@@ -1222,19 +1317,26 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
                             BasicType::U64 => 8
                         };
 
-                        Some( quote! { #size } )
+                        quote! { #size }
                     },
                     | Ty::Array( ty, length ) => {
                         let length = *length as usize;
-                        Some( quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() * #length } )
+                        quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() * #length }
                     },
                     | Ty::Ty( .. ) => {
                         let raw_ty = &field.raw_ty;
-                        Some( quote! { <#raw_ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() } )
+                        quote! { <#raw_ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() }
                     }
                 }
             }
+        };
+
+        if let Some( ref constant_prefix ) = field.constant_prefix {
+            let extra_length = constant_prefix.value().len();
+            length = quote! { #length + #extra_length };
         }
+
+        Some( length )
     }
 }
 

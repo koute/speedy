@@ -7,6 +7,7 @@ use {
         Writable,
         Writer,
         error::{
+            error_expected_constant,
             error_invalid_string_utf8,
             error_invalid_str_utf8
         }
@@ -224,4 +225,25 @@ impl< 'a, T > IntoLength for &'a mut T where T: IntoLength + Copy {
 #[inline]
 pub fn are_lengths_the_same( lhs: usize, rhs: impl IntoLength ) -> bool {
     lhs == rhs.into_length()
+}
+
+pub fn read_constant< 'a, C, R >( reader: &mut R, constant: &'static [u8] ) -> Result< (), C::Error >
+    where C: Context,
+          R: Reader< 'a, C >
+{
+    let is_ok =
+        if let Some( result ) = reader.read_bytes_borrowed( constant.len() ) {
+            result? == constant
+        } else {
+            // TODO: Do this more efficiently for sufficiently small constants.
+            let data: Vec< u8 > = reader.read_vec( constant.len() )?;
+            data == constant
+        };
+
+    if !is_ok {
+        let error = error_expected_constant( constant );
+        return Err( error );
+    }
+
+    Ok(())
 }

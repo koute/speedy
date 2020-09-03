@@ -398,6 +398,54 @@ struct DerivedStructWithArray< T > {
     data: [T; 4]
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithConstantPrefixString {
+    #[speedy(constant_prefix = "ABC")]
+    value: ()
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithConstantPrefixByteString {
+    #[speedy(constant_prefix = b"ABC")]
+    value: ()
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithConstantPrefixChar {
+    #[speedy(constant_prefix = '苺')]
+    value: ()
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithConstantPrefixByte {
+    #[speedy(constant_prefix = b'A')]
+    value: ()
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithConstantPrefixBoolTrue {
+    #[speedy(constant_prefix = true)]
+    value: ()
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithConstantPrefixBoolFalse {
+    #[speedy(constant_prefix = false)]
+    value: ()
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithConstantPrefixU8 {
+    #[speedy(constant_prefix = 10_u8)]
+    value: ()
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithConstantPrefixI8 {
+    #[speedy(constant_prefix = -1_i8)]
+    value: ()
+}
+
 macro_rules! atomic_wrapper {
     ($name:ident, $base_ty:ident) => {
         #[derive(Debug, Readable, Writable)]
@@ -1108,6 +1156,54 @@ symmetric_tests! {
         be = [1, 3],
         minimum_bytes = 2
     }
+    derived_struct_with_constant_prefix_string for DerivedStructWithConstantPrefixString {
+        in = DerivedStructWithConstantPrefixString { value: () },
+        le = [0x41, 0x42, 0x43],
+        be = [0x41, 0x42, 0x43],
+        minimum_bytes = 3
+    }
+    derived_struct_with_constant_prefix_byte_string for DerivedStructWithConstantPrefixByteString {
+        in = DerivedStructWithConstantPrefixByteString { value: () },
+        le = [0x41, 0x42, 0x43],
+        be = [0x41, 0x42, 0x43],
+        minimum_bytes = 3
+    }
+    derived_struct_with_constant_prefix_char for DerivedStructWithConstantPrefixChar {
+        in = DerivedStructWithConstantPrefixChar { value: () },
+        le = [0xe8, 0x8b, 0xba],
+        be = [0xe8, 0x8b, 0xba],
+        minimum_bytes = 3
+    }
+    derived_struct_with_constant_prefix_byte for DerivedStructWithConstantPrefixByte {
+        in = DerivedStructWithConstantPrefixByte { value: () },
+        le = [0x41],
+        be = [0x41],
+        minimum_bytes = 1
+    }
+    derived_struct_with_constant_prefix_bool_true for DerivedStructWithConstantPrefixBoolTrue {
+        in = DerivedStructWithConstantPrefixBoolTrue { value: () },
+        le = [0x01],
+        be = [0x01],
+        minimum_bytes = 1
+    }
+    derived_struct_with_constant_prefix_bool_false for DerivedStructWithConstantPrefixBoolFalse {
+        in = DerivedStructWithConstantPrefixBoolFalse { value: () },
+        le = [0x00],
+        be = [0x00],
+        minimum_bytes = 1
+    }
+    derived_struct_with_constant_prefix_u8 for DerivedStructWithConstantPrefixU8 {
+        in = DerivedStructWithConstantPrefixU8 { value: () },
+        le = [10],
+        be = [10],
+        minimum_bytes = 1
+    }
+    derived_struct_with_constant_prefix_i8 for DerivedStructWithConstantPrefixI8 {
+        in = DerivedStructWithConstantPrefixI8 { value: () },
+        le = [255],
+        be = [255],
+        minimum_bytes = 1
+    }
 }
 
 #[cfg(feature = "chrono")]
@@ -1194,6 +1290,21 @@ fn test_vec_with_length_type_u7_read_out_of_range_length() {
     let error = DerivedStructWithVecWithLengthTypeU7::read_from_buffer( &[0x80] ).unwrap_err();
     match speedy::private::get_error_kind( &error ) {
         speedy::private::ErrorKind::OutOfRangeLength => {},
+        error => panic!( "Unexpected error: {:?}", error )
+    }
+}
+
+#[test]
+fn test_prefix_constant_mismatch() {
+    let error = DerivedStructWithConstantPrefixString::read_from_buffer( &[0x41, 0x42] ).unwrap_err();
+    match speedy::private::get_error_kind( &error ) {
+        speedy::private::ErrorKind::InputBufferIsTooSmall { .. } => {},
+        error => panic!( "Unexpected error: {:?}", error )
+    }
+
+    let error = DerivedStructWithConstantPrefixString::read_from_buffer( &[0x41, 0x42, 0x00] ).unwrap_err();
+    match speedy::private::get_error_kind( &error ) {
+        speedy::private::ErrorKind::ExpectedConstant { .. } => {},
         error => panic!( "Unexpected error: {:?}", error )
     }
 }

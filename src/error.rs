@@ -33,6 +33,9 @@ pub enum ErrorKind {
     LengthIsNotTheSameAsLengthAttribute {
         field_name: &'static str
     },
+    ExpectedConstant {
+        constant: &'static [u8]
+    },
 
     IoError( io::Error )
 }
@@ -96,6 +99,7 @@ impl fmt::Display for Error {
             ErrorKind::InputBufferIsTooSmall { actual_size, expected_size } => write!( fmt, "input buffer is too small; expected at least {} bytes, got {}", expected_size, actual_size ),
             ErrorKind::OutputBufferIsTooSmall { actual_size, expected_size } => write!( fmt, "output buffer is too small; expected at least {} bytes, got {}", expected_size, actual_size ),
             ErrorKind::LengthIsNotTheSameAsLengthAttribute { field_name } => write!( fmt, "the length of '{}' is not the same as its 'length' attribute", field_name ),
+            ErrorKind::ExpectedConstant { constant } => write!( fmt, "expected a predefined {} bytes(s) long constant", constant.len() ),
             ErrorKind::IoError( ref error ) => write!( fmt, "{}", error )
         }
     }
@@ -188,4 +192,9 @@ pub fn error_zero_non_zero< T >() -> T where T: From< Error > {
 #[cold]
 pub fn error_invalid_system_time< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidSystemTime ) )
+}
+
+#[cold]
+pub fn error_expected_constant< T >( constant: &'static [u8] ) -> T where T: From< Error > {
+    T::from( Error::new( ErrorKind::ExpectedConstant { constant } ) )
 }
