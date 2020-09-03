@@ -109,6 +109,19 @@ macro_rules! symmetric_tests {
             fn minimum_bytes() {
                 assert_eq!( <$type as Readable< Endianness >>::minimum_bytes_needed(), $minimum_bytes );
             }
+
+            #[test]
+            fn read_from_stream_only_reads_what_is_necessary() {
+                let original: $type = $value;
+                let mut serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let message_length = serialized.len();
+                serialized.extend_from_slice( &[0, 1, 2, 3, 4, 5, 6, 7, 8] );
+
+                let mut cursor = std::io::Cursor::new( serialized );
+                let deserialized: $type = Readable::read_from_stream_with_ctx( Endianness::LittleEndian, &mut cursor ).unwrap();
+                assert_eq!( original, deserialized );
+                assert_eq!( cursor.position(), message_length as u64 );
+            }
         }
     )* }
 }
