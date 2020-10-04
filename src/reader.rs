@@ -11,6 +11,7 @@ use crate::error::error_end_of_input;
 
 pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
+    fn peek_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
     fn context( &self ) -> &C;
     fn context_mut( &mut self ) -> &mut C;
 
@@ -49,7 +50,23 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
+    fn peek_u8( &mut self ) -> Result< u8, C::Error > {
+        if self.can_read_at_least( 1 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 1] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
+        Ok( slice[0] )
+    }
+
+    #[inline(always)]
     fn read_i8( &mut self ) -> Result< i8, C::Error > {
+        self.read_u8().map( |byte| byte as i8 )
+    }
+
+    #[inline(always)]
+    fn peek_i8( &mut self ) -> Result< i8, C::Error > {
         self.read_u8().map( |byte| byte as i8 )
     }
 
@@ -65,6 +82,17 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
+    fn peek_u16( &mut self ) -> Result< u16, C::Error > {
+        if self.can_read_at_least( 2 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 2] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
+        Ok( self.context().endianness().read_u16( &slice ) )
+    }
+
+    #[inline(always)]
     fn read_i16( &mut self ) -> Result< i16, C::Error > {
         if self.can_read_at_least( 2 ) == Some( false ) {
             return Err( error_end_of_input() );
@@ -72,6 +100,17 @@ pub trait Reader< 'a, C: Context >: Sized {
 
         let mut slice: [u8; 2] = unsafe { MaybeUninit::uninit().assume_init() };
         self.read_bytes( &mut slice )?;
+        Ok( self.context().endianness().read_i16( &slice ) )
+    }
+
+    #[inline(always)]
+    fn peek_i16( &mut self ) -> Result< i16, C::Error > {
+        if self.can_read_at_least( 2 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 2] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
         Ok( self.context().endianness().read_i16( &slice ) )
     }
 
@@ -87,6 +126,17 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
+    fn peek_u32( &mut self ) -> Result< u32, C::Error > {
+        if self.can_read_at_least( 4 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 4] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
+        Ok( self.context().endianness().read_u32( &slice ) )
+    }
+
+    #[inline(always)]
     fn read_i32( &mut self ) -> Result< i32, C::Error > {
         if self.can_read_at_least( 4 ) == Some( false ) {
             return Err( error_end_of_input() );
@@ -94,6 +144,17 @@ pub trait Reader< 'a, C: Context >: Sized {
 
         let mut slice: [u8; 4] = unsafe { MaybeUninit::uninit().assume_init() };
         self.read_bytes( &mut slice )?;
+        Ok( self.context().endianness().read_i32( &slice ) )
+    }
+
+    #[inline(always)]
+    fn peek_i32( &mut self ) -> Result< i32, C::Error > {
+        if self.can_read_at_least( 4 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 4] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
         Ok( self.context().endianness().read_i32( &slice ) )
     }
 
@@ -109,6 +170,17 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
+    fn peek_u64( &mut self ) -> Result< u64, C::Error > {
+        if self.can_read_at_least( 8 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 8] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
+        Ok( self.context().endianness().read_u64( &slice ) )
+    }
+
+    #[inline(always)]
     fn read_i64( &mut self ) -> Result< i64, C::Error > {
         if self.can_read_at_least( 8 ) == Some( false ) {
             return Err( error_end_of_input() );
@@ -116,6 +188,17 @@ pub trait Reader< 'a, C: Context >: Sized {
 
         let mut slice: [u8; 8] = unsafe { MaybeUninit::uninit().assume_init() };
         self.read_bytes( &mut slice )?;
+        Ok( self.context().endianness().read_i64( &slice ) )
+    }
+
+    #[inline(always)]
+    fn peek_i64( &mut self ) -> Result< i64, C::Error > {
+        if self.can_read_at_least( 8 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 8] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
         Ok( self.context().endianness().read_i64( &slice ) )
     }
 
@@ -131,6 +214,17 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
+    fn peek_f32( &mut self ) -> Result< f32, C::Error > {
+        if self.can_read_at_least( 4 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 4] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
+        Ok( self.context().endianness().read_f32( &slice ) )
+    }
+
+    #[inline(always)]
     fn read_f64( &mut self ) -> Result< f64, C::Error > {
         if self.can_read_at_least( 8 ) == Some( false ) {
             return Err( error_end_of_input() );
@@ -138,6 +232,17 @@ pub trait Reader< 'a, C: Context >: Sized {
 
         let mut slice: [u8; 8] = unsafe { MaybeUninit::uninit().assume_init() };
         self.read_bytes( &mut slice )?;
+        Ok( self.context().endianness().read_f64( &slice ) )
+    }
+
+    #[inline(always)]
+    fn peek_f64( &mut self ) -> Result< f64, C::Error > {
+        if self.can_read_at_least( 8 ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        let mut slice: [u8; 8] = unsafe { MaybeUninit::uninit().assume_init() };
+        self.peek_bytes( &mut slice )?;
         Ok( self.context().endianness().read_f64( &slice ) )
     }
 
@@ -230,6 +335,12 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline]
     fn read_u64_varint( &mut self ) -> Result< u64, C::Error > {
         let value = VarInt64::read_from( self )?;
+        Ok( value.into() )
+    }
+
+    #[inline]
+    fn peek_u64_varint( &mut self ) -> Result< u64, C::Error > {
+        let value = VarInt64::peek_from( self )?;
         Ok( value.into() )
     }
 }

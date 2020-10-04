@@ -103,10 +103,9 @@ impl From< VarInt64 > for i64 {
     }
 }
 
-impl< 'a, C: Context > Readable< 'a, C > for VarInt64 {
-    #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let first_byte = reader.read_u8()?;
+macro_rules! impl_read {
+    ($reader:ident, $read_u8:ident, $read_bytes:ident) => {{
+        let first_byte = $reader.$read_u8()?;
         let length = (!first_byte).leading_zeros();
 
         let upper_mask = 0b11111111_u64 >> length;
@@ -117,7 +116,7 @@ impl< 'a, C: Context > Readable< 'a, C > for VarInt64 {
                 let mut value: u64 = 0;
                 {
                     let slice = unsafe { std::slice::from_raw_parts_mut( &mut value as *mut u64 as *mut u8, $count ) };
-                    reader.read_bytes( slice )?;
+                    $reader.$read_bytes( slice )?;
                 }
                 value = value.to_le();
                 Ok( VarInt64( upper_bits | value ) )
@@ -144,11 +143,28 @@ impl< 'a, C: Context > Readable< 'a, C > for VarInt64 {
                 }
             }
         }
+    }}
+}
+
+impl< 'a, C: Context > Readable< 'a, C > for VarInt64 {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        impl_read!( reader, read_u8, read_bytes )
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
         1
+    }
+}
+
+impl VarInt64 {
+    #[inline]
+    pub(crate) fn peek_from< 'a, C, R >( reader: &mut R ) -> Result< Self, C::Error >
+        where C: Context,
+              R: Reader< 'a, C >
+    {
+        impl_read!( reader, peek_u8, peek_bytes )
     }
 }
 

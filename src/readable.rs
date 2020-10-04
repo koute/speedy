@@ -53,6 +53,20 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
+    fn peek_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
+        let length = output.len();
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
+        }
+
+        Ok(())
+    }
+
+    #[inline(always)]
     fn skip_bytes( &mut self, length: usize ) -> Result< (), C::Error > {
         if self.can_read_at_least( length ) == Some( false ) {
             return Err( error_end_of_input() );
@@ -125,6 +139,20 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
         unsafe {
             std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
             self.ptr = self.ptr.add( length );
+        }
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn peek_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
+        let length = output.len();
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
         }
 
         Ok(())
@@ -218,6 +246,38 @@ impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
         }
 
         self.read_bytes_slow( output )
+    }
+
+    fn peek_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
+        if output.len() > self.buffer.len() {
+            let reader = &mut self.reader;
+            while self.buffer.len() < output.len() {
+                let mut chunk_size = output.len() - self.buffer.len();
+                if self.is_buffering {
+                    chunk_size = std::cmp::max( chunk_size, self.buffer.capacity() - self.buffer.len() );
+                }
+
+                let bytes_written = self.buffer.try_append_with( chunk_size, |chunk| {
+                    reader.read( chunk )
+                }).map_err( |error| {
+                    let error = Error::from_io_error( error );
+                    <C::Error as From< Error >>::from( error )
+                })?;
+
+                if bytes_written == 0 {
+                    return Err( error_end_of_input() );
+                }
+            }
+        }
+
+        let (a, b) = self.buffer.as_slices_of_length( output.len() );
+        output[ ..a.len() ].copy_from_slice( a );
+
+        if let Some( b ) = b {
+            output[ a.len().. ].copy_from_slice( b );
+        }
+
+        Ok(())
     }
 
     #[inline(always)]
@@ -379,4 +439,45 @@ pub trait Readable< 'a, C: Context >: Sized {
     fn speedy_convert_slice_endianness( _: Endianness, _: &mut [Self] ) {
         panic!()
     }
+}
+
+#[test]
+fn test_peek() {
+    let value: f64 = 2.0;
+    let data = unsafe {
+        std::slice::from_raw_parts( (&value as *const f64) as *const u8, 8 )
+    };
+
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_f64().unwrap(), reader.read_f64().unwrap() );
+
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_f32().unwrap(), reader.read_f32().unwrap() );
+
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_u64().unwrap(), reader.read_u64().unwrap() );
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_i64().unwrap(), reader.read_i64().unwrap() );
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_u32().unwrap(), reader.read_u32().unwrap() );
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_i32().unwrap(), reader.read_i32().unwrap() );
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_u16().unwrap(), reader.read_u16().unwrap() );
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_i16().unwrap(), reader.read_i16().unwrap() );
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_u8().unwrap(), reader.read_u8().unwrap() );
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_i8().unwrap(), reader.read_i8().unwrap() );
+
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_u64_varint().unwrap(), reader.read_u64_varint().unwrap() );
+
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    assert_eq!( reader.peek_u64().unwrap(), reader.peek_u64().unwrap() );
+
+    let mut reader = CopyingBufferReader::new( crate::LittleEndian {}, data );
+    reader.peek_u8().unwrap();
+    assert_eq!( reader.read_f64().unwrap(), 2.0 );
 }
