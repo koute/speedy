@@ -480,6 +480,16 @@ struct DerivedStructWithConstantPrefixI8 {
     value: ()
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u8)]
+#[speedy(peek_tag)]
+enum DerivedEnumWithPeekTagU8 {
+    #[speedy(tag = 1)]
+    One( u8 ),
+    #[speedy(tag = 2)]
+    Two( u8 )
+}
+
 macro_rules! atomic_wrapper {
     ($name:ident, $base_ty:ident) => {
         #[derive(Debug, Readable, Writable)]
@@ -1236,6 +1246,12 @@ symmetric_tests! {
         in = DerivedStructWithConstantPrefixI8 { value: () },
         le = [255],
         be = [255],
+        minimum_bytes = 1
+    }
+    derived_enum_with_peek_tag_u8 for DerivedEnumWithPeekTagU8 {
+        in = DerivedEnumWithPeekTagU8::One( 1 ),
+        le = [1],
+        be = [1],
         minimum_bytes = 1
     }
 }

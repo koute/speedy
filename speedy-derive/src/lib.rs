@@ -46,6 +46,7 @@ mod kw {
     syn::custom_keyword!( tag );
     syn::custom_keyword!( skip );
     syn::custom_keyword!( constant_prefix );
+    syn::custom_keyword!( peek_tag );
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -203,6 +204,9 @@ enum EnumAttribute {
     TagType {
         key_token: kw::tag_type,
         ty: BasicType
+    },
+    PeekTag {
+        key_token: kw::peek_tag
     }
 }
 
@@ -257,6 +261,11 @@ fn parse_enum_attribute(
             key_token,
             ty
         }
+    } else if lookahead.peek( kw::peek_tag ) {
+        let key_token = input.parse::< kw::peek_tag >()?;
+        EnumAttribute::PeekTag {
+            key_token
+        }
     } else {
         return Ok( None )
     };
@@ -301,7 +310,8 @@ struct StructAttributes {
 }
 
 struct EnumAttributes {
-    tag_type: Option< BasicType >
+    tag_type: Option< BasicType >,
+    peek_tag: bool
 }
 
 fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::Error > where T: syn::parse::Parse {
@@ -360,6 +370,7 @@ fn collect_struct_attributes( attrs: Vec< StructAttribute > ) -> Result< StructA
 
 fn collect_enum_attributes( attrs: Vec< EnumAttribute > ) -> Result< EnumAttributes, syn::Error > {
     let mut tag_type = None;
+    let mut peek_tag = false;
     for attr in attrs {
         match attr {
             EnumAttribute::TagType { key_token, ty } => {
@@ -368,12 +379,20 @@ fn collect_enum_attributes( attrs: Vec< EnumAttribute > ) -> Result< EnumAttribu
                     return Err( syn::Error::new( key_token.span(), message ) );
                 }
                 tag_type = Some( ty );
+            },
+            EnumAttribute::PeekTag { key_token } => {
+                if peek_tag {
+                    let message = "Duplicate 'peek_tag'";
+                    return Err( syn::Error::new( key_token.span(), message ) );
+                }
+                peek_tag = true;
             }
         }
     }
 
     Ok( EnumAttributes {
-        tag_type
+        tag_type,
+        peek_tag
     })
 }
 
@@ -1173,6 +1192,7 @@ struct Variant< 'a > {
 
 struct Enum< 'a > {
     tag_type: BasicType,
+    peek_tag: bool,
     variants: Vec< Variant< 'a > >
 }
 
@@ -1286,6 +1306,7 @@ impl< 'a > Enum< 'a > {
 
         Ok( Enum {
             tag_type,
+            peek_tag: attrs.peek_tag,
             variants
         })
     }
@@ -1401,13 +1422,29 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 }
             }
 
-            let (tag_reader, tag_size) = match enumeration.tag_type {
-                BasicType::U64 => (quote! { read_u64 }, 8_usize),
-                BasicType::U32 => (quote! { read_u32 }, 4_usize),
-                BasicType::U16 => (quote! { read_u16 }, 2_usize),
-                BasicType::U8 => (quote! { read_u8 }, 1_usize),
-                BasicType::U7 => (quote! { read_u8 }, 1_usize),
-                BasicType::VarInt64 => (quote! { read_u64_varint }, 1_usize),
+            let tag_size = match enumeration.tag_type {
+                BasicType::U64 => 8_usize,
+                BasicType::U32 => 4_usize,
+                BasicType::U16 => 2_usize,
+                BasicType::U8 => 1_usize,
+                BasicType::U7 => 1_usize,
+                BasicType::VarInt64 => 1_usize,
+            };
+
+            let tag_reader = match (enumeration.peek_tag, enumeration.tag_type) {
+                (false, BasicType::U64) => quote! { read_u64 },
+                (false, BasicType::U32) => quote! { read_u32 },
+                (false, BasicType::U16) => quote! { read_u16 },
+                (false, BasicType::U8) => quote! { read_u8 },
+                (false, BasicType::U7) => quote! { read_u8 },
+                (false, BasicType::VarInt64) => quote! { read_u64_varint },
+
+                (true, BasicType::U64) => quote! { peek_u64 },
+                (true, BasicType::U32) => quote! { peek_u32 },
+                (true, BasicType::U16) => quote! { peek_u16 },
+                (true, BasicType::U8) => quote! { peek_u8 },
+                (true, BasicType::U7) => quote! { peek_u8 },
+                (true, BasicType::VarInt64) => quote! { peek_u64_varint },
             };
 
             let reader_body = quote! {
@@ -1418,7 +1455,13 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 }
             };
             let minimum_bytes_needed_body = min( variant_minimum_sizes.into_iter() );
-            let minimum_bytes_needed_body = quote! { (#minimum_bytes_needed_body) + #tag_size };
+            let minimum_bytes_needed_body =
+                if !enumeration.peek_tag {
+                    quote! { (#minimum_bytes_needed_body) + #tag_size }
+                } else {
+                    quote! { std::cmp::max( #minimum_bytes_needed_body, #tag_size ) }
+                };
+
             (reader_body, minimum_bytes_needed_body)
         },
         syn::Data::Union( syn::DataUnion { union_token, .. } ) => {
@@ -1491,9 +1534,16 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     let tag_expr = &variant.tag_expr;
                     let variant_path = quote! { #name::#unqualified_ident };
                     let (body, initializer) = writable_body( &mut types, &variant.structure );
+                    let write_tag =
+                        if !enumeration.peek_tag {
+                            quote! { _writer_.#tag_writer( #tag_expr )?; }
+                        } else {
+                            quote! {}
+                        };
+
                     let snippet = quote! {
                         #variant_path #initializer => {
-                            _writer_.#tag_writer( #tag_expr )?;
+                            #write_tag
                             #body
                         }
                     };
