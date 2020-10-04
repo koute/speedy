@@ -1,5 +1,4 @@
 use std::io::{
-    self,
     Read
 };
 
@@ -11,6 +10,7 @@ use crate::reader::Reader;
 use crate::context::{Context, DefaultContext};
 use crate::endianness::Endianness;
 use crate::Error;
+use crate::circular_buffer::CircularBuffer;
 
 use crate::error::{
     error_end_of_input,
@@ -136,16 +136,64 @@ impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
 
 struct StreamReader< C: Context, S: Read > {
     context: C,
-    reader: S
+    reader: S,
+    buffer: CircularBuffer,
+    is_buffering: bool
+}
+
+impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
+    #[inline(never)]
+    fn read_bytes_slow( &mut self, mut output: &mut [u8] ) -> Result< (), C::Error > {
+        if self.is_buffering && output.len() < self.buffer.capacity() {
+            let reader = &mut self.reader;
+            while self.buffer.len() < self.buffer.capacity() {
+                let bytes_written = self.buffer.try_append_with( self.buffer.capacity() - self.buffer.len(), |chunk| {
+                    reader.read( chunk )
+                }).map_err( |error| {
+                    let error = Error::from_io_error( error );
+                    <C::Error as From< Error >>::from( error )
+                })?;
+
+                if bytes_written == 0 {
+                    if self.buffer.len() < output.len() {
+                        return Err( error_end_of_input() );
+                    } else {
+                        break;
+                    }
+                }
+
+                if self.buffer.len() >= output.len() {
+                    break;
+                }
+            }
+        }
+
+        if self.buffer.len() > 0 {
+            let length = std::cmp::min( self.buffer.len(), output.len() );
+            self.buffer.consume_into( &mut output[ ..length ] );
+            output = &mut output[ length.. ];
+        }
+
+        if output.is_empty() {
+            return Ok(());
+        }
+
+        self.reader.read_exact( output ).map_err( |error| {
+            let error = Error::from_io_error( error );
+            <C::Error as From< Error >>::from( error )
+        })
+    }
 }
 
 impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
     #[inline(always)]
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
-        self.reader.read_exact( output ).map_err( |error| {
-            let error = Error::from_io_error( error );
-            <C::Error as From< Error >>::from( error )
-        })
+        if self.buffer.len() >= output.len() {
+            self.buffer.consume_into( output );
+            return Ok(());
+        }
+
+        self.read_bytes_slow( output )
     }
 
     #[inline(always)]
@@ -161,8 +209,20 @@ impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
 
 impl< C: Context, S: Read > StreamReader< C, S > {
     #[inline]
-    fn deserialize< 'a, T: Readable< 'a, C > >( context: C, reader: S ) -> Result< T, C::Error > {
-        let mut reader = StreamReader { context, reader };
+    fn deserialize< 'a, T: Readable< 'a, C > >( context: C, reader: S, is_buffering: bool ) -> Result< T, C::Error > {
+        let capacity = if is_buffering {
+            8 * 1024
+        } else {
+            0
+        };
+
+        let mut reader = StreamReader {
+            context,
+            reader,
+            buffer: CircularBuffer::with_capacity( capacity ),
+            is_buffering
+        };
+
         T::read_from( &mut reader )
     }
 }
@@ -190,9 +250,29 @@ pub trait Readable< 'a, C: Context >: Sized {
         Self::read_from_buffer_owned_with_ctx( Default::default(), buffer )
     }
 
+    /// Reads from a given stream without any buffering.
+    ///
+    /// This will only read what is necessary from the stream to deserialize
+    /// a given type, but is going to be slow.
+    ///
+    /// Use [`read_from_stream_buffered`](Readable::read_from_stream_buffered) if you need
+    /// to read from a stream and you don't care about not overreading.
     #[inline]
-    fn read_from_stream( stream: impl Read ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
-        Self::read_from_stream_with_ctx( Default::default(), stream )
+    fn read_from_stream_unbuffered( stream: impl Read ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        Self::read_from_stream_unbuffered_with_ctx( Default::default(), stream )
+    }
+
+    /// Reads from a given stream with internal buffering.
+    ///
+    /// This will read more data from the stream than is necessary to deserialize
+    /// a given type, however it should be orders of magnitude faster than unbuffered streaming,
+    /// especially when reading relatively complex objects.
+    ///
+    /// Use the slower [`read_from_stream_unbuffered`](Readable::read_from_stream_unbuffered) if you want
+    /// to avoid overreading.
+    #[inline]
+    fn read_from_stream_buffered( stream: impl Read ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        Self::read_from_stream_buffered_with_ctx( Default::default(), stream )
     }
 
     #[inline]
@@ -244,8 +324,13 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_stream_with_ctx< S: Read >( context: C, stream: S ) -> Result< Self, C::Error > {
-        StreamReader::deserialize( context, stream )
+    fn read_from_stream_unbuffered_with_ctx< S: Read >( context: C, stream: S ) -> Result< Self, C::Error > {
+        StreamReader::deserialize( context, stream, false )
+    }
+
+    #[inline]
+    fn read_from_stream_buffered_with_ctx< S: Read >( context: C, stream: S ) -> Result< Self, C::Error > {
+        StreamReader::deserialize( context, stream, true )
     }
 
     #[inline]
@@ -255,8 +340,7 @@ pub trait Readable< 'a, C: Context >: Sized {
             <C::Error as From< Error >>::from( error )
         })?;
 
-        let stream = io::BufReader::new( stream );
-        Self::read_from_stream_with_ctx( context, stream )
+        Self::read_from_stream_buffered_with_ctx( context, stream )
     }
 
     // Since specialization is not stable yet we do it this way.

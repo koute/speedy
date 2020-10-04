@@ -111,16 +111,37 @@ macro_rules! symmetric_tests {
             }
 
             #[test]
-            fn read_from_stream_only_reads_what_is_necessary() {
+            fn read_from_stream_unbuffered_only_reads_what_is_necessary() {
                 let original: $type = $value;
                 let mut serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
                 let message_length = serialized.len();
                 serialized.extend_from_slice( &[0, 1, 2, 3, 4, 5, 6, 7, 8] );
 
                 let mut cursor = std::io::Cursor::new( serialized );
-                let deserialized: $type = Readable::read_from_stream_with_ctx( Endianness::LittleEndian, &mut cursor ).unwrap();
+                let deserialized: $type = Readable::read_from_stream_unbuffered_with_ctx( Endianness::LittleEndian, &mut cursor ).unwrap();
                 assert_eq!( original, deserialized );
                 assert_eq!( cursor.position(), message_length as u64 );
+            }
+
+            #[test]
+            fn read_from_stream_buffered_reads_as_much_as_possible() {
+                let original: $type = $value;
+                let mut serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let is_zero_length = serialized.is_empty();
+
+                serialized.extend_from_slice( &[0, 1, 2, 3, 4, 5, 6, 7, 8] );
+                let total_length = serialized.len();
+
+                let mut cursor = std::io::Cursor::new( serialized );
+                let deserialized: $type = Readable::read_from_stream_buffered_with_ctx( Endianness::LittleEndian, &mut cursor ).unwrap();
+                assert_eq!( original, deserialized );
+
+                if is_zero_length {
+                    // If the type is zero length no buffering should be done.
+                    assert_eq!( cursor.position(), 0 );
+                } else {
+                    assert_eq!( cursor.position(), total_length as u64 );
+                }
             }
         }
     )* }

@@ -4,6 +4,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 export RUST_BACKTRACE=1
+export QUICKCHECK_TESTS=5000
 
 set +e
 echo "$(rustc --version)" | grep -q "nightly"
