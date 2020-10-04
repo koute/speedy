@@ -26,3 +26,6 @@ if [ "$IS_NIGHTLY" = "1" ]; then
 else
     cargo test
 fi
+
+cd speedy-derive
+cargo test
