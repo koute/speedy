@@ -88,8 +88,58 @@ fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> 
                 }
             })
         },
+        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().any( |elem| possibly_uses_generic_ty( generic_types, elem ) ),
+        syn::Type::Reference( syn::TypeReference { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Paren( syn::TypeParen { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Group( syn::TypeGroup { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Array( syn::TypeArray { elem, len, .. } ) => {
+            if possibly_uses_generic_ty( generic_types, &elem ) {
+                return true;
+            }
+
+            // This is probably too conservative.
+            match len {
+                syn::Expr::Lit( .. ) => false,
+                _ => true
+            }
+        },
+        syn::Type::Never( .. ) => false,
         _ => true
     }
+}
+
+#[test]
+fn test_possibly_uses_generic_ty() {
+    macro_rules! assert_test {
+        ($result:expr, $($token:tt)+) => {
+            assert_eq!(
+                possibly_uses_generic_ty( &[&syn::Ident::new( "T", proc_macro2::Span::call_site() )], &syn::parse2( quote! { $($token)+ } ).unwrap() ),
+                $result
+            );
+        }
+    }
+
+    assert_test!( false, String );
+    assert_test!( false, Cow<'a, BTreeMap<u8, u8>> );
+    assert_test!( false, Cow<'a, [u8]> );
+    assert_test!( false, () );
+    assert_test!( false, (u8) );
+    assert_test!( false, (u8, u8) );
+    assert_test!( false, &u8 );
+    assert_test!( false, *const u8 );
+    assert_test!( false, ! );
+    assert_test!( false, [u8; 2] );
+    assert_test!( true, T );
+    assert_test!( true, Cow<'a, BTreeMap<T, u8>> );
+    assert_test!( true, Cow<'a, BTreeMap<u8, T>> );
+    assert_test!( true, Cow<'a, [T]> );
+    assert_test!( true, (T) );
+    assert_test!( true, (u8, T) );
+    assert_test!( true, &T );
+    assert_test!( true, *const T );
+    assert_test!( true, [T; 2] );
 }
 
 fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Trait ) -> (TokenStream, TokenStream, TokenStream) {
