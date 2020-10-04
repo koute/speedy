@@ -653,6 +653,11 @@ enum Ty {
     BTreeMap( syn::Type, syn::Type ),
     BTreeSet( syn::Type ),
 
+    CowHashMap( syn::Lifetime, syn::Type, syn::Type ),
+    CowHashSet( syn::Lifetime, syn::Type ),
+    CowBTreeMap( syn::Lifetime, syn::Type, syn::Type ),
+    CowBTreeSet( syn::Lifetime, syn::Type ),
+
     Array( syn::Type, u32 ),
 
     Ty( syn::Type )
@@ -772,7 +777,30 @@ fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
                         } else if is_bare_ty( ty, "str" ) {
                             Some( Ty::CowStr( lifetime.clone() ) )
                         } else {
-                            None
+                            match *ty {
+                                syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
+                                    let inner_name = &segments[ 0 ].ident;
+                                    match segments[ 0 ].arguments {
+                                        syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { colon2_token: None, ref args, .. } ) => {
+                                            if inner_name == "HashSet" {
+                                                Some( Ty::CowHashSet( lifetime.clone(), extract_inner_ty( args )?.clone() ) )
+                                            } else if inner_name == "BTreeSet" {
+                                                Some( Ty::CowBTreeSet( lifetime.clone(), extract_inner_ty( args )?.clone() ) )
+                                            } else if inner_name == "HashMap" {
+                                                let (key_ty, value_ty) = extract_inner_ty_2( args )?;
+                                                Some( Ty::CowHashMap( lifetime.clone(), key_ty.clone(), value_ty.clone() ) )
+                                            } else if inner_name == "BTreeMap" {
+                                                let (key_ty, value_ty) = extract_inner_ty_2( args )?;
+                                                Some( Ty::CowBTreeMap( lifetime.clone(), key_ty.clone(), value_ty.clone() ) )
+                                            } else {
+                                                None
+                                            }
+                                        },
+                                        _ => None
+                                    }
+                                },
+                                _ => None
+                            }
                         }
                     } else if name == "HashMap" {
                         let (key_ty, value_ty) = extract_inner_ty_2( args )?;
@@ -881,6 +909,10 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Plain( Ty::HashSet( .. ) )
                     | Opt::Plain( Ty::BTreeMap( .. ) )
                     | Opt::Plain( Ty::BTreeSet( .. ) )
+                    | Opt::Plain( Ty::CowHashMap( .. ) )
+                    | Opt::Plain( Ty::CowHashSet( .. ) )
+                    | Opt::Plain( Ty::CowBTreeMap( .. ) )
+                    | Opt::Plain( Ty::CowBTreeSet( .. ) )
                         => {},
 
                     | Opt::Option( Ty::String )
@@ -891,12 +923,21 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::HashSet( .. ) )
                     | Opt::Option( Ty::BTreeMap( .. ) )
                     | Opt::Option( Ty::BTreeSet( .. ) )
+                    | Opt::Option( Ty::CowHashMap( .. ) )
+                    | Opt::Option( Ty::CowHashSet( .. ) )
+                    | Opt::Option( Ty::CowBTreeMap( .. ) )
+                    | Opt::Option( Ty::CowBTreeSet( .. ) )
                     | Opt::Plain( Ty::Array( .. ) )
                     | Opt::Option( Ty::Array( .. ) )
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
-                        return Err( syn::Error::new( field.ty.span(), "The 'length' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`" ) );
+                        return Err(
+                            syn::Error::new(
+                                field.ty.span(),
+                                "The 'length' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`, `Cow<HashMap>`, `Cow<HashSet>`, `Cow<BTreeMap>`, `Cow<BTreeSet>`"
+                            )
+                        );
                     }
                 }
             }
@@ -911,6 +952,10 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Plain( Ty::HashSet( .. ) )
                     | Opt::Plain( Ty::BTreeMap( .. ) )
                     | Opt::Plain( Ty::BTreeSet( .. ) )
+                    | Opt::Plain( Ty::CowHashMap( .. ) )
+                    | Opt::Plain( Ty::CowHashSet( .. ) )
+                    | Opt::Plain( Ty::CowBTreeMap( .. ) )
+                    | Opt::Plain( Ty::CowBTreeSet( .. ) )
                     | Opt::Option( Ty::String )
                     | Opt::Option( Ty::Vec( .. ) )
                     | Opt::Option( Ty::CowSlice( .. ) )
@@ -919,6 +964,10 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::HashSet( .. ) )
                     | Opt::Option( Ty::BTreeMap( .. ) )
                     | Opt::Option( Ty::BTreeSet( .. ) )
+                    | Opt::Option( Ty::CowHashMap( .. ) )
+                    | Opt::Option( Ty::CowHashSet( .. ) )
+                    | Opt::Option( Ty::CowBTreeMap( .. ) )
+                    | Opt::Option( Ty::CowBTreeSet( .. ) )
                         => {},
 
                     | Opt::Plain( Ty::Array( .. ) )
@@ -926,7 +975,12 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
-                        return Err( syn::Error::new( field.ty.span(), "The 'length_type' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet` and for `Option<T>` where `T` is one of these types" ) );
+                        return Err(
+                            syn::Error::new(
+                                field.ty.span(),
+                                "The 'length_type' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`, `Cow<HashMap>`, `Cow<HashSet>`, `Cow<BTreeMap>`, `Cow<BTreeSet>` and for `Option<T>` where `T` is one of these types"
+                            )
+                        );
                     }
                 }
             }
@@ -1022,6 +1076,12 @@ fn read_field_body( field: &Field ) -> TokenStream {
             _reader_.read_collection( _length_ )
         }};
 
+    let read_cow_collection = ||
+        quote! {{
+            let _length_ = #read_length_body;
+            _reader_.read_collection( _length_ ).map( std::borrow::Cow::Owned )
+        }};
+
     let read_array = |length: u32| {
         // TODO: This is quite inefficient; for primitive types we can do better.
         let readers = (0..length).map( |_| quote! {
@@ -1056,6 +1116,10 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Ty::HashSet( .. ) |
         Ty::BTreeMap( .. ) |
         Ty::BTreeSet( .. ) => read_collection(),
+        Ty::CowHashMap( .. ) |
+        Ty::CowHashSet( .. ) |
+        Ty::CowBTreeMap( .. ) |
+        Ty::CowBTreeSet( .. ) => read_cow_collection(),
         Ty::Array( _, length ) => read_array( *length ),
         Ty::Ty( .. ) => {
             assert!( field.length.is_none() );
@@ -1181,7 +1245,11 @@ fn write_field_body( field: &Field ) -> TokenStream {
         Ty::HashMap( .. ) |
         Ty::HashSet( .. ) |
         Ty::BTreeMap( .. ) |
-        Ty::BTreeSet( .. ) => write_collection(),
+        Ty::BTreeSet( .. ) |
+        Ty::CowHashMap( .. ) |
+        Ty::CowHashSet( .. ) |
+        Ty::CowBTreeMap( .. ) |
+        Ty::CowBTreeSet( .. ) => write_collection(),
         Ty::Array( .. ) => write_array(),
         Ty::Ty( .. ) => {
             assert!( field.length.is_none() );
@@ -1380,6 +1448,10 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
                     | Ty::HashSet( .. )
                     | Ty::BTreeMap( .. )
                     | Ty::BTreeSet( .. )
+                    | Ty::CowHashMap( .. )
+                    | Ty::CowHashSet( .. )
+                    | Ty::CowBTreeMap( .. )
+                    | Ty::CowBTreeSet( .. )
                     => {
                         let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
                             BasicType::U7 | BasicType::U8 | BasicType::VarInt64 => 1,

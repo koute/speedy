@@ -328,6 +328,34 @@ struct DerivedStructWithBTreeSetWithCount {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithCowHashMapWithCount< 'a > {
+    length: u8,
+    #[speedy(length = length / 4)]
+    data: Cow< 'a, HashMap< u8, u8 > >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithCowBTreeMapWithCount< 'a > {
+    length: u8,
+    #[speedy(length = length / 4)]
+    data: Cow< 'a, BTreeMap< u8, u8 > >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithCowHashSetWithCount< 'a > {
+    length: u8,
+    #[speedy(length = length / 4)]
+    data: Cow< 'a, HashSet< u8 > >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithCowBTreeSetWithCount< 'a > {
+    length: u8,
+    #[speedy(length = length / 4)]
+    data: Cow< 'a, BTreeSet< u8 > >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedTupleStructWithVecWithCount(
     u8,
     #[speedy(length = t0 * 2)]
@@ -488,6 +516,13 @@ enum DerivedEnumWithPeekTagU8 {
     One( u8 ),
     #[speedy(tag = 2)]
     Two( u8 )
+}
+
+// This is here only to make sure it compiles.
+#[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithTwoDifferentCows< 'a > {
+    a: Cow< 'a, BTreeMap< u8, u8 > >,
+    b: Cow< 'a, [u8] >
 }
 
 macro_rules! atomic_wrapper {
@@ -1106,6 +1141,30 @@ symmetric_tests! {
     }
     derived_struct_with_btree_set_with_length for DerivedStructWithBTreeSetWithCount {
         in = DerivedStructWithBTreeSetWithCount { length: 4, data: vec![ 50 ].into_iter().collect() },
+        le = [4, 50],
+        be = [4, 50],
+        minimum_bytes = 1
+    }
+    derived_struct_with_cow_hash_map_with_length for DerivedStructWithCowHashMapWithCount {
+        in = DerivedStructWithCowHashMapWithCount { length: 4, data: Cow::Owned( vec![ (50, 60) ].into_iter().collect() ) },
+        le = [4, 50, 60],
+        be = [4, 50, 60],
+        minimum_bytes = 1
+    }
+    derived_struct_with_cow_btree_map_with_length for DerivedStructWithCowBTreeMapWithCount {
+        in = DerivedStructWithCowBTreeMapWithCount { length: 4, data: Cow::Owned( vec![ (50, 60) ].into_iter().collect() ) },
+        le = [4, 50, 60],
+        be = [4, 50, 60],
+        minimum_bytes = 1
+    }
+    derived_struct_with_cow_hash_set_with_length for DerivedStructWithCowHashSetWithCount {
+        in = DerivedStructWithCowHashSetWithCount { length: 4, data: Cow::Owned( vec![ 50 ].into_iter().collect() ) },
+        le = [4, 50],
+        be = [4, 50],
+        minimum_bytes = 1
+    }
+    derived_struct_with_cow_btree_set_with_length for DerivedStructWithCowBTreeSetWithCount {
+        in = DerivedStructWithCowBTreeSetWithCount { length: 4, data: Cow::Owned( vec![ 50 ].into_iter().collect() ) },
         le = [4, 50],
         be = [4, 50],
         minimum_bytes = 1
