@@ -24,6 +24,18 @@ struct BufferReader< 'a, C > where C: Context {
     phantom: PhantomData< &'a [u8] >
 }
 
+impl< 'a, C > BufferReader< 'a, C > where C: Context {
+    #[inline]
+    fn new( context: C, buffer: &'a [u8] ) -> Self {
+        BufferReader {
+            context,
+            ptr: buffer.as_ptr(),
+            end: unsafe { buffer.as_ptr().add( buffer.len() ) },
+            phantom: PhantomData
+        }
+    }
+}
+
 impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     #[inline(always)]
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
@@ -88,6 +100,18 @@ struct CopyingBufferReader< 'a, C > where C: Context {
     ptr: *const u8,
     end: *const u8,
     phantom: PhantomData< &'a [u8] >
+}
+
+impl< 'a, C > CopyingBufferReader< 'a, C > where C: Context {
+    #[inline]
+    fn new( context: C, buffer: &'a [u8] ) -> Self {
+        CopyingBufferReader {
+            context,
+            ptr: buffer.as_ptr(),
+            end: unsafe { buffer.as_ptr().add( buffer.len() ) },
+            phantom: PhantomData
+        }
+    }
 }
 
 impl< 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'a, C > {
@@ -293,13 +317,7 @@ pub trait Readable< 'a, C: Context >: Sized {
             return (Err( error_input_buffer_is_too_small( buffer_length, bytes_needed ) ), 0);
         }
 
-        let mut reader = BufferReader {
-            context,
-            ptr: buffer.as_ptr(),
-            end: unsafe { buffer.as_ptr().add( buffer_length ) },
-            phantom: PhantomData
-        };
-
+        let mut reader = BufferReader::new( context, buffer );
         let value = Self::read_from( &mut reader );
         let bytes_read = reader.ptr as usize - buffer.as_ptr() as usize;
         (value, bytes_read)
@@ -313,13 +331,7 @@ pub trait Readable< 'a, C: Context >: Sized {
             return Err( error_input_buffer_is_too_small( buffer_length, bytes_needed ) );
         }
 
-        let mut reader = CopyingBufferReader {
-            context,
-            ptr: buffer.as_ptr(),
-            end: unsafe { buffer.as_ptr().add( buffer_length ) },
-            phantom: PhantomData
-        };
-
+        let mut reader = CopyingBufferReader::new( context, buffer );
         Self::read_from( &mut reader )
     }
 
