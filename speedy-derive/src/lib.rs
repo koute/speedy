@@ -140,6 +140,7 @@ fn test_possibly_uses_generic_ty() {
     assert_test!( true, &T );
     assert_test!( true, *const T );
     assert_test!( true, [T; 2] );
+    assert_test!( true, Vec<T> );
 }
 
 fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Trait ) -> (TokenStream, TokenStream, TokenStream) {
@@ -512,6 +513,27 @@ impl< 'a > Field< 'a > {
             syn::Member::Named( name.clone() )
         } else {
             syn::Member::Unnamed( syn::Index { index: self.index as u32, span: Span::call_site() } )
+        }
+    }
+
+    fn bound_types( &self ) -> Vec< syn::Type > {
+        match self.ty.inner() {
+            | Ty::Array( inner_ty, .. )
+            | Ty::Vec( inner_ty )
+            | Ty::HashSet( inner_ty )
+            | Ty::BTreeSet( inner_ty )
+            | Ty::CowHashSet( _, inner_ty )
+            | Ty::CowBTreeSet( _, inner_ty )
+            | Ty::CowSlice( _, inner_ty )
+                => vec![ inner_ty.clone() ],
+            | Ty::HashMap( key_ty, value_ty )
+            | Ty::BTreeMap( key_ty, value_ty )
+            | Ty::CowHashMap( _, key_ty, value_ty )
+            | Ty::CowBTreeMap( _, key_ty, value_ty )
+                => vec![ key_ty.clone(), value_ty.clone() ],
+            | Ty::String
+            | Ty::CowStr( .. ) => vec![],
+            | Ty::Ty( _ ) => vec![ self.raw_ty.clone() ]
         }
     }
 }
@@ -1157,10 +1179,7 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
         let raw_ty = field.raw_ty;
         field_readers.push( quote! { let #name: #raw_ty = #read_value; } );
         field_names.push( name );
-        match field.ty.inner() {
-            Ty::Array( inner_ty, .. ) => types.push( inner_ty.clone() ),
-            _ => types.push( raw_ty.clone() )
-        }
+        types.extend( field.bound_types() );
 
         if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
             minimum_bytes_needed.push( minimum_bytes );
@@ -1283,10 +1302,8 @@ fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
         }
 
         let write_value = write_field_body( &field );
-        match field.ty.inner() {
-            Ty::Array( inner_ty, .. ) => types.push( inner_ty.clone() ),
-            _ => types.push( field.raw_ty.clone() )
-        }
+        types.extend( field.bound_types() );
+
         field_names.push( field.var_name().clone() );
         field_writers.push( write_value );
     }

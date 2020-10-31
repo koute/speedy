@@ -525,6 +525,33 @@ struct DerivedStructWithTwoDifferentCows< 'a > {
     b: Cow< 'a, [u8] >
 }
 
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericVec< T >( Vec< T > );
+
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericHashMap< K, V >( HashMap< K, V > ) where K: std::hash::Hash + Eq;
+
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericHashSet< T >( HashSet< T > ) where T: std::hash::Hash + Eq;
+
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericBTreeMap< K, V >( BTreeMap< K, V > ) where K: Ord;
+
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericBTreeSet< T >( BTreeSet< T > ) where T: Ord;
+
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericCowHashMap< 'a, K, V >( Cow< 'a, HashMap< K, V > > ) where K: std::hash::Hash + Eq + Clone, V: Clone;
+
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericCowHashSet< 'a, T >( Cow< 'a, HashSet< T > > ) where T: std::hash::Hash + Eq + Clone;
+
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericCowBTreeMap< 'a, K, V >( Cow< 'a, BTreeMap< K, V > > ) where K: Ord + Clone, V: Clone;
+
+#[derive(Readable, Writable)]
+struct DerivedTupleStructWithGenericCowBTreeSet< 'a, T >( Cow< 'a, BTreeSet< T > > ) where T: Ord + Clone;
+
 macro_rules! atomic_wrapper {
     ($name:ident, $base_ty:ident) => {
         #[derive(Debug, Readable, Writable)]
