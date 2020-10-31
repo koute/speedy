@@ -97,7 +97,7 @@ Out-of-box the following types are supported:
 |            `NonZeroU32` |                                    `u32` |
 |    `std::net::Ipv4Addr` |                                    `u32` |
 |    `std::net::Ipv6Addr` |                                   `u128` |
-|      `std::net::IpAddr` |     `{is_ipv4: u8, value: {u32 | u128}}` |
+|      `std::net::IpAddr` |    `{is_ipv4: u8, value: {u32 or u128}}` |
 |   `std::time::Duration` |         `{secs: u64, subsec_nanos: u32}` |
 | `std::time::SystemTime` | `std::time::Duration` since `UNIX_EPOCH` |
 
