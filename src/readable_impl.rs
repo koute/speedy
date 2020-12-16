@@ -482,3 +482,18 @@ impl_for_array!( 5 );
 impl_for_array!( 6 );
 impl_for_array!( 7 );
 impl_for_array!( 8 );
+
+impl< 'a, C, T > Readable< 'a, C > for Box< T >
+    where C: Context,
+          T: Readable< 'a, C >
+{
+    #[inline]
+    fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
+        Ok( Box::new( T::read_from( reader )? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        T::minimum_bytes_needed()
+    }
+}

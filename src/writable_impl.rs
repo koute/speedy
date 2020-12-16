@@ -541,3 +541,18 @@ impl_for_array!( 5 );
 impl_for_array!( 6 );
 impl_for_array!( 7 );
 impl_for_array!( 8 );
+
+impl< C, T > Writable< C > for Box< T >
+    where C: Context,
+          T: Writable< C >
+{
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        (**self).write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        (**self).bytes_needed()
+    }
+}

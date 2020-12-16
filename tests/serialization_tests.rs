@@ -986,6 +986,12 @@ symmetric_tests! {
         ],
         minimum_bytes = 12
     }
+    boxed for Box< u8 > {
+        in = Box::new( 10 ),
+        le = [10],
+        be = [10],
+        minimum_bytes = 1
+    }
     derived_struct for DerivedStruct {
         in = DerivedStruct { a: 1, b: 2, c: 3 },
         le = [1, 2, 0, 3, 0, 0, 0],
