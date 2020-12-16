@@ -144,6 +144,84 @@ fn test_possibly_uses_generic_ty() {
     assert_test!( true, Vec<T> );
 }
 
+fn is_guaranteed_non_recursive( ty: &syn::Type ) -> bool {
+    match ty {
+        syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
+            if segments.len() != 1 {
+                return false;
+            }
+
+            let segment = &segments[ 0 ];
+            let ident = segment.ident.to_string();
+            match ident.as_str() {
+                "String" | "Vec" | "BTreeSet" | "BTreeMap" | "HashSet" | "HashMap" |
+                "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" | "usize" | "isize" |
+                "str" => {},
+                _ => return false
+            }
+
+            match segment.arguments {
+                syn::PathArguments::None => true,
+                syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { ref args, .. } ) => {
+                    args.iter().all( |arg| {
+                            match arg {
+                                syn::GenericArgument::Lifetime( .. ) => true,
+                                syn::GenericArgument::Type( inner_ty ) => is_guaranteed_non_recursive( inner_ty ),
+                                // TODO: How to handle these?
+                                syn::GenericArgument::Binding( .. ) => false,
+                                syn::GenericArgument::Constraint( .. ) => false,
+                                syn::GenericArgument::Const( .. ) => false
+                            }
+                        })
+                },
+                _ => false
+            }
+        },
+        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
+        syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().all( |elem| is_guaranteed_non_recursive( elem ) ),
+        syn::Type::Reference( syn::TypeReference { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
+        syn::Type::Paren( syn::TypeParen { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
+        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
+        syn::Type::Group( syn::TypeGroup { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
+        syn::Type::Array( syn::TypeArray { elem, len, .. } ) => {
+            if !is_guaranteed_non_recursive( &elem ) {
+                return false;
+            }
+
+            // This is probably too conservative.
+            match len {
+                syn::Expr::Lit( .. ) => true,
+                _ => false
+            }
+        },
+        syn::Type::Never( .. ) => true,
+        _ => false
+    }
+}
+
+#[test]
+fn test_is_guaranteed_non_recursive() {
+    macro_rules! assert_test {
+        ($result:expr, $($token:tt)+) => {
+            assert_eq!(
+                is_guaranteed_non_recursive( &syn::parse2( quote! { $($token)+ } ).unwrap() ),
+                $result
+            );
+        }
+    }
+
+    assert_test!( true, String );
+    assert_test!( true, u8 );
+    assert_test!( true, () );
+    assert_test!( true, *const u8 );
+    assert_test!( true, [u8; 2] );
+    assert_test!( true, (u8, u16) );
+    assert_test!( true, ! );
+    assert_test!( true, Vec< u8 > );
+    assert_test!( false, T );
+    assert_test!( false, Vec< T > );
+}
+
 fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Trait ) -> (TokenStream, TokenStream, TokenStream) {
     let impl_params = {
         let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
@@ -486,6 +564,10 @@ impl< 'a > Struct< 'a > {
 
         Ok( structure )
     }
+
+    fn is_guaranteed_non_recursive( &self ) -> bool {
+        self.fields.iter().all( |field| field.is_guaranteed_non_recursive() )
+    }
 }
 
 struct Field< 'a > {
@@ -536,6 +618,10 @@ impl< 'a > Field< 'a > {
             | Ty::CowStr( .. ) => vec![],
             | Ty::Ty( _ ) => vec![ self.raw_ty.clone() ]
         }
+    }
+
+    fn is_guaranteed_non_recursive( &self ) -> bool {
+        is_guaranteed_non_recursive( &self.raw_ty )
     }
 }
 
@@ -1558,7 +1644,9 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 });
 
                 if variant.structure.kind != StructKind::Unit {
-                    variant_minimum_sizes.push( minimum_bytes );
+                    if variant.structure.is_guaranteed_non_recursive() {
+                        variant_minimum_sizes.push( minimum_bytes );
+                    }
                 }
             }
 

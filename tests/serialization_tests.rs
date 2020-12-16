@@ -518,6 +518,13 @@ enum DerivedEnumWithPeekTagU8 {
     Two( u8 )
 }
 
+#[derive(PartialEq, Debug, Readable, Writable)]
+#[speedy(tag_type = u8)]
+enum DerivedRecursiveEnum {
+    None,
+    Some( Box< DerivedRecursiveEnum > )
+}
+
 // This is here only to make sure it compiles.
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithTwoDifferentCows< 'a > {
@@ -1344,6 +1351,12 @@ symmetric_tests! {
         in = DerivedEnumWithPeekTagU8::One( 1 ),
         le = [1],
         be = [1],
+        minimum_bytes = 1
+    }
+    derived_recursive_enum for DerivedRecursiveEnum {
+        in = DerivedRecursiveEnum::Some( Box::new( DerivedRecursiveEnum::None ) ),
+        le = [1, 0],
+        be = [1, 0],
         minimum_bytes = 1
     }
 }
