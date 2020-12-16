@@ -66,7 +66,7 @@ fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> 
     match ty {
         syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
             segments.iter().any( |segment| {
-                if generic_types.iter().any( |&ident| ident == &segments[ 0 ].ident ) {
+                if generic_types.iter().any( |&ident| *ident == segment.ident ) {
                     return true;
                 }
 
@@ -132,6 +132,7 @@ fn test_possibly_uses_generic_ty() {
     assert_test!( false, ! );
     assert_test!( false, [u8; 2] );
     assert_test!( true, T );
+    assert_test!( true, Dummy::T );
     assert_test!( true, Cow<'a, BTreeMap<T, u8>> );
     assert_test!( true, Cow<'a, BTreeMap<u8, T>> );
     assert_test!( true, Cow<'a, [T]> );
