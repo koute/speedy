@@ -330,8 +330,8 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer_owned( buffer: &[u8] ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
-        Self::read_from_buffer_owned_with_ctx( Default::default(), buffer )
+    fn read_from_buffer_copying_data( buffer: &[u8] ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+        Self::read_from_buffer_copying_data_with_ctx( Default::default(), buffer )
     }
 
     /// Reads from a given stream without any buffering.
@@ -384,7 +384,7 @@ pub trait Readable< 'a, C: Context >: Sized {
     }
 
     #[inline]
-    fn read_from_buffer_owned_with_ctx( context: C, buffer: &[u8] ) -> Result< Self, C::Error > {
+    fn read_from_buffer_copying_data_with_ctx( context: C, buffer: &[u8] ) -> Result< Self, C::Error > {
         let bytes_needed = Self::minimum_bytes_needed();
         let buffer_length = buffer.len();
         if buffer_length < bytes_needed {

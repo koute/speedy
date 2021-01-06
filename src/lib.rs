@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn simple_read_bytes_from_buffer_owned() {
         let data = vec![ 2, 0, 0, 0, 12, 34 ];
-        let value: Cow< [u8] > = Readable::read_from_buffer_owned_with_ctx( Endianness::LittleEndian, &data ).unwrap();
+        let value: Cow< [u8] > = Readable::read_from_buffer_copying_data_with_ctx( Endianness::LittleEndian, &data ).unwrap();
         assert_eq!( &*value, &[12, 34] );
         assert_ne!( value.as_ptr(), data[ 4.. ].as_ptr() );
     }
@@ -125,9 +125,9 @@ mod tests {
     }
 
     #[test]
-    fn read_from_buffer_owned_with_default_ctx() {
+    fn read_from_buffer_copying_data_with_default_ctx() {
         let data = vec![ 2, 0 ];
-        let value = u16::read_from_buffer_owned( &data ).unwrap();
+        let value = u16::read_from_buffer_copying_data( &data ).unwrap();
         assert_eq!( value, 2 );
     }
 

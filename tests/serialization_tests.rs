@@ -39,7 +39,7 @@ macro_rules! symmetric_tests {
             fn round_trip_le_owned() {
                 let original: $type = $value;
                 let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer_owned_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_copying_data_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 
@@ -63,7 +63,7 @@ macro_rules! symmetric_tests {
             fn round_trip_be_owned() {
                 let original: $type = $value;
                 let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer_owned_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_copying_data_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
                 assert_eq!( original, deserialized );
             }
 
