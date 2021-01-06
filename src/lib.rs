@@ -21,6 +21,9 @@ mod ext_chrono;
 #[cfg(feature = "smallvec")]
 mod ext_smallvec;
 
+#[cfg(feature = "regex")]
+mod ext_regex;
+
 #[doc(hidden)]
 pub mod private;
 
