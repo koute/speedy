@@ -1,5 +1,3 @@
-[![Build Status](https://api.travis-ci.org/koute/speedy.svg)](https://travis-ci.org/koute/speedy)
-
 # A fast binary serialization framework
 
 [![Documentation](https://docs.rs/speedy/badge.svg)](https://docs.rs/speedy/*/speedy/)
