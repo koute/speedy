@@ -131,8 +131,7 @@ pub trait Writable< C: Context > {
         self.write_to_buffer_with_ctx( Default::default(), buffer )
     }
 
-    #[inline]
-    fn write_to_vec( &self) -> Result< Vec< u8 >, C::Error > where Self: DefaultContext< Context = C >, C: Default {
+    fn write_to_vec( &self ) -> Result< Vec< u8 >, C::Error > where Self: DefaultContext< Context = C >, C: Default {
         self.write_to_vec_with_ctx( Default::default() )
     }
 
