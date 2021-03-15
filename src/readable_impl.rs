@@ -455,6 +455,14 @@ macro_rules! repeat {
     (6, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr] };
     (7, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr] };
     (8, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (9, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (10, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (11, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (12, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (13, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (14, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (15, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (16, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
 }
 
 macro_rules! impl_for_array {
@@ -482,6 +490,14 @@ impl_for_array!( 5 );
 impl_for_array!( 6 );
 impl_for_array!( 7 );
 impl_for_array!( 8 );
+impl_for_array!( 9 );
+impl_for_array!( 10 );
+impl_for_array!( 11 );
+impl_for_array!( 12 );
+impl_for_array!( 13 );
+impl_for_array!( 14 );
+impl_for_array!( 15 );
+impl_for_array!( 16 );
 
 impl< 'a, C, T > Readable< 'a, C > for Box< T >
     where C: Context,
