@@ -17,7 +17,7 @@ use crate::error::{
 };
 
 struct BufferCollector< 'a, C: Context > {
-    context: C,
+    context: &'a mut C,
     buffer: &'a mut [u8],
     position: usize
 }
@@ -146,7 +146,12 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn write_to_buffer_with_ctx( &self, context: C, buffer: &mut [u8] ) -> Result< (), C::Error > {
+    fn write_to_buffer_with_ctx( &self, mut context: C, buffer: &mut [u8] ) -> Result< (), C::Error > {
+        self.write_to_buffer_with_ctx_mut( &mut context, buffer )
+    }
+
+    #[inline]
+    fn write_to_buffer_with_ctx_mut( &self, context: &mut C, buffer: &mut [u8] ) -> Result< (), C::Error > {
         let bytes_needed = self.bytes_needed()?;
         let buffer_length = buffer.len();
         let buffer = buffer.get_mut( 0..bytes_needed ).ok_or_else( || error_output_buffer_is_too_small( buffer_length, bytes_needed ) )?;
@@ -161,7 +166,12 @@ pub trait Writable< C: Context > {
     }
 
     #[inline]
-    fn write_to_vec_with_ctx( &self, context: C ) -> Result< Vec< u8 >, C::Error > {
+    fn write_to_vec_with_ctx( &self, mut context: C ) -> Result< Vec< u8 >, C::Error > {
+        self.write_to_vec_with_ctx_mut( &mut context )
+    }
+
+    #[inline]
+    fn write_to_vec_with_ctx_mut( &self, context: &mut C ) -> Result< Vec< u8 >, C::Error > {
         let capacity = self.bytes_needed()?;
         let mut vec = Vec::with_capacity( capacity );
         unsafe {
