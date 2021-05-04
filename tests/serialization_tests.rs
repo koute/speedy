@@ -999,6 +999,20 @@ symmetric_tests! {
         be = [10],
         minimum_bytes = 1
     }
+    boxed_slice for Box< [u8] > {
+        in = vec![ 10, 11 ].into(),
+        le = [
+            2, 0, 0, 0,
+            10,
+            11
+        ],
+        be = [
+            0, 0, 0, 2,
+            10,
+            11
+        ],
+        minimum_bytes = 4
+    }
     derived_struct for DerivedStruct {
         in = DerivedStruct { a: 1, b: 2, c: 3 },
         le = [1, 2, 0, 3, 0, 0, 0],

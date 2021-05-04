@@ -513,3 +513,19 @@ impl< 'a, C, T > Readable< 'a, C > for Box< T >
         T::minimum_bytes_needed()
     }
 }
+
+impl< 'a, C, T > Readable< 'a, C > for Box< [T] >
+    where C: Context,
+          T: Readable< 'a, C >
+{
+    #[inline]
+    fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
+        let data = Vec::< T >::read_from( reader )?;
+        Ok( data.into() )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        Vec::< T >::minimum_bytes_needed()
+    }
+}
