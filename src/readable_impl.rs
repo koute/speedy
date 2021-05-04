@@ -529,3 +529,18 @@ impl< 'a, C, T > Readable< 'a, C > for Box< [T] >
         Vec::< T >::minimum_bytes_needed()
     }
 }
+
+impl< 'a, C > Readable< 'a, C > for Box< str >
+    where C: Context
+{
+    #[inline]
+    fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
+        let data = String::read_from( reader )?;
+        Ok( data.into() )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <String as Readable< 'a, C >>::minimum_bytes_needed()
+    }
+}

@@ -1013,6 +1013,12 @@ symmetric_tests! {
         ],
         minimum_bytes = 4
     }
+    boxed_str for Box< str > {
+        in = "Hello".into(),
+        le = [5, 0, 0, 0, 72, 101, 108, 108, 111],
+        be = [0, 0, 0, 5, 72, 101, 108, 108, 111],
+        minimum_bytes = 4
+    }
     derived_struct for DerivedStruct {
         in = DerivedStruct { a: 1, b: 2, c: 3 },
         le = [1, 2, 0, 3, 0, 0, 0],
