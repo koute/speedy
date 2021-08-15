@@ -1628,7 +1628,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
 }
 
 fn assign_to_variables< 'a >( fields: impl IntoIterator< Item = &'a Field< 'a > > ) -> TokenStream {
-    let fields: Vec< _ > = fields.into_iter().map( |field| {
+    let fields: Vec< _ > = fields.into_iter().filter(|field| !field.skip).map( |field| {
         let var_name = field.var_name();
         let name = field.name();
 
