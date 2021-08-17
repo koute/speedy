@@ -1,5 +1,4 @@
-#![cfg_attr(feature = "external_doc", feature(external_doc))]
-#![cfg_attr(feature = "external_doc", doc(include = "../README.md"))]
+#![cfg_attr(feature = "external_doc", doc = include_str!("../README.md"))]
 
 mod error;
 #[macro_use]
