@@ -588,6 +588,17 @@ atomic_wrapper!( AtomicU32, u32 );
 atomic_wrapper!( AtomicI64, i64 );
 atomic_wrapper!( AtomicU64, u64 );
 
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+struct TransparentU8( u8 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+struct TransparentU32( u32 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct NonTransparentU8( u8 );
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -747,6 +758,12 @@ symmetric_tests! {
         be = [33],
         minimum_bytes = 1
     }
+    transparent_u8 for TransparentU8 {
+        in = TransparentU8(33),
+        le = [33],
+        be = [33],
+        minimum_bytes = 1
+    }
     i8 for i8 {
         in = -33,
         le = [223],
@@ -767,6 +784,12 @@ symmetric_tests! {
     }
     u32 for u32 {
         in = 33,
+        le = [33, 0, 0, 0],
+        be = [0, 0, 0, 33],
+        minimum_bytes = 4
+    }
+    transparent_u32 for TransparentU32 {
+        in = TransparentU32(33),
         le = [33, 0, 0, 0],
         be = [0, 0, 0, 33],
         minimum_bytes = 4
@@ -1508,4 +1531,10 @@ fn test_minimum_bytes_needed() {
     };
 
     assert_eq!( <DerivedStructWithDefaultOnEof as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+}
+
+#[test]
+fn test_derive_transparent() {
+    assert!( <TransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( !<NonTransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
 }
