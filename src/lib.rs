@@ -17,6 +17,9 @@ mod circular_buffer;
 #[cfg(feature = "chrono")]
 mod ext_chrono;
 
+#[cfg(feature = "glam")]
+mod ext_glam;
+
 #[cfg(feature = "smallvec")]
 mod ext_smallvec;
 

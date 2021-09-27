@@ -15,6 +15,7 @@ edition = "2018"
 [dependencies]
 speedy-derive = { version = "= 0.8.0", path = "speedy-derive", optional = true }
 chrono = { version = "0.4", optional = true }
+glam = { version = "0.17", optional = true }
 smallvec = { version = "1", optional = true }
 regex = { version = "1", optional = true, default-features = false }
 
