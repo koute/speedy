@@ -283,7 +283,7 @@ pub trait Reader< 'a, C: Context >: Sized {
                 let length = vec.len();
                 unsafe {
                     vec.set_len( length + 1 );
-                    std::ptr::write( vec.as_mut_ptr().offset( length as isize ), value );
+                    std::ptr::write( vec.as_mut_ptr().add(length), value );
                 }
             }
 

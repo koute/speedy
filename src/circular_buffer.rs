@@ -334,7 +334,7 @@ impl CircularBuffer {
 
         self.buffer[ range_1.clone() ].copy_from_slice( &slice[ ..range_1.len() ] );
         if let Some( range_2 ) = range_2 {
-            self.buffer[ range_2.clone() ].copy_from_slice( &slice[ range_1.len().. ] );
+            self.buffer[ range_2 ].copy_from_slice( &slice[ range_1.len().. ] );
         }
 
         self.length += slice.len();
@@ -391,17 +391,17 @@ fn test_circular_buffer_basic() {
     let mut buf = CircularBuffer::new();
     assert_eq!( buf.len(), 0 );
     assert_eq!( buf.capacity(), 0 );
-    assert_eq!( buf.is_empty(), true );
+    assert!( buf.is_empty() );
 
     buf.reserve_exact( 3 );
     assert_eq!( buf.len(), 0 );
     assert_eq!( buf.capacity(), 3 );
-    assert_eq!( buf.is_empty(), true );
+    assert!( buf.is_empty() );
 
     buf.extend_from_slice( &[1, 2] );
     assert_eq!( buf.len(), 2 );
     assert_eq!( buf.capacity(), 3 );
-    assert_eq!( buf.is_empty(), false );
+    assert!( !buf.is_empty() );
     assert_eq!( buf.as_slices(), (&[1, 2][..], None) );
     assert_eq!( buf.to_vec(), vec![1, 2] );
     assert_eq!( buf.as_slices_of_length(0), (&[][..], None) );
@@ -505,7 +505,7 @@ quickcheck::quickcheck! {
                 assert_eq!( buffer.len(), control_buffer.len() );
                 assert_eq!( buffer.to_vec(), control_buffer );
 
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let expected = control_buffer.remove( 0 );
                     let mut actual = [!expected];
                     buffer.consume_into( &mut actual );
