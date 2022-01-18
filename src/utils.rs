@@ -29,6 +29,8 @@ unsafe impl Primitive for i32 {}
 unsafe impl Primitive for u32 {}
 unsafe impl Primitive for i64 {}
 unsafe impl Primitive for u64 {}
+unsafe impl Primitive for i128 {}
+unsafe impl Primitive for u128 {}
 unsafe impl Primitive for f32 {}
 unsafe impl Primitive for f64 {}
 

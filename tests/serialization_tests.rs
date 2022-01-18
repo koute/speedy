@@ -597,6 +597,10 @@ struct TransparentU8( u8 );
 struct TransparentU32( u32 );
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+struct TransparentU128( u128 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
 struct NonTransparentU8( u8 );
 
 symmetric_tests! {
@@ -829,6 +833,24 @@ symmetric_tests! {
         le = [0, 0, 0, 64, 0, 0, 96, 65],
         be = [65, 96, 0, 0, 64, 0, 0, 0],
         minimum_bytes = 8
+    }
+    transparent_u128 for TransparentU128 {
+        in = TransparentU128(33),
+        le = [33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        be = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33],
+        minimum_bytes = 16
+    }
+    u128 for u128 {
+        in = 33,
+        le = [33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        be = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33],
+        minimum_bytes = 16
+    }
+    i128 for i128 {
+        in = -33,
+        le = [223, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+        be = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 223],
+        minimum_bytes = 16
     }
     atomic_u8 for AtomicU8 {
         in = AtomicU8::new( 33 ),

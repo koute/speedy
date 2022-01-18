@@ -70,9 +70,11 @@ macro_rules! emit_wrapper {
 emit_wrapper!( u16, read_u16, swap_u16, swap_slice_u16 );
 emit_wrapper!( u32, read_u32, swap_u32, swap_slice_u32 );
 emit_wrapper!( u64, read_u64, swap_u64, swap_slice_u64 );
+emit_wrapper!( u128, read_u128, swap_u128, swap_slice_u128 );
 emit_wrapper!( i16, read_i16, swap_i16, swap_slice_i16 );
 emit_wrapper!( i32, read_i32, swap_i32, swap_slice_i32 );
 emit_wrapper!( i64, read_i64, swap_i64, swap_slice_i64 );
+emit_wrapper!( i128, read_i128, swap_i128, swap_slice_i128 );
 
 impl Endianness {
     #[inline]

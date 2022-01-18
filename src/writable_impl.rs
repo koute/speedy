@@ -139,10 +139,12 @@ impl_for_primitive!( i8, write_i8 );
 impl_for_primitive!( i16, write_i16 );
 impl_for_primitive!( i32, write_i32 );
 impl_for_primitive!( i64, write_i64 );
+impl_for_primitive!( i128, write_i128 );
 impl_for_primitive!( u8, write_u8 );
 impl_for_primitive!( u16, write_u16 );
 impl_for_primitive!( u32, write_u32 );
 impl_for_primitive!( u64, write_u64 );
+impl_for_primitive!( u128, write_u128 );
 impl_for_primitive!( f32, write_f32 );
 impl_for_primitive!( f64, write_f64 );
 

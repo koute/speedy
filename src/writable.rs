@@ -108,6 +108,12 @@ impl< C: Context > Writer< C > for SizeCalculatorCollector {
     }
 
     #[inline]
+    fn write_u128( &mut self, _: u128 ) -> Result< (), C::Error > {
+        self.size += 16;
+        Ok(())
+    }
+
+    #[inline]
     fn endianness( &self ) -> Endianness {
         Endianness::NATIVE
     }

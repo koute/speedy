@@ -472,9 +472,9 @@ pub trait Readable< 'a, C: Context >: Sized {
 
 #[test]
 fn test_peek() {
-    let value: f64 = 2.0;
+    let value: &[f64] = &[2.0, 123.0];
     let data = unsafe {
-        std::slice::from_raw_parts( (&value as *const f64) as *const u8, 8 )
+        std::slice::from_raw_parts( value.as_ptr() as *const u8, 16 )
     };
 
     let mut ctx = crate::LittleEndian {};
@@ -492,10 +492,12 @@ fn test_peek() {
 
     test!( peek_f64, read_f64 );
     test!( peek_f32, read_f32 );
+    test!( peek_u128, read_u128 );
     test!( peek_u64, read_u64 );
     test!( peek_u32, read_u32 );
     test!( peek_u16, read_u16 );
     test!( peek_u8, read_u8 );
+    test!( peek_i128, read_i128 );
     test!( peek_i64, read_i64 );
     test!( peek_i32, read_i32 );
     test!( peek_i16, read_i16 );

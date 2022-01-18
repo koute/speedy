@@ -44,6 +44,13 @@ pub trait Writer< C: Context > {
     }
 
     #[inline(always)]
+    fn write_u128( &mut self, mut value: u128 ) -> Result< (), C::Error > {
+        self.context().endianness().swap_u128( &mut value );
+        let slice = unsafe { std::slice::from_raw_parts( &value as *const u128 as *const u8, 16 ) };
+        self.write_bytes( slice )
+    }
+
+    #[inline(always)]
     fn write_i8( &mut self, value: i8 ) -> Result< (), C::Error > {
         self.write_u8( value as u8 )
     }
@@ -61,6 +68,11 @@ pub trait Writer< C: Context > {
     #[inline(always)]
     fn write_i64( &mut self, value: i64 ) -> Result< (), C::Error > {
         self.write_u64( value as u64 )
+    }
+
+    #[inline(always)]
+    fn write_i128( &mut self, value: i128 ) -> Result< (), C::Error > {
+        self.write_u128( value as u128 )
     }
 
     #[inline(always)]
