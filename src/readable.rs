@@ -478,34 +478,29 @@ fn test_peek() {
     };
 
     let mut ctx = crate::LittleEndian {};
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_f64().unwrap(), reader.read_f64().unwrap() );
 
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_f32().unwrap(), reader.read_f32().unwrap() );
+    macro_rules! test {
+        ($peek:ident, $read:ident) => {
+            let mut reader = CopyingBufferReader::new( &mut ctx, data );
+            let value = reader.$peek().unwrap();
+            for _ in 0..8 {
+                assert_eq!( value, reader.$peek().unwrap() );
+            }
+            assert_eq!( value, reader.$read().unwrap() );
+        }
+    }
 
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_u64().unwrap(), reader.read_u64().unwrap() );
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_i64().unwrap(), reader.read_i64().unwrap() );
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_u32().unwrap(), reader.read_u32().unwrap() );
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_i32().unwrap(), reader.read_i32().unwrap() );
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_u16().unwrap(), reader.read_u16().unwrap() );
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_i16().unwrap(), reader.read_i16().unwrap() );
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_u8().unwrap(), reader.read_u8().unwrap() );
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_i8().unwrap(), reader.read_i8().unwrap() );
-
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_u64_varint().unwrap(), reader.read_u64_varint().unwrap() );
-
-    let mut reader = CopyingBufferReader::new( &mut ctx, data );
-    assert_eq!( reader.peek_u64().unwrap(), reader.peek_u64().unwrap() );
+    test!( peek_f64, read_f64 );
+    test!( peek_f32, read_f32 );
+    test!( peek_u64, read_u64 );
+    test!( peek_u32, read_u32 );
+    test!( peek_u16, read_u16 );
+    test!( peek_u8, read_u8 );
+    test!( peek_i64, read_i64 );
+    test!( peek_i32, read_i32 );
+    test!( peek_i16, read_i16 );
+    test!( peek_i8, read_i8 );
+    test!( peek_u64_varint, read_u64_varint );
 
     let mut reader = CopyingBufferReader::new( &mut ctx, data );
     reader.peek_u8().unwrap();

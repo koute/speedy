@@ -67,7 +67,7 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn peek_i8( &mut self ) -> Result< i8, C::Error > {
-        self.read_u8().map( |byte| byte as i8 )
+        self.peek_u8().map( |byte| byte as i8 )
     }
 
     #[inline(always)]
