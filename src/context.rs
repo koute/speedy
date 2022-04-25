@@ -42,6 +42,6 @@ pub trait DefaultContext {
     type Context;
 }
 
-impl< T > DefaultContext for T {
+impl< T > DefaultContext for T where T: ?Sized {
     type Context = LittleEndian;
 }
