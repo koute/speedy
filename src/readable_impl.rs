@@ -3,7 +3,6 @@ use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash};
-use std::num::NonZeroU32;
 
 use crate::readable::Readable;
 use crate::reader::Reader;
@@ -333,18 +332,31 @@ impl< 'a, C: Context > Readable< 'a, C > for Endianness {
     }
 }
 
-impl< 'a, C: Context > Readable< 'a, C > for NonZeroU32 {
-    #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let value = reader.read_u32()?;
-        NonZeroU32::new( value ).ok_or_else( crate::error::error_zero_non_zero )
-    }
+macro_rules! impl_for_non_zero {
+    ($type:ident, $base_type:ty) => {
+        impl< 'a, C: Context > Readable< 'a, C > for std::num::$type {
+            #[inline]
+            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+                let value: $base_type = reader.read_value()?;
+                std::num::$type::new( value ).ok_or_else( crate::error::error_zero_non_zero )
+            }
 
-    #[inline]
-    fn minimum_bytes_needed() -> usize {
-        4
+            #[inline]
+            fn minimum_bytes_needed() -> usize {
+                mem::size_of::< $base_type >()
+            }
+        }
     }
 }
+
+impl_for_non_zero!( NonZeroU8, u8 );
+impl_for_non_zero!( NonZeroU16, u16 );
+impl_for_non_zero!( NonZeroU32, u32 );
+impl_for_non_zero!( NonZeroU64, u64 );
+impl_for_non_zero!( NonZeroI8, i8 );
+impl_for_non_zero!( NonZeroI16, i16 );
+impl_for_non_zero!( NonZeroI32, i32 );
+impl_for_non_zero!( NonZeroI64, i64 );
 
 macro_rules! impl_for_atomic {
     ($type:ident, $base_type:ty) => {

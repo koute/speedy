@@ -2,7 +2,6 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::num::NonZeroU32;
 
 use crate::endianness::Endianness;
 use crate::writable::Writable;
@@ -394,17 +393,30 @@ impl< 'a, C, T > Writable< C > for &'a mut T where C: Context, T: Writable< C > 
     }
 }
 
-impl< C > Writable< C > for NonZeroU32 where C: Context {
-    #[inline]
-    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
-        self.get().write_to( writer )
-    }
+macro_rules! impl_for_non_zero {
+    ($type:ident, $base_type:ty) => {
+        impl< C > Writable< C > for std::num::$type where C: Context {
+            #[inline]
+            fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+                self.get().write_to( writer )
+            }
 
-    #[inline]
-    fn bytes_needed( &self ) -> Result< usize, C::Error > {
-        Ok( 4 )
+            #[inline]
+            fn bytes_needed( &self ) -> Result< usize, C::Error > {
+                Ok( mem::size_of::< $base_type >() )
+            }
+        }
     }
 }
+
+impl_for_non_zero!( NonZeroU8, u8 );
+impl_for_non_zero!( NonZeroU16, u16 );
+impl_for_non_zero!( NonZeroU32, u32 );
+impl_for_non_zero!( NonZeroU64, u64 );
+impl_for_non_zero!( NonZeroI8, i8 );
+impl_for_non_zero!( NonZeroI16, i16 );
+impl_for_non_zero!( NonZeroI32, i32 );
+impl_for_non_zero!( NonZeroI64, i64 );
 
 macro_rules! impl_for_atomic {
     ($type:ident, $base_type:ty) => {
