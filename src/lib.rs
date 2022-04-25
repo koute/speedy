@@ -26,6 +26,9 @@ mod ext_smallvec;
 #[cfg(feature = "regex")]
 mod ext_regex;
 
+#[cfg(feature = "indexmap")]
+mod ext_indexmap;
+
 #[doc(hidden)]
 pub mod private;
 

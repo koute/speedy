@@ -1452,6 +1452,22 @@ symmetric_tests! {
     }
 }
 
+#[cfg(feature = "indexmap")]
+symmetric_tests! {
+    indexmap_u16 for indexmap::IndexMap< u16, bool > {
+        in = vec![ (10, true) ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1],
+        minimum_bytes = 4
+    }
+    indexset_u16 for indexmap::IndexSet< u16 > {
+        in = vec![ 10 ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0],
+        be = [0, 0, 0, 1, 0, 10],
+        minimum_bytes = 4
+    }
+}
+
 #[cfg(feature = "regex")]
 #[test]
 fn test_regex() {
