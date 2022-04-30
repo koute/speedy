@@ -267,6 +267,18 @@ impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where 
     }
 }
 
+impl< 'a, C: Context, T: Writable< C > > Writable< C > for &'a [T] where [T]: ToOwned {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        <[T] as Writable< C >>::write_to( self, writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        <[T] as Writable::< C >>::bytes_needed( self.as_ref() )
+    }
+}
+
 impl< C: Context, T: Writable< C > > Writable< C > for Vec< T > {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
