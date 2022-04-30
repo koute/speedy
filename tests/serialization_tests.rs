@@ -10,13 +10,14 @@ use speedy::{Readable, Writable, Endianness};
 macro_rules! symmetric_tests {
     ($(
         $name:ident for $type:ty {
+            kind = common,
             in = $value:expr,
             le = $le_bytes:expr,
             be = $be_bytes:expr,
             minimum_bytes = $minimum_bytes:expr
         }
-    )*) => { $(
-        mod $name {
+    )*) => { paste::paste! { $(
+        mod [<$name _common_tests>] {
             use super::*;
 
             #[test]
@@ -32,15 +33,8 @@ macro_rules! symmetric_tests {
                 let original: (u8, $type) = (1, $value);
                 let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
                 let deserialized: (u8, $type) = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
-                assert_eq!( original, deserialized );
-            }
-
-            #[test]
-            fn round_trip_le_owned() {
-                let original: $type = $value;
-                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer_copying_data_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
-                assert_eq!( original, deserialized );
+                assert_eq!( original.0, deserialized.0 );
+                assert_eq!( original.1, deserialized.1 );
             }
 
             #[test]
@@ -56,15 +50,8 @@ macro_rules! symmetric_tests {
                 let original: (u8, $type) = (1, $value);
                 let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
                 let deserialized: (u8, $type) = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
-                assert_eq!( original, deserialized );
-            }
-
-            #[test]
-            fn round_trip_be_owned() {
-                let original: $type = $value;
-                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer_copying_data_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
-                assert_eq!( original, deserialized );
+                assert_eq!( original.0, deserialized.0 );
+                assert_eq!( original.1, deserialized.1 );
             }
 
             #[test]
@@ -109,6 +96,36 @@ macro_rules! symmetric_tests {
             fn minimum_bytes() {
                 assert_eq!( <$type as Readable< Endianness >>::minimum_bytes_needed(), $minimum_bytes );
             }
+        }
+    )* } };
+
+    ($(
+        $name:ident for $type:ty {
+            kind = sized,
+            in = $value:expr,
+            le = $le_bytes:expr,
+            be = $be_bytes:expr,
+            minimum_bytes = $minimum_bytes:expr
+        }
+    )*) => { paste::paste! { $(
+        mod [<$name _sized_tests>] {
+            use super::*;
+
+            #[test]
+            fn round_trip_le_owned() {
+                let original: $type = $value;
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_copying_data_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
+                assert_eq!( original, deserialized );
+            }
+
+            #[test]
+            fn round_trip_be_owned() {
+                let original: $type = $value;
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_copying_data_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
+                assert_eq!( original, deserialized );
+            }
 
             #[test]
             fn read_from_stream_unbuffered_only_reads_what_is_necessary() {
@@ -144,7 +161,36 @@ macro_rules! symmetric_tests {
                 }
             }
         }
-    )* }
+    )* } };
+
+    ($(
+        $name:ident for $type:ty {
+            in = $value:expr,
+            le = $le_bytes:expr,
+            be = $be_bytes:expr,
+            minimum_bytes = $minimum_bytes:expr
+        }
+    )*) => { $(
+        symmetric_tests! {
+            $name for $type {
+                kind = common,
+                in = $value,
+                le = $le_bytes,
+                be = $be_bytes,
+                minimum_bytes = $minimum_bytes
+            }
+        }
+
+        symmetric_tests! {
+            $name for $type {
+                kind = sized,
+                in = $value,
+                le = $le_bytes,
+                be = $be_bytes,
+                minimum_bytes = $minimum_bytes
+            }
+        }
+    )* };
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -602,6 +648,12 @@ struct TransparentU128( u128 );
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 struct NonTransparentU8( u8 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedRefStr< 'a >( &'a str );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedRefSliceU8< 'a >( &'a [u8] );
 
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
@@ -1423,6 +1475,53 @@ symmetric_tests! {
         le = [1, 0],
         be = [1, 0],
         minimum_bytes = 1
+    }
+}
+
+symmetric_tests! {
+    ref_str for &str {
+        kind = common,
+        in = "Hello",
+        le = [5, 0, 0, 0, 72, 101, 108, 108, 111],
+        be = [0, 0, 0, 5, 72, 101, 108, 108, 111],
+        minimum_bytes = 4
+    }
+    derived_ref_str for DerivedRefStr {
+        kind = common,
+        in = DerivedRefStr( "Hello" ),
+        le = [5, 0, 0, 0, 72, 101, 108, 108, 111],
+        be = [0, 0, 0, 5, 72, 101, 108, 108, 111],
+        minimum_bytes = 4
+    }
+    ref_slice_u8 for &[u8] {
+        kind = common,
+        in = &[10, 11],
+        le = [
+            2, 0, 0, 0,
+            10,
+            11
+        ],
+        be = [
+            0, 0, 0, 2,
+            10,
+            11
+        ],
+        minimum_bytes = 4
+    }
+    derived_ref_slice_u8 for DerivedRefSliceU8 {
+        kind = common,
+        in = DerivedRefSliceU8( &[10, 11] ),
+        le = [
+            2, 0, 0, 0,
+            10,
+            11
+        ],
+        be = [
+            0, 0, 0, 2,
+            10,
+            11
+        ],
+        minimum_bytes = 4
     }
 }
 

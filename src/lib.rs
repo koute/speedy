@@ -5,6 +5,7 @@ mod error;
 mod utils;
 mod readable;
 mod readable_impl;
+mod readable_unsized_impl;
 mod reader;
 mod writable;
 mod writable_impl;
