@@ -1950,17 +1950,69 @@ fn assign_to_variables< 'a >( fields: impl IntoIterator< Item = &'a Field< 'a > 
 fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error > {
     let name = &input.ident;
     let mut types = Vec::new();
-    let writer_body = match input.data {
+    let (writer_body, impl_primitive) = match input.data {
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
             let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
             let st = Struct::new( fields, attrs )?;
-            let is_packed = is_packed( &input.attrs );
-            let assignments = assign_to_variables( &st.fields, is_packed );
+            let is_ty_packed = is_packed( &input.attrs );
+            let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
+            let assignments = assign_to_variables( &st.fields, is_ty_packed );
             let (body, _) = writable_body( &mut types, &st );
-            quote! {
+
+            let impl_primitive =
+                if is_ty_transparent {
+                    let ty = &st.fields[ 0 ].raw_ty;
+                    quote! {
+                        #[inline(always)]
+                        fn speedy_is_primitive() -> bool {
+                            <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
+                        }
+
+                        #[inline(always)]
+                        unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
+                            unsafe {
+                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
+                            }
+                        }
+                    }
+                } else if is_ty_packed {
+                    let mut body_is_primitive = Vec::new();
+                    for field in &st.fields {
+                        if !body_is_primitive.is_empty() {
+                            body_is_primitive.push( quote! {
+                                &&
+                            });
+                        }
+
+                        let ty = &field.raw_ty;
+                        body_is_primitive.push( quote! {
+                            <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
+                        });
+                    }
+
+                    quote! {
+                        #[inline(always)]
+                        fn speedy_is_primitive() -> bool {
+                            #(#body_is_primitive)*
+                        }
+
+                        #[inline(always)]
+                        unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
+                            unsafe {
+                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
+                            }
+                        }
+                    }
+                } else {
+                    quote! {}
+                };
+
+            let impl_body = quote! {
                 #assignments
                 #body
-            }
+            };
+
+            (impl_body, impl_primitive)
         },
         syn::Data::Enum( syn::DataEnum { ref variants, .. } ) => {
             let enumeration = Enum::new( &name, &input.attrs, &variants )?;
@@ -1997,7 +2049,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 })
                 .collect();
             let variants = variants?;
-            quote! { match *self { #(#variants),* } }
+            (quote! { match *self { #(#variants),* } }, quote! {})
         },
         syn::Data::Union( syn::DataUnion { union_token, .. } ) => {
             let message = "Unions are not supported!";
@@ -2013,6 +2065,8 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 #writer_body
                 Ok(())
             }
+
+            #impl_primitive
         }
     };
 

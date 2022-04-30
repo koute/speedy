@@ -1915,4 +1915,14 @@ fn test_derive_transparent() {
     assert!( <TransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
     assert!( <TransparentU16 as Readable< Endianness >>::speedy_is_primitive() );
     assert!( !<NonTransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
+
+    assert!( <TransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <TransparentU16 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( !<NonTransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
+}
+
+#[test]
+fn test_derive_packed() {
+    assert!( !<DerivedTupleStruct as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <DerivedPackedTuple as Writable< Endianness >>::speedy_is_primitive() );
 }
