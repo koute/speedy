@@ -207,6 +207,18 @@ impl< C: Context > Writable< C > for str {
     }
 }
 
+impl< 'a, C: Context > Writable< C > for &'a str {
+    #[inline]
+    fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
+        self.as_bytes().write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Writable::< C >::bytes_needed( self.as_bytes() )
+    }
+}
+
 impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
     #[inline]
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
