@@ -205,6 +205,7 @@ mod tests {
         assert_eq!( original, deserialized );
     }
 
+    #[cfg(not(miri))]
     #[test]
     fn read_big_vector_of_vectors_from_stream_buffered() {
         const fn hash32( x: u32 ) -> u32 {

@@ -477,6 +477,7 @@ fn test_circular_buffer_append_and_consume() {
     }
 }
 
+#[cfg(not(miri))]
 #[cfg(test)]
 quickcheck::quickcheck! {
     fn test_circular_buffer_quickcheck_try_append_with( data: Vec< Vec< u8 > > ) -> bool {
