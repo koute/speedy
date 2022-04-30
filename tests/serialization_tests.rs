@@ -652,6 +652,10 @@ atomic_wrapper!( AtomicU64, u64 );
 #[repr(transparent)]
 struct TransparentU8( u8 );
 
+#[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+struct TransparentU16( u16 );
+
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
 struct TransparentU32( u32 );
@@ -1687,6 +1691,78 @@ symmetric_tests! {
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
+    vec_packed_tuple for Vec< DerivedPackedTuple > {
+        kind = common,
+        in = vec![
+            DerivedPackedTuple( 33, 66 ),
+            DerivedPackedTuple( 100, 200 ),
+        ],
+        le = [
+            2, 0, 0, 0,
+            33, 0, 66, 0,
+            100, 0, 200, 0,
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33, 0, 66,
+            0, 100, 0, 200,
+        ],
+        minimum_bytes = 4
+    }
+    vec_transparent_u16 for Vec< TransparentU16 > {
+        kind = common,
+        in = vec![
+            TransparentU16( 33 ),
+            TransparentU16( 100 ),
+        ],
+        le = [
+            2, 0, 0, 0,
+            33, 0,
+            100, 0,
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33,
+            0, 100,
+        ],
+        minimum_bytes = 4
+    }
+    cow_slice_packed_tuple for Cow< [DerivedPackedTuple] > {
+        kind = common,
+        in = Cow::Owned( vec![
+            DerivedPackedTuple( 33, 66 ),
+            DerivedPackedTuple( 100, 200 ),
+        ]),
+        le = [
+            2, 0, 0, 0,
+            33, 0, 66, 0,
+            100, 0, 200, 0,
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33, 0, 66,
+            0, 100, 0, 200,
+        ],
+        minimum_bytes = 4
+    }
+    cow_slice_transparent_u16 for Cow< [TransparentU16] > {
+        kind = common,
+        in = Cow::Owned( vec![
+            TransparentU16( 33 ),
+            TransparentU16( 100 ),
+        ]),
+        le = [
+            2, 0, 0, 0,
+            33, 0,
+            100, 0,
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33,
+            0, 100,
+        ],
+        minimum_bytes = 4
+    }
 }
 
 #[cfg(feature = "chrono")]
@@ -1837,5 +1913,6 @@ fn test_minimum_bytes_needed() {
 #[test]
 fn test_derive_transparent() {
     assert!( <TransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <TransparentU16 as Readable< Endianness >>::speedy_is_primitive() );
     assert!( !<NonTransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
 }
