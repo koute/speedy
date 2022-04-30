@@ -711,6 +711,10 @@ struct DerivedRefStrUntilEof< 'a >(
     &'a str
 );
 
+#[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(packed)]
+struct DerivedPackedTuple( u16, u16 );
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -893,6 +897,12 @@ symmetric_tests! {
         le = [223, 255],
         be = [255, 223],
         minimum_bytes = 2
+    }
+    packed_tuple_u16 for DerivedPackedTuple {
+        in = DerivedPackedTuple( 33, 66 ),
+        le = [33, 0, 66, 0],
+        be = [0, 33, 0, 66],
+        minimum_bytes = 4
     }
     u32 for u32 {
         in = 33,

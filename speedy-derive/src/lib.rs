@@ -458,6 +458,20 @@ fn is_transparent( attrs: &[syn::Attribute] ) -> bool {
     result
 }
 
+fn is_packed( attrs: &[syn::Attribute] ) -> bool {
+    let mut result = false;
+    for raw_attr in attrs {
+        let path = raw_attr.path.clone().into_token_stream().to_string();
+        if path != "repr" {
+            continue;
+        }
+
+        result = raw_attr.tokens.clone().into_token_stream().to_string() == "(packed)";
+    }
+
+    result
+}
+
 fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::Error > where T: syn::parse::Parse {
     struct RawAttributes< T >( syn::punctuated::Punctuated< T, Token![,] > );
 
@@ -1911,13 +1925,20 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     Ok( output )
 }
 
-fn assign_to_variables< 'a >( fields: impl IntoIterator< Item = &'a Field< 'a > > ) -> TokenStream {
+fn assign_to_variables< 'a >( fields: impl IntoIterator< Item = &'a Field< 'a > >, is_packed: bool ) -> TokenStream {
     let fields: Vec< _ > = fields.into_iter().filter(|field| !field.skip).map( |field| {
         let var_name = field.var_name();
         let name = field.name();
 
-        quote! {
-            let #var_name = &self.#name;
+        if !is_packed {
+            quote! {
+                let #var_name = &self.#name;
+            }
+        } else {
+            quote! {
+                let #var_name = self.#name;
+                let #var_name = &#var_name;
+            }
         }
     }).collect();
 
@@ -1933,7 +1954,8 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
             let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
             let st = Struct::new( fields, attrs )?;
-            let assignments = assign_to_variables( &st.fields );
+            let is_packed = is_packed( &input.attrs );
+            let assignments = assign_to_variables( &st.fields, is_packed );
             let (body, _) = writable_body( &mut types, &st );
             quote! {
                 #assignments
