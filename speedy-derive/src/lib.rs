@@ -589,7 +589,7 @@ struct Field< 'a > {
     name: Option< &'a syn::Ident >,
     raw_ty: &'a syn::Type,
     default_on_eof: bool,
-    length: Option< syn::Expr >,
+    length: Option< LengthKind >,
     length_type: Option< BasicType >,
     ty: Opt< Ty >,
     skip: bool,
@@ -639,13 +639,30 @@ impl< 'a > Field< 'a > {
     }
 }
 
+enum LengthKind {
+    Expr( syn::Expr ),
+    UntilEndOfFile
+}
+
+impl syn::parse::Parse for LengthKind {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        if input.peek( Token![..] ) {
+            let _: Token![..] = input.parse()?;
+            Ok( LengthKind::UntilEndOfFile )
+        } else {
+            let expr: syn::Expr = input.parse()?;
+            Ok( LengthKind::Expr( expr ) )
+        }
+    }
+}
+
 enum FieldAttribute {
     DefaultOnEof {
         key_span: Span
     },
     Length {
         key_span: Span,
-        expr: syn::Expr
+        length_kind: LengthKind
     },
     LengthType {
         key_span: Span,
@@ -671,10 +688,10 @@ impl syn::parse::Parse for FieldAttribute {
         } else if lookahead.peek( kw::length ) {
             let key_token = input.parse::< kw::length >()?;
             let _: Token![=] = input.parse()?;
-            let expr: syn::Expr = input.parse()?;
+            let length_kind: LengthKind = input.parse()?;
             FieldAttribute::Length {
                 key_span: key_token.span(),
-                expr
+                length_kind
             }
         } else if lookahead.peek( kw::length_type ) {
             let key_token = input.parse::< kw::length_type>()?;
@@ -957,9 +974,15 @@ fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
 }
 
 fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) -> Result< Vec< Field< 'a > >, syn::Error > {
+    let mut length_until_eof_seen = false;
     let iter = fields.into_iter()
         .enumerate()
         .map( |(index, field)| {
+            if length_until_eof_seen {
+                let message = "The field with 'length = ..' has to be the last field; found another field";
+                return Err( syn::Error::new( field.span(), message ) );
+            }
+
             let mut default_on_eof = None;
             let mut length = None;
             let mut length_type = None;
@@ -975,13 +998,17 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
 
                         default_on_eof = Some( key_span );
                     }
-                    FieldAttribute::Length { key_span, expr } => {
+                    FieldAttribute::Length { key_span, length_kind } => {
                         if length.is_some() {
                             let message = "Duplicate 'length'";
                             return Err( syn::Error::new( key_span, message ) );
                         }
 
-                        length = Some( (key_span, expr) );
+                        if matches!( length_kind, LengthKind::UntilEndOfFile ) {
+                            length_until_eof_seen = true;
+                        }
+
+                        length = Some( (key_span, length_kind) );
                     }
                     FieldAttribute::LengthType { key_span, ty } => {
                         if length_type.is_some() {
@@ -1146,7 +1173,8 @@ fn read_field_body( field: &Field ) -> TokenStream {
     }
 
     let read_length_body = match field.length {
-        Some( ref length ) => quote! { ((#length) as usize) },
+        Some( LengthKind::Expr( ref length ) ) => Some( quote! { ((#length) as usize) } ),
+        Some( LengthKind::UntilEndOfFile ) => None,
         None => {
             let read_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
                 BasicType::U7 => quote! { read_length_u7 },
@@ -1162,48 +1190,90 @@ fn read_field_body( field: &Field ) -> TokenStream {
             };
 
             if field.default_on_eof {
-                default_on_eof_body( body )
+                Some( default_on_eof_body( body ) )
             } else {
-                quote! { #body? }
+                Some( quote! { #body? } )
             }
         }
     };
 
-    let read_string = ||
-        quote! {{
-            let _length_ = #read_length_body;
-            _reader_.read_vec( _length_ ).and_then( speedy::private::vec_to_string )
-        }};
+    let read_string = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_vec( _length_ ).and_then( speedy::private::vec_to_string )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_vec_until_eof().and_then( speedy::private::vec_to_string )
+            }}
+        }
+    };
 
-    let read_vec = ||
-        quote! {{
-            let _length_ = #read_length_body;
-            _reader_.read_vec( _length_ )
-        }};
+    let read_vec = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_vec( _length_ )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_vec_until_eof()
+            }}
+        }
+    };
 
-    let read_cow_slice = ||
-        quote! {{
-            let _length_ = #read_length_body;
-            _reader_.read_cow( _length_ )
-        }};
+    let read_cow_slice = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_cow( _length_ )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_cow_until_eof()
+            }}
+        }
+    };
 
-    let read_cow_str = ||
-        quote! {{
-            let _length_ = #read_length_body;
-            _reader_.read_cow( _length_ ).and_then( speedy::private::cow_bytes_to_cow_str )
-        }};
+    let read_cow_str = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_cow( _length_ ).and_then( speedy::private::cow_bytes_to_cow_str )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_cow_until_eof().and_then( speedy::private::cow_bytes_to_cow_str )
+            }}
+        }
+    };
 
-    let read_collection = ||
-        quote! {{
-            let _length_ = #read_length_body;
-            _reader_.read_collection( _length_ )
-        }};
+    let read_collection = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_collection( _length_ )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_collection_until_eof()
+            }}
+        }
+    };
 
-    let read_cow_collection = ||
-        quote! {{
-            let _length_ = #read_length_body;
-            _reader_.read_collection( _length_ ).map( std::borrow::Cow::Owned )
-        }};
+    let read_cow_collection = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_collection( _length_ ).map( std::borrow::Cow::Owned )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_collection_until_eof().map( std::borrow::Cow::Owned )
+            }}
+        }
+    };
 
     let read_array = |length: u32| {
         // TODO: This is quite inefficient; for primitive types we can do better.
@@ -1302,7 +1372,7 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
 fn write_field_body( field: &Field ) -> TokenStream {
     let name = field.var_name();
     let write_length_body = match field.length {
-        Some( ref length ) => {
+        Some( LengthKind::Expr( ref length ) ) => {
             let field_name = format!( "{}", name );
             quote! {
                 if !speedy::private::are_lengths_the_same( #name.len(), #length ) {
@@ -1310,6 +1380,7 @@ fn write_field_body( field: &Field ) -> TokenStream {
                 }
             }
         },
+        Some( LengthKind::UntilEndOfFile ) => quote! {},
         None => {
             let write_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
                 BasicType::U7 => quote! { write_length_u7 },

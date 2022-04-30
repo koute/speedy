@@ -8,6 +8,7 @@ use crate::context::Context;
 use crate::varint::VarInt64;
 
 use crate::error::error_end_of_input;
+use crate::error::IsEof;
 
 pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
@@ -336,6 +337,24 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline]
+    fn read_vec_until_eof< T >( &mut self ) -> Result< Vec< T >, C::Error >
+        where T: Readable< 'a, C >
+    {
+        // TODO: Optimize this.
+        let mut vec: Vec< T > = Vec::new();
+        loop {
+            let value = match self.read_value() {
+                Ok( value ) => value,
+                Err( error ) if error.is_eof() => break,
+                Err( error ) => return Err( error )
+            };
+            vec.push( value );
+        }
+
+        Ok( vec )
+    }
+
+    #[inline]
     fn read_cow< T >( &mut self, length: usize ) -> Result< Cow< 'a, [T] >, C::Error >
         where T: Readable< 'a, C >,
               [T]: ToOwned< Owned = Vec< T > >
@@ -363,6 +382,15 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline]
+    fn read_cow_until_eof< T >( &mut self ) -> Result< Cow< 'a, [T] >, C::Error >
+        where T: Readable< 'a, C >,
+              [T]: ToOwned< Owned = Vec< T > >
+    {
+        // TODO: Optimize this.
+        Ok( Cow::Owned( self.read_vec_until_eof()? ) )
+    }
+
+    #[inline]
     fn read_string( &mut self, length: usize ) -> Result< String, C::Error > {
         let bytes = self.read_vec( length )?;
         crate::private::vec_to_string( bytes )
@@ -374,6 +402,20 @@ pub trait Reader< 'a, C: Context >: Sized {
               T: Readable< 'a, C >
     {
         (0..length).into_iter().map( |_| self.read_value::< T >() ).collect()
+    }
+
+    #[inline]
+    fn read_collection_until_eof< T, U >( &mut self ) -> Result< U, C::Error >
+        where U: FromIterator< T >,
+              T: Readable< 'a, C >
+    {
+        std::iter::from_fn( move || {
+            match self.read_value::< T >() {
+                Ok( value ) => Some( Ok( value ) ),
+                Err( error ) if error.is_eof() => None,
+                Err( error ) => Some( Err( error ) )
+            }
+        }).collect()
     }
 
     #[inline]

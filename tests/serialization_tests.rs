@@ -655,6 +655,36 @@ struct DerivedRefStr< 'a >( &'a str );
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 struct DerivedRefSliceU8< 'a >( &'a [u8] );
 
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedStringUntilEof(
+    #[speedy(length = ..)]
+    String
+);
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedVecUntilEof(
+    #[speedy(length = ..)]
+    Vec< u8 >
+);
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedCowSliceUntilEof< 'a >(
+    #[speedy(length = ..)]
+    Cow< 'a, [u8] >
+);
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedCowStrUntilEof< 'a >(
+    #[speedy(length = ..)]
+    Cow< 'a, str >
+);
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedBTreeSetUntilEof(
+    #[speedy(length = ..)]
+    BTreeSet< u16 >
+);
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -1522,6 +1552,76 @@ symmetric_tests! {
             11
         ],
         minimum_bytes = 4
+    }
+    derived_string_until_eof_empty for DerivedStringUntilEof {
+        kind = common,
+        in = DerivedStringUntilEof( "".into() ),
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    derived_string_until_eof_non_empty for DerivedStringUntilEof {
+        kind = common,
+        in = DerivedStringUntilEof( "Hello".into() ),
+        le = [72, 101, 108, 108, 111],
+        be = [72, 101, 108, 108, 111],
+        minimum_bytes = 0
+    }
+    derived_vec_until_eof_empty for DerivedVecUntilEof {
+        kind = common,
+        in = DerivedVecUntilEof( b"".into() ),
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    derived_vec_until_eof_non_empty for DerivedVecUntilEof {
+        kind = common,
+        in = DerivedVecUntilEof( b"Hello".into() ),
+        le = [72, 101, 108, 108, 111],
+        be = [72, 101, 108, 108, 111],
+        minimum_bytes = 0
+    }
+    derived_cow_str_until_eof_empty for DerivedCowStrUntilEof {
+        kind = common,
+        in = DerivedCowStrUntilEof( "".into() ),
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    derived_cow_str_until_eof_non_empty for DerivedCowStrUntilEof {
+        kind = common,
+        in = DerivedCowStrUntilEof( "Hello".into() ),
+        le = [72, 101, 108, 108, 111],
+        be = [72, 101, 108, 108, 111],
+        minimum_bytes = 0
+    }
+    derived_cow_slice_until_eof_empty for DerivedCowSliceUntilEof {
+        kind = common,
+        in = DerivedCowSliceUntilEof( Cow::Borrowed( b"" ) ),
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    derived_cow_slice_until_eof_non_empty for DerivedCowSliceUntilEof {
+        kind = common,
+        in = DerivedCowSliceUntilEof( Cow::Borrowed( b"Hello" ) ),
+        le = [72, 101, 108, 108, 111],
+        be = [72, 101, 108, 108, 111],
+        minimum_bytes = 0
+    }
+    derived_btreeset_until_eof_empty for DerivedBTreeSetUntilEof {
+        kind = common,
+        in = DerivedBTreeSetUntilEof( BTreeSet::new() ),
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    derived_btreeset_until_eof_non_empty for DerivedBTreeSetUntilEof {
+        kind = common,
+        in = DerivedBTreeSetUntilEof( vec![ 10, 20 ].into_iter().collect() ),
+        le = [10, 0, 20, 0],
+        be = [0, 10, 0, 20],
+        minimum_bytes = 0
     }
 }
 
