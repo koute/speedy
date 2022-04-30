@@ -40,6 +40,11 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
+    fn read_bytes_borrowed_until_eof( &mut self ) -> Option< &'a [u8] > {
+        None
+    }
+
+    #[inline(always)]
     fn read_u8( &mut self ) -> Result< u8, C::Error > {
         if self.can_read_at_least( 1 ) == Some( false ) {
             return Err( error_end_of_input() );

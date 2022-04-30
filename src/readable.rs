@@ -94,6 +94,18 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
+    fn read_bytes_borrowed_until_eof( &mut self ) -> Option< &'a [u8] > {
+        let length = self.end as usize - self.ptr as usize;
+        let slice;
+        unsafe {
+            slice = std::slice::from_raw_parts( self.ptr, length );
+            self.ptr = self.ptr.add( length );
+        }
+
+        Some( slice )
+    }
+
+    #[inline(always)]
     fn can_read_at_least( &self, size: usize ) -> Option< bool > {
         Some( (self.end as usize - self.ptr as usize) >= size )
     }

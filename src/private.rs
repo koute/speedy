@@ -8,8 +8,7 @@ use {
         Writer,
         error::{
             error_expected_constant,
-            error_invalid_string_utf8,
-            error_invalid_str_utf8
+            error_invalid_string_utf8
         }
     },
     std::{
@@ -26,6 +25,8 @@ pub use crate::error::{
     error_length_is_not_the_same_as_length_attribute,
     error_out_of_range_length,
     error_invalid_enum_variant,
+    error_invalid_str_utf8,
+    error_unsized,
 
     get_error_kind,
 };

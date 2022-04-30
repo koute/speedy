@@ -345,6 +345,20 @@ struct DerivedStructWithCowStrWithCount< 'a > {
     data: Cow< 'a, str >
 }
 
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedRefSliceU8WithCount< 'a > {
+    length: u8,
+    #[speedy(length = length * 2)]
+    data: &'a [u8]
+}
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedRefStrWithCount< 'a > {
+    length: u8,
+    #[speedy(length = length * 2)]
+    data: &'a str
+}
+
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithHashMapWithCount {
     length: u8,
@@ -683,6 +697,18 @@ struct DerivedCowStrUntilEof< 'a >(
 struct DerivedBTreeSetUntilEof(
     #[speedy(length = ..)]
     BTreeSet< u16 >
+);
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedRefSliceU8UntilEof< 'a >(
+    #[speedy(length = ..)]
+    &'a [u8]
+);
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedRefStrUntilEof< 'a >(
+    #[speedy(length = ..)]
+    &'a str
 );
 
 symmetric_tests! {
@@ -1553,6 +1579,20 @@ symmetric_tests! {
         ],
         minimum_bytes = 4
     }
+    derived_struct_with_ref_slice_u8_with_length for DerivedRefSliceU8WithCount {
+        kind = common,
+        in = DerivedRefSliceU8WithCount { length: 2, data: &[1, 0, 0, 1] },
+        le = [2, 1, 0, 0, 1],
+        be = [2, 1, 0, 0, 1],
+        minimum_bytes = 1
+    }
+    derived_struct_with_ref_str_with_length for DerivedRefStrWithCount {
+        kind = common,
+        in = DerivedRefStrWithCount { length: 2, data: "ABCD" },
+        le = [2, b'A', b'B', b'C', b'D'],
+        be = [2, b'A', b'B', b'C', b'D'],
+        minimum_bytes = 1
+    }
     derived_string_until_eof_empty for DerivedStringUntilEof {
         kind = common,
         in = DerivedStringUntilEof( "".into() ),
@@ -1621,6 +1661,20 @@ symmetric_tests! {
         in = DerivedBTreeSetUntilEof( vec![ 10, 20 ].into_iter().collect() ),
         le = [10, 0, 20, 0],
         be = [0, 10, 0, 20],
+        minimum_bytes = 0
+    }
+    derived_ref_slice_u8_until_eof for DerivedRefSliceU8UntilEof {
+        kind = common,
+        in = DerivedRefSliceU8UntilEof( b"Hello" ),
+        le = [72, 101, 108, 108, 111],
+        be = [72, 101, 108, 108, 111],
+        minimum_bytes = 0
+    }
+    derived_ref_str_until_eof for DerivedRefStrUntilEof {
+        kind = common,
+        in = DerivedRefStrUntilEof( "Hello" ),
+        le = [72, 101, 108, 108, 111],
+        be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
 }

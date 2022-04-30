@@ -628,6 +628,8 @@ impl< 'a > Field< 'a > {
             | Ty::CowHashMap( _, key_ty, value_ty )
             | Ty::CowBTreeMap( _, key_ty, value_ty )
                 => vec![ key_ty.clone(), value_ty.clone() ],
+            | Ty::RefSliceU8( _ )
+            | Ty::RefStr( _ )
             | Ty::String
             | Ty::CowStr( .. ) => vec![],
             | Ty::Ty( _ ) => vec![ self.raw_ty.clone() ]
@@ -797,6 +799,9 @@ enum Ty {
     CowHashSet( syn::Lifetime, syn::Type ),
     CowBTreeMap( syn::Lifetime, syn::Type, syn::Type ),
     CowBTreeSet( syn::Lifetime, syn::Type ),
+
+    RefSliceU8( syn::Lifetime ),
+    RefStr( syn::Lifetime ),
 
     Array( syn::Type, u32 ),
 
@@ -969,6 +974,24 @@ fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
                 None
             }
         },
+        syn::Type::Reference( syn::TypeReference {
+            lifetime: Some( ref lifetime ),
+            mutability: None,
+            ref elem,
+            ..
+        }) => {
+            if is_bare_ty( &*elem, "str" ) {
+                Some( Ty::RefStr( lifetime.clone() ) )
+            } else if let Some( inner_ty ) = extract_slice_inner_ty( &*elem ) {
+                if is_bare_ty( inner_ty, "u8" ) {
+                    Some( Ty::RefSliceU8( lifetime.clone() ) )
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        },
         _ => None
     }
 }
@@ -1063,6 +1086,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Plain( Ty::CowHashSet( .. ) )
                     | Opt::Plain( Ty::CowBTreeMap( .. ) )
                     | Opt::Plain( Ty::CowBTreeSet( .. ) )
+                    | Opt::Plain( Ty::RefSliceU8( .. ) )
+                    | Opt::Plain( Ty::RefStr( .. ) )
                         => {},
 
                     | Opt::Option( Ty::String )
@@ -1077,6 +1102,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::CowHashSet( .. ) )
                     | Opt::Option( Ty::CowBTreeMap( .. ) )
                     | Opt::Option( Ty::CowBTreeSet( .. ) )
+                    | Opt::Option( Ty::RefSliceU8( .. ) )
+                    | Opt::Option( Ty::RefStr( .. ) )
                     | Opt::Plain( Ty::Array( .. ) )
                     | Opt::Option( Ty::Array( .. ) )
                     | Opt::Plain( Ty::Ty( .. ) )
@@ -1085,7 +1112,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                         return Err(
                             syn::Error::new(
                                 field.ty.span(),
-                                "The 'length' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`, `Cow<HashMap>`, `Cow<HashSet>`, `Cow<BTreeMap>`, `Cow<BTreeSet>`"
+                                "The 'length' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`, `Cow<HashMap>`, `Cow<HashSet>`, `Cow<BTreeMap>`, `Cow<BTreeSet>`, `&[u8]`, `&str`"
                             )
                         );
                     }
@@ -1106,6 +1133,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Plain( Ty::CowHashSet( .. ) )
                     | Opt::Plain( Ty::CowBTreeMap( .. ) )
                     | Opt::Plain( Ty::CowBTreeSet( .. ) )
+                    | Opt::Plain( Ty::RefSliceU8( .. ) )
+                    | Opt::Plain( Ty::RefStr( .. ) )
                     | Opt::Option( Ty::String )
                     | Opt::Option( Ty::Vec( .. ) )
                     | Opt::Option( Ty::CowSlice( .. ) )
@@ -1118,6 +1147,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::CowHashSet( .. ) )
                     | Opt::Option( Ty::CowBTreeMap( .. ) )
                     | Opt::Option( Ty::CowBTreeSet( .. ) )
+                    | Opt::Option( Ty::RefSliceU8( .. ) )
+                    | Opt::Option( Ty::RefStr( .. ) )
                         => {},
 
                     | Opt::Plain( Ty::Array( .. ) )
@@ -1128,7 +1159,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                         return Err(
                             syn::Error::new(
                                 field.ty.span(),
-                                "The 'length_type' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`, `Cow<HashMap>`, `Cow<HashSet>`, `Cow<BTreeMap>`, `Cow<BTreeSet>` and for `Option<T>` where `T` is one of these types"
+                                "The 'length_type' attribute is only supported for `Vec`, `String`, `Cow<[_]>`, `Cow<str>`, `HashMap`, `HashSet`, `BTreeMap`, `BTreeSet`, `Cow<HashMap>`, `Cow<HashSet>`, `Cow<BTreeMap>`, `Cow<BTreeSet>`, `&[u8]`, `&str` and for `Option<T>` where `T` is one of these types"
                             )
                         );
                     }
@@ -1275,6 +1306,39 @@ fn read_field_body( field: &Field ) -> TokenStream {
         }
     };
 
+    let read_ref_slice_u8 = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_bytes_borrowed( _length_ ).ok_or_else( speedy::private::error_unsized ).and_then( |error| error )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_bytes_borrowed_until_eof().ok_or_else( speedy::private::error_unsized )
+            }}
+        }
+    };
+
+    let read_ref_str = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                match _reader_.read_bytes_borrowed( _length_ ) {
+                    Some( Ok( bytes ) ) => std::str::from_utf8( bytes ).map_err( speedy::private::error_invalid_str_utf8 ),
+                    Some( Err( error ) ) => Err( error ),
+                    None => Err( speedy::private::error_unsized() )
+                }
+            }}
+        } else {
+            quote! {{
+                match _reader_.read_bytes_borrowed_until_eof() {
+                    Some( bytes ) => std::str::from_utf8( bytes ).map_err( speedy::private::error_invalid_str_utf8 ),
+                    None => Err( speedy::private::error_unsized() )
+                }
+            }}
+        }
+    };
+
     let read_array = |length: u32| {
         // TODO: This is quite inefficient; for primitive types we can do better.
         let readers = (0..length).map( |_| quote! {
@@ -1313,6 +1377,8 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Ty::CowHashSet( .. ) |
         Ty::CowBTreeMap( .. ) |
         Ty::CowBTreeSet( .. ) => read_cow_collection(),
+        Ty::RefSliceU8( .. ) => read_ref_slice_u8(),
+        Ty::RefStr( .. ) => read_ref_str(),
         Ty::Array( _, length ) => read_array( *length ),
         Ty::Ty( .. ) => {
             assert!( field.length.is_none() );
@@ -1430,9 +1496,13 @@ fn write_field_body( field: &Field ) -> TokenStream {
 
     let body = match field.ty.inner() {
         Ty::String |
-        Ty::CowStr( .. ) => write_str(),
+        Ty::CowStr( .. ) |
+        Ty::RefStr( .. )
+            => write_str(),
         Ty::Vec( .. ) |
-        Ty::CowSlice( .. ) => write_slice(),
+        Ty::CowSlice( .. ) |
+        Ty::RefSliceU8( .. )
+            => write_slice(),
         Ty::HashMap( .. ) |
         Ty::HashSet( .. ) |
         Ty::BTreeMap( .. ) |
@@ -1641,6 +1711,8 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
                     | Ty::CowHashSet( .. )
                     | Ty::CowBTreeMap( .. )
                     | Ty::CowBTreeSet( .. )
+                    | Ty::RefSliceU8( .. )
+                    | Ty::RefStr( .. )
                     => {
                         let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
                             BasicType::U7 | BasicType::U8 | BasicType::VarInt64 => 1,
