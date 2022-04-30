@@ -1787,21 +1787,51 @@ fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
 fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error > {
     let name = &input.ident;
     let mut types = Vec::new();
-    let mut inner_field = None;
 
-    let (reader_body, minimum_bytes_needed_body) = match &input.data {
+    let (reader_body, minimum_bytes_needed_body, impl_primitive) = match &input.data {
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
             let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
             let structure = Struct::new( fields, attrs )?;
-            if fields.len() == 1 && is_transparent( &input.attrs ) {
-                inner_field = Some( structure.fields[0].raw_ty.clone() );
-            }
+            let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
             let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
                 #body
                 Ok( #name #initializer )
             };
-            (reader_body, minimum_bytes)
+
+            let impl_primitive = if is_ty_transparent {
+                let field_ty = &structure.fields[ 0 ].raw_ty;
+                quote! {
+                    #[inline(always)]
+                    fn speedy_is_primitive() -> bool {
+                        <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
+                    }
+
+                    #[inline(always)]
+                    unsafe fn speedy_slice_as_bytes_mut( slice: &mut [Self] ) -> &mut [u8] {
+                        let slice = std::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut #field_ty, slice.len() );
+                        <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_slice_as_bytes_mut( slice )
+                    }
+
+                    #[inline]
+                    unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
+                        let slice = <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_slice_from_bytes( slice );
+                        std::slice::from_raw_parts( slice.as_ptr() as *const Self, slice.len() )
+                    }
+
+                    #[inline(always)]
+                    fn speedy_convert_slice_endianness( endianness: speedy::Endianness, slice: &mut [Self] ) {
+                        unsafe {
+                            let slice = std::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut #field_ty, slice.len() );
+                            <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_convert_slice_endianness( endianness, slice )
+                        }
+                    }
+                }
+            } else {
+                quote! {}
+            };
+
+            (reader_body, minimum_bytes, impl_primitive)
         },
         syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
             let enumeration = Enum::new( &name, &input.attrs, &variants )?;
@@ -1866,7 +1896,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     quote! { std::cmp::max( #minimum_bytes_needed_body, #tag_size ) }
                 };
 
-            (reader_body, minimum_bytes_needed_body)
+            (reader_body, minimum_bytes_needed_body, quote! {})
         },
         syn::Data::Union( syn::DataUnion { union_token, .. } ) => {
             let message = "Unions are not supported!";
@@ -1875,37 +1905,6 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     };
 
     let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Trait::Readable );
-    let impl_primitive = if let Some( field_ty ) = inner_field {
-        quote! {
-            #[inline(always)]
-            fn speedy_is_primitive() -> bool {
-                <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
-            }
-
-            #[inline(always)]
-            unsafe fn speedy_slice_as_bytes_mut( slice: &mut [Self] ) -> &mut [u8] {
-                let slice = std::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut #field_ty, slice.len() );
-                <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_slice_as_bytes_mut( slice )
-            }
-
-            #[inline]
-            unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
-                let slice = <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_slice_from_bytes( slice );
-                std::slice::from_raw_parts( slice.as_ptr() as *const Self, slice.len() )
-            }
-
-            #[inline(always)]
-            fn speedy_convert_slice_endianness( endianness: speedy::Endianness, slice: &mut [Self] ) {
-                unsafe {
-                    let slice = std::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut #field_ty, slice.len() );
-                    <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_convert_slice_endianness( endianness, slice )
-                }
-            }
-        }
-    } else {
-        quote! {}
-    };
-
     let output = quote! {
         impl< 'a_, #impl_params C_: speedy::Context > speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
             #[inline]
