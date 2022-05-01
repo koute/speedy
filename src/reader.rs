@@ -493,8 +493,8 @@ pub trait Reader< 'a, C: Context >: Sized {
                 // eliding the Vec's realloc.
                 let length = vec.len();
                 unsafe {
-                    vec.set_len( length + 1 );
                     std::ptr::write( vec.as_mut_ptr().offset( length as isize ), value );
+                    vec.set_len( length + 1 );
                 }
             }
 
