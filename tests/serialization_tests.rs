@@ -888,6 +888,26 @@ struct DerivedPackedTuple( u16, u16 );
 #[repr(packed)]
 struct DerivedPackedRecursiveTuple( DerivedPackedTuple, DerivedPackedTuple );
 
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(C)]
+struct DeriveCWithU8( u8 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(C)]
+struct DeriveCWithU16( u16 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(C)]
+struct DeriveCWithU16U16( u16, u16 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(C)]
+struct DeriveCWithU16U8( u16, u8 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(C)]
+struct DeriveCWithDeriveC( DeriveCWithU16 );
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -1721,6 +1741,36 @@ symmetric_tests! {
         be = [1, 0],
         minimum_bytes = 1
     }
+    derive_c_u8 for DeriveCWithU8 {
+        in = DeriveCWithU8( 127 ),
+        le = [127],
+        be = [127],
+        minimum_bytes = 1
+    }
+    derive_c_u16 for DeriveCWithU16 {
+        in = DeriveCWithU16( 33 ),
+        le = [33, 0],
+        be = [0, 33],
+        minimum_bytes = 2
+    }
+    derive_c_u16_u16 for DeriveCWithU16U16 {
+        in = DeriveCWithU16U16( 33, 44 ),
+        le = [33, 0, 44, 0],
+        be = [0, 33, 0, 44],
+        minimum_bytes = 4
+    }
+    derive_c_u16_u8 for DeriveCWithU16U8 {
+        in = DeriveCWithU16U8( 33, 44 ),
+        le = [33, 0, 44],
+        be = [0, 33, 44],
+        minimum_bytes = 3
+    }
+    derive_c_derive_c for DeriveCWithDeriveC {
+        in = DeriveCWithDeriveC( DeriveCWithU16( 33 ) ),
+        le = [33, 0],
+        be = [0, 33],
+        minimum_bytes = 2
+    }
 }
 
 symmetric_tests_unsized! {
@@ -2169,6 +2219,21 @@ fn test_derive_packed() {
 
     assert!( <DerivedPackedRecursiveTuple as Readable< Endianness >>::speedy_is_primitive() );
     assert!( <DerivedPackedRecursiveTuple as Writable< Endianness >>::speedy_is_primitive() );
+}
+
+#[test]
+fn test_derive_c() {
+    assert!( <DeriveCWithU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <DeriveCWithU16 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <DeriveCWithU16U16 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <DeriveCWithDeriveC as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( !<DeriveCWithU16U8 as Readable< Endianness >>::speedy_is_primitive() );
+
+    assert!( <DeriveCWithU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <DeriveCWithU16 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <DeriveCWithU16U16 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <DeriveCWithDeriveC as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( !<DeriveCWithU16U8 as Writable< Endianness >>::speedy_is_primitive() );
 }
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]

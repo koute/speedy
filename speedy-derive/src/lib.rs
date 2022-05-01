@@ -468,6 +468,10 @@ fn is_packed( attrs: &[syn::Attribute] ) -> bool {
     check_repr( attrs, "(packed)" )
 }
 
+fn is_c( attrs: &[syn::Attribute] ) -> bool {
+    check_repr( attrs, "(C)" )
+}
+
 fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::Error > where T: syn::parse::Parse {
     struct RawAttributes< T >( syn::punctuated::Punctuated< T, Token![,] > );
 
@@ -1822,6 +1826,37 @@ fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     }
 }
 
+fn generate_is_primitive( fields: &[Field] ) -> TokenStream {
+    if fields.is_empty() {
+        return quote! { true };
+    }
+
+    let mut is_primitive = Vec::new();
+    let mut fields_size = Vec::new();
+    for field in fields {
+        if !is_primitive.is_empty() {
+            is_primitive.push( quote! { && });
+            fields_size.push( quote! { + });
+        }
+
+        let ty = &field.raw_ty;
+        is_primitive.push( quote! {
+            <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
+        });
+        fields_size.push( quote! {
+            std::mem::size_of::< #ty >()
+        });
+    }
+
+    is_primitive.push( quote! {
+        && (#(#fields_size)*) == std::mem::size_of::< Self >()
+    });
+
+    quote! {
+        #(#is_primitive)*
+    }
+}
+
 fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error > {
     let name = &input.ident;
     let mut types = Vec::new();
@@ -1832,6 +1867,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let structure = Struct::new( fields, attrs )?;
             let is_ty_packed = is_packed( &input.attrs );
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
+            let is_ty_c = is_c( &input.attrs );
             let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
                 #body
@@ -1865,22 +1901,12 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         }
                     }
                 }
-            } else if is_ty_packed {
-                let mut body_is_primitive = Vec::new();
+            } else if is_ty_packed || is_ty_c {
+                let is_primitive = generate_is_primitive( &structure.fields );
                 let mut body_flip_endianness = Vec::new();
                 for field in &structure.fields {
-                    if !body_is_primitive.is_empty() {
-                        body_is_primitive.push( quote! {
-                            &&
-                        });
-                    }
-
                     let ty = &field.raw_ty;
                     let name = field.name();
-
-                    body_is_primitive.push( quote! {
-                        <#ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
-                    });
 
                     body_flip_endianness.push( quote! {
                         <#ty as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness(
@@ -1892,7 +1918,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 quote! {
                     #[inline(always)]
                     fn speedy_is_primitive() -> bool {
-                        #(#body_is_primitive)*
+                        #is_primitive
                     }
 
                     #[inline]
@@ -2057,44 +2083,17 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let st = Struct::new( fields, attrs )?;
             let is_ty_packed = is_packed( &input.attrs );
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
+            let is_ty_c = is_c( &input.attrs );
             let assignments = assign_to_variables( &st.fields, is_ty_packed );
             let (body, _) = writable_body( &mut types, &st );
 
             let impl_primitive =
-                if is_ty_transparent {
-                    let ty = &st.fields[ 0 ].raw_ty;
+                if is_ty_transparent || is_ty_packed || is_ty_c {
+                    let is_primitive = generate_is_primitive( &st.fields );
                     quote! {
                         #[inline(always)]
                         fn speedy_is_primitive() -> bool {
-                            <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
-                        }
-
-                        #[inline(always)]
-                        unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
-                            unsafe {
-                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
-                            }
-                        }
-                    }
-                } else if is_ty_packed {
-                    let mut body_is_primitive = Vec::new();
-                    for field in &st.fields {
-                        if !body_is_primitive.is_empty() {
-                            body_is_primitive.push( quote! {
-                                &&
-                            });
-                        }
-
-                        let ty = &field.raw_ty;
-                        body_is_primitive.push( quote! {
-                            <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
-                        });
-                    }
-
-                    quote! {
-                        #[inline(always)]
-                        fn speedy_is_primitive() -> bool {
-                            #(#body_is_primitive)*
+                            #is_primitive
                         }
 
                         #[inline(always)]
