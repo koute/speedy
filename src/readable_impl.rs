@@ -8,6 +8,7 @@ use crate::readable::Readable;
 use crate::reader::Reader;
 
 use crate::context::Context;
+use crate::utils::SwapBytes;
 use crate::endianness::Endianness;
 
 impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
@@ -131,6 +132,14 @@ macro_rules! impl_for_primitive {
             #[inline]
             unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
                 std::slice::from_raw_parts( slice.as_ptr() as *const $type, slice.len() / mem::size_of::< Self >() )
+            }
+
+            #[doc(hidden)]
+            #[inline(always)]
+            fn speedy_flip_endianness( itself: *mut Self ) {
+                unsafe {
+                    std::ptr::write_unaligned( itself, std::ptr::read_unaligned( itself ).swap_bytes() );
+                }
             }
 
             #[doc(hidden)]

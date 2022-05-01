@@ -719,6 +719,10 @@ struct DerivedRefStrUntilEof< 'a >(
 #[repr(packed)]
 struct DerivedPackedTuple( u16, u16 );
 
+#[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(packed)]
+struct DerivedPackedRecursiveTuple( DerivedPackedTuple, DerivedPackedTuple );
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -907,6 +911,12 @@ symmetric_tests! {
         le = [33, 0, 66, 0],
         be = [0, 33, 0, 66],
         minimum_bytes = 4
+    }
+    packed_recursive_tuple_u16 for DerivedPackedRecursiveTuple {
+        in = DerivedPackedRecursiveTuple( DerivedPackedTuple( 33, 66 ), DerivedPackedTuple( 34, 67 ) ),
+        le = [33, 0, 66, 0, 34, 0, 67, 0],
+        be = [0, 33, 0, 66, 0, 34, 0, 67],
+        minimum_bytes = 8
     }
     u32 for u32 {
         in = 33,
@@ -1709,6 +1719,24 @@ symmetric_tests! {
         ],
         minimum_bytes = 4
     }
+    vec_packed_recursive_tuple for Vec< DerivedPackedRecursiveTuple > {
+        kind = common,
+        in = vec![
+            DerivedPackedRecursiveTuple( DerivedPackedTuple( 33, 66 ), DerivedPackedTuple( 34, 67 ) ),
+            DerivedPackedRecursiveTuple( DerivedPackedTuple( 100, 200 ), DerivedPackedTuple( 101, 201 ) ),
+        ],
+        le = [
+            2, 0, 0, 0,
+            33, 0, 66, 0, 34, 0, 67, 0,
+            100, 0, 200, 0, 101, 0, 201, 0
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33, 0, 66, 0, 34, 0, 67,
+            0, 100, 0, 200, 0, 101, 0, 201
+        ],
+        minimum_bytes = 4
+    }
     vec_transparent_u16 for Vec< TransparentU16 > {
         kind = common,
         in = vec![
@@ -1742,6 +1770,24 @@ symmetric_tests! {
             0, 0, 0, 2,
             0, 33, 0, 66,
             0, 100, 0, 200,
+        ],
+        minimum_bytes = 4
+    }
+    cow_slice_packed_recursive_tuple for Cow< [DerivedPackedRecursiveTuple] > {
+        kind = common,
+        in = Cow::Owned( vec![
+            DerivedPackedRecursiveTuple( DerivedPackedTuple( 33, 66 ), DerivedPackedTuple( 34, 67 ) ),
+            DerivedPackedRecursiveTuple( DerivedPackedTuple( 100, 200 ), DerivedPackedTuple( 101, 201 ) ),
+        ]),
+        le = [
+            2, 0, 0, 0,
+            33, 0, 66, 0, 34, 0, 67, 0,
+            100, 0, 200, 0, 101, 0, 201, 0
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33, 0, 66, 0, 34, 0, 67,
+            0, 100, 0, 200, 0, 101, 0, 201
         ],
         minimum_bytes = 4
     }
@@ -1923,6 +1969,11 @@ fn test_derive_transparent() {
 
 #[test]
 fn test_derive_packed() {
+    assert!( !<DerivedTupleStruct as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <DerivedPackedTuple as Readable< Endianness >>::speedy_is_primitive() );
     assert!( !<DerivedTupleStruct as Writable< Endianness >>::speedy_is_primitive() );
     assert!( <DerivedPackedTuple as Writable< Endianness >>::speedy_is_primitive() );
+
+    assert!( <DerivedPackedRecursiveTuple as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <DerivedPackedRecursiveTuple as Writable< Endianness >>::speedy_is_primitive() );
 }

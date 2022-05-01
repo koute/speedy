@@ -515,6 +515,12 @@ pub trait Readable< 'a, C: Context >: Sized {
 
     #[doc(hidden)]
     #[inline]
+    fn speedy_flip_endianness( _: *mut Self ) {
+        panic!();
+    }
+
+    #[doc(hidden)]
+    #[inline]
     fn speedy_convert_slice_endianness( _: Endianness, _: &mut [Self] ) {
         panic!()
     }

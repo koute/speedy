@@ -1792,6 +1792,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
             let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
             let structure = Struct::new( fields, attrs )?;
+            let is_ty_packed = is_packed( &input.attrs );
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
             let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
@@ -1818,6 +1819,59 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         unsafe {
                             let slice = std::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut #field_ty, slice.len() );
                             <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_convert_slice_endianness( endianness, slice )
+                        }
+                    }
+                }
+            } else if is_ty_packed {
+                let mut body_is_primitive = Vec::new();
+                let mut body_flip_endianness = Vec::new();
+                for field in &structure.fields {
+                    if !body_is_primitive.is_empty() {
+                        body_is_primitive.push( quote! {
+                            &&
+                        });
+                    }
+
+                    let ty = &field.raw_ty;
+                    let name = field.name();
+
+                    body_is_primitive.push( quote! {
+                        <#ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
+                    });
+
+                    body_flip_endianness.push( quote! {
+                        <#ty as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness(
+                            std::ptr::addr_of_mut!( (*itself).#name )
+                        );
+                    });
+                }
+
+                quote! {
+                    #[inline(always)]
+                    fn speedy_is_primitive() -> bool {
+                        #(#body_is_primitive)*
+                    }
+
+                    #[inline]
+                    unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
+                        unsafe {
+                            std::slice::from_raw_parts( slice.as_ptr() as *const Self, slice.len() / std::mem::size_of::< Self >() )
+                        }
+                    }
+
+                    #[inline(always)]
+                    fn speedy_flip_endianness( itself: *mut Self ) {
+                        unsafe {
+                            #(#body_flip_endianness)*
+                        }
+                    }
+
+                    #[inline(always)]
+                    fn speedy_convert_slice_endianness( endianness: speedy::Endianness, slice: &mut [Self] ) {
+                        if endianness.conversion_necessary() {
+                            for value in slice {
+                                <Self as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness( value );
+                            }
                         }
                     }
                 }
