@@ -60,7 +60,7 @@ mod kw {
 enum Trait {
     Readable,
     Writable,
-    Primitive
+    Primitive { is_packed: bool }
 }
 
 fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> bool {
@@ -223,6 +223,24 @@ fn test_is_guaranteed_non_recursive() {
     assert_test!( false, Vec< T > );
 }
 
+fn is_primitive_ty( ty: &syn::Type ) -> bool {
+    match ty {
+        syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
+            if segments.len() != 1 {
+                return false;
+            }
+
+            let segment = &segments[ 0 ];
+            let ident = segment.ident.to_string();
+            match ident.as_str() {
+                "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64" | "i128" => true,
+                _ => false
+            }
+        },
+        _ => false
+    }
+}
+
 fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Trait ) -> (TokenStream, TokenStream, TokenStream) {
     let impl_params = {
         let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
@@ -253,7 +271,13 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Tr
                 (Trait::Readable, false) => None,
                 (Trait::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
                 (Trait::Writable, false) => None,
-                (Trait::Primitive, _) => Some( quote! { #ty: speedy::private::Primitive< T_ > } ),
+                (Trait::Primitive { is_packed }, _) => {
+                    if is_packed && is_primitive_ty( ty ) {
+                        None
+                    } else {
+                        Some( quote! { #ty: speedy::private::Primitive< T_ > } )
+                    }
+                },
             }
         });
 
@@ -1949,7 +1973,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             };
 
             let impl_primitive_outer = if is_ty_packed || is_ty_transparent {
-                let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::Primitive );
+                let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::Primitive { is_packed: is_ty_packed } );
                 quote! {
                     unsafe impl< #impl_params T_ > speedy::private::Primitive< T_ > for #name #ty_params #where_clause {}
                 }

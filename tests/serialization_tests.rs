@@ -2320,12 +2320,23 @@ assert_not_impl!( PackedNonPrimitive, speedy::private::Primitive< () > );
 assert_not_impl!( DerivedRefSlicePackedTuple, speedy::private::Primitive< () > );
 assert_not_impl!( DerivedRefSlicePackedTupleUntilEof, speedy::private::Primitive< () > );
 assert_not_impl!( &[DerivedPackedTuple], speedy::private::Primitive< () > );
+assert_not_impl!( u16, speedy::private::Primitive< () > );
+assert_not_impl!( u32, speedy::private::Primitive< () > );
+assert_not_impl!( u64, speedy::private::Primitive< () > );
+assert_not_impl!( u128, speedy::private::Primitive< () > );
+assert_not_impl!( i16, speedy::private::Primitive< () > );
+assert_not_impl!( i32, speedy::private::Primitive< () > );
+assert_not_impl!( i64, speedy::private::Primitive< () > );
+assert_not_impl!( i128, speedy::private::Primitive< () > );
+assert_not_impl!( f32, speedy::private::Primitive< () > );
+assert_not_impl!( f64, speedy::private::Primitive< () > );
+assert_not_impl!( TransparentU16, speedy::private::Primitive< () > );
+assert_not_impl!( TransparentU32, speedy::private::Primitive< () > );
+assert_not_impl!( TransparentU128, speedy::private::Primitive< () > );
 
 assert_impl!( u8, speedy::private::Primitive< () > );
+assert_impl!( i8, speedy::private::Primitive< () > );
 assert_impl!( TransparentU8, speedy::private::Primitive< () > );
-assert_impl!( TransparentU16, speedy::private::Primitive< () > );
-assert_impl!( TransparentU32, speedy::private::Primitive< () > );
-assert_impl!( TransparentU128, speedy::private::Primitive< () > );
 assert_impl!( DerivedPackedTuple, speedy::private::Primitive< () > );
 assert_impl!( DerivedPackedRecursiveTuple, speedy::private::Primitive< () > );
 
