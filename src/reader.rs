@@ -474,18 +474,15 @@ pub trait Reader< 'a, C: Context >: Sized {
             return Err( error_end_of_input() );
         }
 
+        let mut vec = Vec::with_capacity( length );
         if T::speedy_is_primitive() {
-            let mut vec = Vec::with_capacity( length );
-
             unsafe {
                 self.read_bytes_into_ptr( vec.as_mut_ptr() as *mut u8, vec.capacity() * std::mem::size_of::< T >() )?;
                 vec.set_len( length );
             }
 
             T::speedy_convert_slice_endianness( self.endianness(), &mut vec );
-            Ok( vec )
         } else {
-            let mut vec: Vec< T > = Vec::with_capacity( length );
             for _ in 0..length {
                 let value = self.read_value()?;
 
@@ -497,9 +494,9 @@ pub trait Reader< 'a, C: Context >: Sized {
                     vec.set_len( length + 1 );
                 }
             }
-
-            Ok( vec )
         }
+
+        Ok( vec )
     }
 
     #[inline]

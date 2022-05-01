@@ -1,6 +1,3 @@
-use std::slice;
-use std::mem;
-
 macro_rules! unsafe_is_length {
     ($expr:expr) => {
         if $expr as u64 >= 0x7FFFFFFF_FFFFFFFF {
@@ -33,13 +30,6 @@ unsafe impl Primitive for i128 {}
 unsafe impl Primitive for u128 {}
 unsafe impl Primitive for f32 {}
 unsafe impl Primitive for f64 {}
-
-#[inline(always)]
-pub fn as_bytes< T: Primitive >( slice: &[T] ) -> &[u8] {
-    unsafe {
-        slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * mem::size_of::< T >() )
-    }
-}
 
 pub trait SwapBytes {
     fn swap_bytes( self ) -> Self;

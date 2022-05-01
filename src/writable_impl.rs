@@ -8,7 +8,6 @@ use crate::writable::Writable;
 use crate::writer::Writer;
 
 use crate::context::Context;
-use crate::utils::as_bytes;
 
 use crate::private::write_length;
 
@@ -128,7 +127,7 @@ macro_rules! impl_for_primitive {
             #[doc(hidden)]
             #[inline(always)]
             unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
-                as_bytes( slice )
+                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * mem::size_of::< Self >() )
             }
         }
     }
