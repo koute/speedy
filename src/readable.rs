@@ -53,6 +53,18 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
+    unsafe fn read_bytes_into_ptr( &mut self, output: *mut u8, length: usize ) -> Result< (), C::Error > {
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        std::ptr::copy_nonoverlapping( self.ptr, output, length );
+        self.ptr = self.ptr.add( length );
+
+        Ok(())
+    }
+
+    #[inline(always)]
     fn peek_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
         let length = output.len();
         if self.can_read_at_least( length ) == Some( false ) {
@@ -63,6 +75,16 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
             std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
         }
 
+        Ok(())
+    }
+
+    #[inline(always)]
+    unsafe fn peek_bytes_into_ptr( &mut self, output: *mut u8, length: usize ) -> Result< (), C::Error > {
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        std::ptr::copy_nonoverlapping( self.ptr, output, length );
         Ok(())
     }
 
@@ -157,6 +179,18 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
     }
 
     #[inline(always)]
+    unsafe fn read_bytes_into_ptr( &mut self, output: *mut u8, length: usize ) -> Result< (), C::Error > {
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        std::ptr::copy_nonoverlapping( self.ptr, output, length );
+        self.ptr = self.ptr.add( length );
+
+        Ok(())
+    }
+
+    #[inline(always)]
     fn peek_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
         let length = output.len();
         if self.can_read_at_least( length ) == Some( false ) {
@@ -167,6 +201,16 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
             std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
         }
 
+        Ok(())
+    }
+
+    #[inline(always)]
+    unsafe fn peek_bytes_into_ptr( &mut self, output: *mut u8, length: usize ) -> Result< (), C::Error > {
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Err( error_end_of_input() );
+        }
+
+        std::ptr::copy_nonoverlapping( self.ptr, output, length );
         Ok(())
     }
 

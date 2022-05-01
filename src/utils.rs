@@ -47,3 +47,39 @@ pub fn as_bytes_mut< T: Primitive >( slice: &mut [T] ) -> &mut [u8] {
         slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut u8, slice.len() * mem::size_of::< T >() )
     }
 }
+
+pub trait SwapBytes {
+    fn swap_bytes( self ) -> Self;
+}
+
+impl SwapBytes for f32 {
+    #[inline(always)]
+    fn swap_bytes( self ) -> Self {
+        union Union {
+            float: f32,
+            int: u32
+        }
+
+        unsafe {
+            let mut u = Union { float: self };
+            u.int = u.int.swap_bytes();
+            u.float
+        }
+    }
+}
+
+impl SwapBytes for f64 {
+    #[inline(always)]
+    fn swap_bytes( self ) -> Self {
+        union Union {
+            float: f64,
+            int: u64
+        }
+
+        unsafe {
+            let mut u = Union { float: self };
+            u.int = u.int.swap_bytes();
+            u.float
+        }
+    }
+}
