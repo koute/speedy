@@ -928,6 +928,10 @@ pub struct DeriveVecGenericTransparent< T >( Vec< T > );
 #[repr(transparent)]
 pub struct DeriveArrayTransparent( [u8; 16] );
 
+#[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(packed)]
+struct PackedU16( u16 );
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -2090,6 +2094,18 @@ symmetric_tests_unsized_native_endian! {
         ],
         minimum_bytes = 4
     }
+    ref_slice_packed_u16 for &[PackedU16] {
+        in = &[PackedU16( 33 ), PackedU16( 66 )],
+        le = [
+            2, 0, 0, 0,
+            33, 0, 66, 0,
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33, 0, 66,
+        ],
+        minimum_bytes = 4
+    }
 }
 
 #[cfg(feature = "chrono")]
@@ -2333,12 +2349,14 @@ assert_not_impl!( f64, speedy::private::ZeroCopyable< () > );
 assert_not_impl!( TransparentU16, speedy::private::ZeroCopyable< () > );
 assert_not_impl!( TransparentU32, speedy::private::ZeroCopyable< () > );
 assert_not_impl!( TransparentU128, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( &'static [u16], speedy::Readable< 'static, speedy::LittleEndian > );
 
 assert_impl!( u8, speedy::private::ZeroCopyable< () > );
 assert_impl!( i8, speedy::private::ZeroCopyable< () > );
 assert_impl!( TransparentU8, speedy::private::ZeroCopyable< () > );
 assert_impl!( DerivedPackedTuple, speedy::private::ZeroCopyable< () > );
 assert_impl!( DerivedPackedRecursiveTuple, speedy::private::ZeroCopyable< () > );
+assert_impl!( &'static [PackedU16], speedy::Readable< 'static, speedy::LittleEndian > );
 
 #[test]
 fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {
