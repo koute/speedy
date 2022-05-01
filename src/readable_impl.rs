@@ -8,7 +8,6 @@ use crate::readable::Readable;
 use crate::reader::Reader;
 
 use crate::context::Context;
-use crate::utils::as_bytes_mut;
 use crate::endianness::Endianness;
 
 impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
@@ -126,12 +125,6 @@ macro_rules! impl_for_primitive {
             #[inline(always)]
             fn speedy_is_primitive() -> bool {
                 true
-            }
-
-            #[doc(hidden)]
-            #[inline(always)]
-            unsafe fn speedy_slice_as_bytes_mut( slice: &mut [Self] ) -> &mut [u8] {
-                as_bytes_mut( slice )
             }
 
             #[doc(hidden)]

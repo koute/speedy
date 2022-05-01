@@ -1807,12 +1807,6 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
                     }
 
-                    #[inline(always)]
-                    unsafe fn speedy_slice_as_bytes_mut( slice: &mut [Self] ) -> &mut [u8] {
-                        let slice = std::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut #field_ty, slice.len() );
-                        <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_slice_as_bytes_mut( slice )
-                    }
-
                     #[inline]
                     unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
                         let slice = <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_slice_from_bytes( slice );

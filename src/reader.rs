@@ -476,10 +476,12 @@ pub trait Reader< 'a, C: Context >: Sized {
 
         if T::speedy_is_primitive() {
             let mut vec = Vec::with_capacity( length );
+
             unsafe {
+                self.read_bytes_into_ptr( vec.as_mut_ptr() as *mut u8, vec.capacity() * std::mem::size_of::< T >() )?;
                 vec.set_len( length );
-                self.read_bytes( T::speedy_slice_as_bytes_mut( &mut vec ) )?;
             }
+
             T::speedy_convert_slice_endianness( self.endianness(), &mut vec );
             Ok( vec )
         } else {
@@ -534,8 +536,8 @@ pub trait Reader< 'a, C: Context >: Sized {
                 } else {
                     let mut vec: Vec< T > = Vec::with_capacity( length );
                     unsafe {
-                        vec.set_len( length );
                         std::ptr::copy_nonoverlapping( bytes.as_ptr(), vec.as_mut_ptr() as *mut u8, bytes.len() );
+                        vec.set_len( length );
                     }
                     return Ok( Cow::Owned( vec ) );
                 }

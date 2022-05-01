@@ -509,12 +509,6 @@ pub trait Readable< 'a, C: Context >: Sized {
 
     #[doc(hidden)]
     #[inline]
-    unsafe fn speedy_slice_as_bytes_mut( _: &mut [Self] ) -> &mut [u8] {
-        panic!();
-    }
-
-    #[doc(hidden)]
-    #[inline]
     unsafe fn speedy_slice_from_bytes( _: &[u8] ) -> &[Self] {
         panic!();
     }

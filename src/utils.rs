@@ -41,13 +41,6 @@ pub fn as_bytes< T: Primitive >( slice: &[T] ) -> &[u8] {
     }
 }
 
-#[inline(always)]
-pub fn as_bytes_mut< T: Primitive >( slice: &mut [T] ) -> &mut [u8] {
-    unsafe {
-        slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut u8, slice.len() * mem::size_of::< T >() )
-    }
-}
-
 pub trait SwapBytes {
     fn swap_bytes( self ) -> Self;
 }

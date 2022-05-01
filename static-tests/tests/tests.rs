@@ -11,6 +11,11 @@ use {
             ErrorKind,
             get_error_kind
         }
+    },
+    std::{
+        borrow::{
+            Cow
+        }
     }
 };
 
@@ -63,6 +68,22 @@ fn read_vec_u8_from_buffer_when_buffer_length_is_known_and_is_not_big_enough( sl
 #[static_test]
 fn read_vec_u8_from_buffer_when_buffer_length_is_not_known( slice: &[u8] ) {
     match Vec::< u8 >::read_from_buffer_with_ctx( Endianness::NATIVE, slice ) {
+        Ok( _ ) => {},
+        Err( error ) => {
+            match get_error_kind( &error ) {
+                ErrorKind::InputBufferIsTooSmall { expected_size, .. } => {
+                    static_assert!( *expected_size == 4 );
+                },
+                ErrorKind::UnexpectedEndOfInput => {},
+                _ => static_unreachable!()
+            }
+        }
+    }
+}
+
+#[static_test]
+fn read_cow_u8_from_buffer_when_buffer_length_is_not_known( slice: &[u8] ) {
+    match Cow::< [u8] >::read_from_buffer_with_ctx( Endianness::NATIVE, slice ) {
         Ok( _ ) => {},
         Err( error ) => {
             match get_error_kind( &error ) {
