@@ -102,7 +102,7 @@ These are stable and will not change in the future.
 
 ## Field attributes
 
-### `#[speedy(length = ...)]`
+### `#[speedy(length = $expr)]`
 
 Can be used on most standard containers to specify the field's length.
 Can refer to any of the previous fields.
@@ -138,7 +138,7 @@ Setting this attribute changes the serialization format as follows:
 |     `HashSet<T>` |                        `[T]` |
 |    `BTreeSet<T>` |                        `[T]` |
 
-### `#[speedy(length_type = ...)]`
+### `#[speedy(length_type = $ty)]`
 
 Can be used to specify the exact size of the implicit length field of a container
 as it is read or written.
@@ -159,14 +159,14 @@ Skips a given field when reading and writing.
 If an EOF is encountered when reading this field its value will be set
 to the default value for its type and the EOF will be ignored.
 
-### `#[speedy(constant_prefix = ...)]`
+### `#[speedy(constant_prefix = $expr)]`
 
 Specifies a static string of bytes which will be written or has to be present
 when reading before a given field.
 
 ## Enum attributes
 
-### `#[speedy(tag_type = ...)]`
+### `#[speedy(tag_type = $ty)]`
 
 Can be used to specify the exact size of the enum's tag as it is read or written.
 
@@ -184,7 +184,7 @@ from a stream, nor will it write its own tag when writing.
 
 ## Enum variant attributes
 
-### `#[speedy(tag = ...)]`
+### `#[speedy(tag = $expr)]`
 
 Specifies a preset tag value to be used for a given enum variant.
 
