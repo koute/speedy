@@ -483,16 +483,38 @@ pub trait Reader< 'a, C: Context >: Sized {
 
             T::speedy_convert_slice_endianness( self.endianness(), &mut vec );
         } else {
-            for _ in 0..length {
-                let value = self.read_value()?;
-
-                // If we don't do this then for some reason LLVM has trouble
-                // eliding the Vec's realloc.
-                let length = vec.len();
+            #[inline(never)]
+            #[cold]
+            fn drop_vec< T >( mut vec: Vec< T >, length: usize ) {
                 unsafe {
-                    std::ptr::write( vec.as_mut_ptr().offset( length as isize ), value );
-                    vec.set_len( length + 1 );
+                    vec.set_len( length );
                 }
+
+                std::mem::drop( vec );
+            }
+
+            let mut p = vec.as_mut_ptr();
+            let e = unsafe { p.add( length ) };
+
+            // We deliberately have a separate counter instead
+            // of substracting pointers as this optimizes better.
+            let mut count = 0;
+            while p < e {
+                let value = match self.read_value() {
+                    Ok( value ) => value,
+                    Err( error ) => {
+                        drop_vec( vec, count );
+                        return Err( error );
+                    }
+                };
+                unsafe {
+                    std::ptr::write( p, value );
+                    p = p.add( 1 );
+                    count += 1;
+                }
+            }
+            unsafe {
+                vec.set_len( length );
             }
         }
 

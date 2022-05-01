@@ -2225,3 +2225,24 @@ assert_impl!( TransparentU32, speedy::private::Primitive< () > );
 assert_impl!( TransparentU128, speedy::private::Primitive< () > );
 assert_impl!( DerivedPackedTuple, speedy::private::Primitive< () > );
 assert_impl!( DerivedPackedRecursiveTuple, speedy::private::Primitive< () > );
+
+#[test]
+fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new( 0 );
+
+    #[derive(Readable, Writable, PartialEq, Eq, Debug)]
+    struct WithDrop( u8 );
+    impl Drop for WithDrop {
+        fn drop( &mut self ) {
+            COUNTER.fetch_add( 1, Ordering::SeqCst );
+        }
+    }
+
+    #[derive(Readable, Writable, PartialEq, Eq, Debug)]
+    struct Struct( Vec< WithDrop > );
+
+    Struct::read_from_stream_unbuffered( &mut &[0, 0, 0, 10, 1, 2][..] ).unwrap_err();
+    assert_eq!( COUNTER.load( Ordering::SeqCst ), 2 );
+}
