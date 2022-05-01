@@ -908,6 +908,26 @@ struct DeriveCWithU16U8( u16, u8 );
 #[repr(C)]
 struct DeriveCWithDeriveC( DeriveCWithU16 );
 
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(packed)]
+struct DerivePackedDummy;
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+struct DeriveTransparentDummy;
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(C)]
+struct DeriveCDummy;
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+pub struct DeriveVecGenericTransparent< T >( Vec< T > );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+pub struct DeriveArrayTransparent( [u8; 16] );
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -1237,6 +1257,24 @@ symmetric_tests! {
     }
     unit for () {
         in = (),
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    unit_struct_repr_packed for DerivePackedDummy {
+        in = DerivePackedDummy,
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    unit_struct_repr_c for DeriveCDummy {
+        in = DeriveCDummy,
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    unit_struct_repr_transparent for DeriveTransparentDummy {
+        in = DeriveTransparentDummy,
         le = [],
         be = [],
         minimum_bytes = 0
