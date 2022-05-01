@@ -2106,6 +2106,16 @@ symmetric_tests_unsized_native_endian! {
         ],
         minimum_bytes = 4
     }
+    ref_slice_sized_slice_packed_u16 for &[PackedU16; 2] {
+        in = &[PackedU16( 33 ), PackedU16( 66 )],
+        le = [
+            33, 0, 66, 0,
+        ],
+        be = [
+            0, 33, 0, 66,
+        ],
+        minimum_bytes = 4
+    }
 }
 
 #[cfg(feature = "chrono")]

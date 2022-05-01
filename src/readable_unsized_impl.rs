@@ -42,3 +42,26 @@ impl< 'a, C: Context, T > Readable< 'a, C > for &'a [T] where T: crate::utils::Z
         4
     }
 }
+
+#[inline(always)]
+unsafe fn cast_slice< T, const N: usize >( slice: &[u8] ) -> &[T; N] {
+    &*(slice.as_ptr() as *const [T; N])
+}
+
+impl< 'a, C: Context, T, const N: usize > Readable< 'a, C > for &'a [T; N] where T: crate::utils::ZeroCopyable< T > {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        if std::mem::size_of::< T >() != 1 && reader.endianness().conversion_necessary() {
+            return Err( crate::error::error_endianness_mismatch() );
+        }
+
+        let bytes = reader.read_bytes_borrowed( std::mem::size_of::< T >() * N ).ok_or_else( crate::error::error_unsized )??;
+        let slice = unsafe { cast_slice( bytes ) };
+        Ok( slice )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        std::mem::size_of::< T >() * N
+    }
+}
