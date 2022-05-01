@@ -578,6 +578,14 @@ impl_for_array!( 5 );
 impl_for_array!( 6 );
 impl_for_array!( 7 );
 impl_for_array!( 8 );
+impl_for_array!( 9 );
+impl_for_array!( 10 );
+impl_for_array!( 11 );
+impl_for_array!( 12 );
+impl_for_array!( 13 );
+impl_for_array!( 14 );
+impl_for_array!( 15 );
+impl_for_array!( 16 );
 
 impl< C, T > Writable< C > for Box< T >
     where C: Context,
