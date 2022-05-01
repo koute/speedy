@@ -2279,14 +2279,14 @@ struct NonTransparentU8( u8 );
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
-struct TransparentNonPrimitive( Vec< u8 > );
+struct TransparentNonZeroCopyable( Vec< u8 > );
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
-struct NonPrimitive( u8 );
+struct NonZeroCopyable( u8 );
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(packed)]
-struct PackedNonPrimitive( NonPrimitive );
+struct PackedNonZeroCopyable( NonZeroCopyable );
 
 // Source: https://users.rust-lang.org/t/a-macro-to-assert-that-a-type-does-not-implement-trait-bounds/31179
 macro_rules! assert_not_impl {
@@ -2311,34 +2311,34 @@ macro_rules! assert_impl {
     };
 }
 
-assert_not_impl!( (u8, u8), speedy::private::Primitive< () > );
-assert_not_impl!( Vec< u8 >, speedy::private::Primitive< () > );
-assert_not_impl!( NonTransparentU8, speedy::private::Primitive< () > );
-assert_not_impl!( TransparentNonPrimitive, speedy::private::Primitive< () > );
-assert_not_impl!( NonPrimitive, speedy::private::Primitive< () > );
-assert_not_impl!( PackedNonPrimitive, speedy::private::Primitive< () > );
-assert_not_impl!( DerivedRefSlicePackedTuple, speedy::private::Primitive< () > );
-assert_not_impl!( DerivedRefSlicePackedTupleUntilEof, speedy::private::Primitive< () > );
-assert_not_impl!( &[DerivedPackedTuple], speedy::private::Primitive< () > );
-assert_not_impl!( u16, speedy::private::Primitive< () > );
-assert_not_impl!( u32, speedy::private::Primitive< () > );
-assert_not_impl!( u64, speedy::private::Primitive< () > );
-assert_not_impl!( u128, speedy::private::Primitive< () > );
-assert_not_impl!( i16, speedy::private::Primitive< () > );
-assert_not_impl!( i32, speedy::private::Primitive< () > );
-assert_not_impl!( i64, speedy::private::Primitive< () > );
-assert_not_impl!( i128, speedy::private::Primitive< () > );
-assert_not_impl!( f32, speedy::private::Primitive< () > );
-assert_not_impl!( f64, speedy::private::Primitive< () > );
-assert_not_impl!( TransparentU16, speedy::private::Primitive< () > );
-assert_not_impl!( TransparentU32, speedy::private::Primitive< () > );
-assert_not_impl!( TransparentU128, speedy::private::Primitive< () > );
+assert_not_impl!( (u8, u8), speedy::private::ZeroCopyable< () > );
+assert_not_impl!( Vec< u8 >, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( NonTransparentU8, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( TransparentNonZeroCopyable, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( NonZeroCopyable, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( PackedNonZeroCopyable, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( DerivedRefSlicePackedTuple, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( DerivedRefSlicePackedTupleUntilEof, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( &[DerivedPackedTuple], speedy::private::ZeroCopyable< () > );
+assert_not_impl!( u16, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( u32, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( u64, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( u128, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( i16, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( i32, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( i64, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( i128, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( f32, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( f64, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( TransparentU16, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( TransparentU32, speedy::private::ZeroCopyable< () > );
+assert_not_impl!( TransparentU128, speedy::private::ZeroCopyable< () > );
 
-assert_impl!( u8, speedy::private::Primitive< () > );
-assert_impl!( i8, speedy::private::Primitive< () > );
-assert_impl!( TransparentU8, speedy::private::Primitive< () > );
-assert_impl!( DerivedPackedTuple, speedy::private::Primitive< () > );
-assert_impl!( DerivedPackedRecursiveTuple, speedy::private::Primitive< () > );
+assert_impl!( u8, speedy::private::ZeroCopyable< () > );
+assert_impl!( i8, speedy::private::ZeroCopyable< () > );
+assert_impl!( TransparentU8, speedy::private::ZeroCopyable< () > );
+assert_impl!( DerivedPackedTuple, speedy::private::ZeroCopyable< () > );
+assert_impl!( DerivedPackedRecursiveTuple, speedy::private::ZeroCopyable< () > );
 
 #[test]
 fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {

@@ -18,9 +18,9 @@ macro_rules! unsafe_is_length {
 }
 
 // TODO: Remove the T parameter once #![feature(trivial_bounds)] is stable.
-pub unsafe trait Primitive< T > where T: ?Sized {}
-unsafe impl< T > Primitive< T > for i8 {}
-unsafe impl< T > Primitive< T > for u8 {}
+pub unsafe trait ZeroCopyable< T > where T: ?Sized {}
+unsafe impl< T > ZeroCopyable< T > for i8 {}
+unsafe impl< T > ZeroCopyable< T > for u8 {}
 
 pub trait SwapBytes {
     fn swap_bytes( self ) -> Self;

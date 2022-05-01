@@ -31,7 +31,7 @@ pub use crate::error::{
 
     get_error_kind,
 };
-pub use crate::utils::Primitive;
+pub use crate::utils::ZeroCopyable;
 
 #[inline]
 pub fn vec_to_string< E >( bytes: Vec< u8 > ) -> Result< String, E > where E: From< Error > {

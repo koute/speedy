@@ -60,7 +60,7 @@ mod kw {
 enum Trait {
     Readable,
     Writable,
-    Primitive { is_packed: bool }
+    ZeroCopyable { is_packed: bool }
 }
 
 fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> bool {
@@ -271,11 +271,11 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Tr
                 (Trait::Readable, false) => None,
                 (Trait::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
                 (Trait::Writable, false) => None,
-                (Trait::Primitive { is_packed }, _) => {
+                (Trait::ZeroCopyable { is_packed }, _) => {
                     if is_packed && is_primitive_ty( ty ) {
                         None
                     } else {
-                        Some( quote! { #ty: speedy::private::Primitive< T_ > } )
+                        Some( quote! { #ty: speedy::private::ZeroCopyable< T_ > } )
                     }
                 },
             }
@@ -1885,7 +1885,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let name = &input.ident;
     let mut types = Vec::new();
 
-    let (reader_body, minimum_bytes_needed_body, impl_primitive, impl_primitive_outer) = match &input.data {
+    let (reader_body, minimum_bytes_needed_body, impl_primitive, impl_zerocopyable) = match &input.data {
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
             let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
             let structure = Struct::new( fields, attrs )?;
@@ -1972,16 +1972,16 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 quote! {}
             };
 
-            let impl_primitive_outer = if is_ty_packed || is_ty_transparent {
-                let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::Primitive { is_packed: is_ty_packed } );
+            let impl_zerocopyable = if is_ty_packed || is_ty_transparent {
+                let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::ZeroCopyable { is_packed: is_ty_packed } );
                 quote! {
-                    unsafe impl< #impl_params T_ > speedy::private::Primitive< T_ > for #name #ty_params #where_clause {}
+                    unsafe impl< #impl_params T_ > speedy::private::ZeroCopyable< T_ > for #name #ty_params #where_clause {}
                 }
             } else {
                 quote! {}
             };
 
-            (reader_body, minimum_bytes, impl_primitive, impl_primitive_outer)
+            (reader_body, minimum_bytes, impl_primitive, impl_zerocopyable)
         },
         syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
             let enumeration = Enum::new( &name, &input.attrs, &variants )?;
@@ -2070,7 +2070,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             #impl_primitive
         }
 
-        #impl_primitive_outer
+        #impl_zerocopyable
     };
 
     Ok( output )
