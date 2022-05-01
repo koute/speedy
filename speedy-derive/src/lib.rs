@@ -59,7 +59,8 @@ mod kw {
 #[derive(Copy, Clone, PartialEq)]
 enum Trait {
     Readable,
-    Writable
+    Writable,
+    Primitive
 }
 
 fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> bool {
@@ -251,7 +252,8 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Tr
                 (Trait::Readable, true) => Some( quote! { #ty: speedy::Readable< 'a_, C_ > } ),
                 (Trait::Readable, false) => None,
                 (Trait::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
-                (Trait::Writable, false) => None
+                (Trait::Writable, false) => None,
+                (Trait::Primitive, _) => Some( quote! { #ty: speedy::private::Primitive< T_ > } ),
             }
         });
 
@@ -636,6 +638,7 @@ impl< 'a > Field< 'a > {
             | Ty::CowHashSet( _, inner_ty )
             | Ty::CowBTreeSet( _, inner_ty )
             | Ty::CowSlice( _, inner_ty )
+            | Ty::RefSlice( _, inner_ty )
                 => vec![ inner_ty.clone() ],
             | Ty::HashMap( key_ty, value_ty )
             | Ty::BTreeMap( key_ty, value_ty )
@@ -815,6 +818,7 @@ enum Ty {
     CowBTreeSet( syn::Lifetime, syn::Type ),
 
     RefSliceU8( syn::Lifetime ),
+    RefSlice( syn::Lifetime, syn::Type ),
     RefStr( syn::Lifetime ),
 
     Array( syn::Type, u32 ),
@@ -1000,7 +1004,7 @@ fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
                 if is_bare_ty( inner_ty, "u8" ) {
                     Some( Ty::RefSliceU8( lifetime.clone() ) )
                 } else {
-                    None
+                    Some( Ty::RefSlice( lifetime.clone(), inner_ty.clone() ) )
                 }
             } else {
                 None
@@ -1101,6 +1105,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Plain( Ty::CowBTreeMap( .. ) )
                     | Opt::Plain( Ty::CowBTreeSet( .. ) )
                     | Opt::Plain( Ty::RefSliceU8( .. ) )
+                    | Opt::Plain( Ty::RefSlice( .. ) )
                     | Opt::Plain( Ty::RefStr( .. ) )
                         => {},
 
@@ -1117,6 +1122,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::CowBTreeMap( .. ) )
                     | Opt::Option( Ty::CowBTreeSet( .. ) )
                     | Opt::Option( Ty::RefSliceU8( .. ) )
+                    | Opt::Option( Ty::RefSlice( .. ) )
                     | Opt::Option( Ty::RefStr( .. ) )
                     | Opt::Plain( Ty::Array( .. ) )
                     | Opt::Option( Ty::Array( .. ) )
@@ -1148,6 +1154,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Plain( Ty::CowBTreeMap( .. ) )
                     | Opt::Plain( Ty::CowBTreeSet( .. ) )
                     | Opt::Plain( Ty::RefSliceU8( .. ) )
+                    | Opt::Plain( Ty::RefSlice( .. ) )
                     | Opt::Plain( Ty::RefStr( .. ) )
                     | Opt::Option( Ty::String )
                     | Opt::Option( Ty::Vec( .. ) )
@@ -1162,6 +1169,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::CowBTreeMap( .. ) )
                     | Opt::Option( Ty::CowBTreeSet( .. ) )
                     | Opt::Option( Ty::RefSliceU8( .. ) )
+                    | Opt::Option( Ty::RefSlice( .. ) )
                     | Opt::Option( Ty::RefStr( .. ) )
                         => {},
 
@@ -1353,6 +1361,39 @@ fn read_field_body( field: &Field ) -> TokenStream {
         }
     };
 
+    let read_ref_slice = |inner_ty: &syn::Type| {
+        let inner;
+        if let Some( ref read_length_body ) = read_length_body {
+            inner = quote! {{
+                let _length_ = #read_length_body;
+                _length_.checked_mul( std::mem::size_of::< #inner_ty >() )
+                    .ok_or_else( speedy::private::error_out_of_range_length )
+                    .and_then( |bytelength| {
+                        _reader_.read_bytes_borrowed( bytelength )
+                            .ok_or_else( speedy::private::error_unsized )
+                            .and_then( |error| error )
+                    })
+                    .map( |slice| unsafe { std::slice::from_raw_parts( slice.as_ptr() as *const #inner_ty, _length_ ) } )
+            }}
+        } else {
+            inner = quote! {{
+                _reader_.read_bytes_borrowed_until_eof()
+                    .ok_or_else( speedy::private::error_unsized )
+                    .map( |slice| unsafe {
+                        std::slice::from_raw_parts( slice.as_ptr() as *const #inner_ty, slice.len() / std::mem::size_of::< #inner_ty >() )
+                    })
+            }}
+        }
+
+        quote! {{
+            if std::mem::size_of::< #inner_ty >() != 1 && _reader_.endianness().conversion_necessary() {
+                Err( speedy::private::error_endianness_mismatch() )
+            } else {
+                #inner
+            }
+        }}
+    };
+
     let read_array = |length: u32| {
         // TODO: This is quite inefficient; for primitive types we can do better.
         let readers = (0..length).map( |_| quote! {
@@ -1392,6 +1433,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Ty::CowBTreeMap( .. ) |
         Ty::CowBTreeSet( .. ) => read_cow_collection(),
         Ty::RefSliceU8( .. ) => read_ref_slice_u8(),
+        Ty::RefSlice( _, inner_ty ) => read_ref_slice( inner_ty ),
         Ty::RefStr( .. ) => read_ref_str(),
         Ty::Array( _, length ) => read_array( *length ),
         Ty::Ty( .. ) => {
@@ -1515,7 +1557,8 @@ fn write_field_body( field: &Field ) -> TokenStream {
             => write_str(),
         Ty::Vec( .. ) |
         Ty::CowSlice( .. ) |
-        Ty::RefSliceU8( .. )
+        Ty::RefSliceU8( .. ) |
+        Ty::RefSlice( .. )
             => write_slice(),
         Ty::HashMap( .. ) |
         Ty::HashSet( .. ) |
@@ -1726,6 +1769,7 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
                     | Ty::CowBTreeMap( .. )
                     | Ty::CowBTreeSet( .. )
                     | Ty::RefSliceU8( .. )
+                    | Ty::RefSlice( .. )
                     | Ty::RefStr( .. )
                     => {
                         let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
@@ -1788,7 +1832,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let name = &input.ident;
     let mut types = Vec::new();
 
-    let (reader_body, minimum_bytes_needed_body, impl_primitive) = match &input.data {
+    let (reader_body, minimum_bytes_needed_body, impl_primitive, impl_primitive_outer) = match &input.data {
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
             let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
             let structure = Struct::new( fields, attrs )?;
@@ -1799,6 +1843,11 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 #body
                 Ok( #name #initializer )
             };
+
+            let mut field_types = Vec::new();
+            for field in &structure.fields {
+                field_types.push( field.raw_ty.clone() );
+            }
 
             let impl_primitive = if is_ty_transparent {
                 let field_ty = &structure.fields[ 0 ].raw_ty;
@@ -1879,7 +1928,16 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 quote! {}
             };
 
-            (reader_body, minimum_bytes, impl_primitive)
+            let impl_primitive_outer = if is_ty_packed || is_ty_transparent {
+                let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::Primitive );
+                quote! {
+                    unsafe impl< #impl_params T_ > speedy::private::Primitive< T_ > for #name #ty_params #where_clause {}
+                }
+            } else {
+                quote! {}
+            };
+
+            (reader_body, minimum_bytes, impl_primitive, impl_primitive_outer)
         },
         syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
             let enumeration = Enum::new( &name, &input.attrs, &variants )?;
@@ -1944,7 +2002,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     quote! { std::cmp::max( #minimum_bytes_needed_body, #tag_size ) }
                 };
 
-            (reader_body, minimum_bytes_needed_body, quote! {})
+            (reader_body, minimum_bytes_needed_body, quote! {}, quote! {})
         },
         syn::Data::Union( syn::DataUnion { union_token, .. } ) => {
             let message = "Unions are not supported!";
@@ -1967,6 +2025,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
 
             #impl_primitive
         }
+
+        #impl_primitive_outer
     };
 
     Ok( output )

@@ -17,19 +17,20 @@ macro_rules! unsafe_is_length {
     }
 }
 
-pub unsafe trait Primitive {}
-unsafe impl Primitive for i8 {}
-unsafe impl Primitive for u8 {}
-unsafe impl Primitive for i16 {}
-unsafe impl Primitive for u16 {}
-unsafe impl Primitive for i32 {}
-unsafe impl Primitive for u32 {}
-unsafe impl Primitive for i64 {}
-unsafe impl Primitive for u64 {}
-unsafe impl Primitive for i128 {}
-unsafe impl Primitive for u128 {}
-unsafe impl Primitive for f32 {}
-unsafe impl Primitive for f64 {}
+// TODO: Remove the T parameter once #![feature(trivial_bounds)] is stable.
+pub unsafe trait Primitive< T > where T: ?Sized {}
+unsafe impl< T > Primitive< T > for i8 {}
+unsafe impl< T > Primitive< T > for u8 {}
+unsafe impl< T > Primitive< T > for i16 {}
+unsafe impl< T > Primitive< T > for u16 {}
+unsafe impl< T > Primitive< T > for i32 {}
+unsafe impl< T > Primitive< T > for u32 {}
+unsafe impl< T > Primitive< T > for i64 {}
+unsafe impl< T > Primitive< T > for u64 {}
+unsafe impl< T > Primitive< T > for i128 {}
+unsafe impl< T > Primitive< T > for u128 {}
+unsafe impl< T > Primitive< T > for f32 {}
+unsafe impl< T > Primitive< T > for f64 {}
 
 pub trait SwapBytes {
     fn swap_bytes( self ) -> Self;

@@ -21,40 +21,6 @@ macro_rules! symmetric_tests {
             use super::*;
 
             #[test]
-            fn round_trip_le_borrowed_aligned() {
-                let original: $type = $value;
-                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
-                assert_eq!( original, deserialized );
-            }
-
-            #[test]
-            fn round_trip_le_borrowed_unaligned() {
-                let original: (u8, $type) = (1, $value);
-                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
-                let deserialized: (u8, $type) = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
-                assert_eq!( original.0, deserialized.0 );
-                assert_eq!( original.1, deserialized.1 );
-            }
-
-            #[test]
-            fn round_trip_be_borrowed_aligned() {
-                let original: $type = $value;
-                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
-                let deserialized: $type = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
-                assert_eq!( original, deserialized );
-            }
-
-            #[test]
-            fn round_trip_be_borrowed_unaligned() {
-                let original: (u8, $type) = (1, $value);
-                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
-                let deserialized: (u8, $type) = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
-                assert_eq!( original.0, deserialized.0 );
-                assert_eq!( original.1, deserialized.1 );
-            }
-
-            #[test]
             fn serialized_bytes_le() {
                 let original: $type = $value;
                 let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
@@ -101,11 +67,134 @@ macro_rules! symmetric_tests {
 
     ($(
         $name:ident for $type:ty {
+            kind = round_trip,
+            in = $value:expr,
+            le = $le_bytes:expr,
+            be = $be_bytes:expr
+        }
+    )*) => { paste::paste! { $(
+        mod [<$name _round_trip_tests>] {
+            use super::*;
+
+            #[test]
+            fn round_trip_le_borrowed_aligned() {
+                let original: $type = $value;
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let deserialized: Result< $type, _ > = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized );
+                assert_eq!( original, deserialized.unwrap() );
+            }
+
+            #[test]
+            fn round_trip_le_borrowed_unaligned() {
+                let original: (u8, $type) = (1, $value);
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let deserialized: (u8, $type) = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized ).unwrap();
+                assert_eq!( original.0, deserialized.0 );
+                assert_eq!( original.1, deserialized.1 );
+            }
+
+            #[test]
+            fn round_trip_be_borrowed_aligned() {
+                let original: $type = $value;
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
+                let deserialized: $type = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
+                assert_eq!( original, deserialized );
+            }
+
+            #[test]
+            fn round_trip_be_borrowed_unaligned() {
+                let original: (u8, $type) = (1, $value);
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
+                let deserialized: (u8, $type) = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized ).unwrap();
+                assert_eq!( original.0, deserialized.0 );
+                assert_eq!( original.1, deserialized.1 );
+            }
+        }
+    )* } };
+
+    ($(
+        $name:ident for $type:ty {
+            kind = round_trip_native_endian,
+            in = $value:expr,
+            le = $le_bytes:expr,
+            be = $be_bytes:expr
+        }
+    )*) => { paste::paste! { $(
+        mod [<$name _round_trip_native_endian_tests>] {
+            use super::*;
+
+            #[test]
+            fn round_trip_le_borrowed_aligned() {
+                let original: $type = $value;
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let deserialized: Result< $type, _ > = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized );
+                if Endianness::LittleEndian.conversion_necessary() {
+                    match speedy::private::get_error_kind( &deserialized.unwrap_err() ) {
+                        speedy::private::ErrorKind::EndiannessMismatch => {},
+                        error => panic!( "unexpected error: {:?}", error )
+                    }
+                } else {
+                    assert_eq!( original, deserialized.unwrap() );
+                }
+            }
+
+            #[test]
+            fn round_trip_le_borrowed_unaligned() {
+                let original: (u8, $type) = (1, $value);
+                let serialized = original.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap();
+                let deserialized: Result< (u8, $type), _ > = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &serialized );
+                if Endianness::LittleEndian.conversion_necessary() {
+                    match speedy::private::get_error_kind( &deserialized.unwrap_err() ) {
+                        speedy::private::ErrorKind::EndiannessMismatch => {},
+                        error => panic!( "unexpected error: {:?}", error )
+                    }
+                } else {
+                    let deserialized = deserialized.unwrap();
+                    assert_eq!( original.0, deserialized.0 );
+                    assert_eq!( original.1, deserialized.1 );
+                }
+            }
+
+            #[test]
+            fn round_trip_be_borrowed_aligned() {
+                let original: $type = $value;
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
+                let deserialized: Result< $type, _ > = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized );
+                if Endianness::BigEndian.conversion_necessary() {
+                    match speedy::private::get_error_kind( &deserialized.unwrap_err() ) {
+                        speedy::private::ErrorKind::EndiannessMismatch => {},
+                        error => panic!( "unexpected error: {:?}", error )
+                    }
+                } else {
+                    assert_eq!( original, deserialized.unwrap() );
+                }
+            }
+
+            #[test]
+            fn round_trip_be_borrowed_unaligned() {
+                let original: (u8, $type) = (1, $value);
+                let serialized = original.write_to_vec_with_ctx( Endianness::BigEndian ).unwrap();
+                let deserialized: Result< (u8, $type), _ > = Readable::read_from_buffer_with_ctx( Endianness::BigEndian, &serialized );
+                if Endianness::BigEndian.conversion_necessary() {
+                    match speedy::private::get_error_kind( &deserialized.unwrap_err() ) {
+                        speedy::private::ErrorKind::EndiannessMismatch => {},
+                        error => panic!( "unexpected error: {:?}", error )
+                    }
+                } else {
+                    let deserialized = deserialized.unwrap();
+                    assert_eq!( original.0, deserialized.0 );
+                    assert_eq!( original.1, deserialized.1 );
+                }
+            }
+        }
+    )* } };
+
+    ($(
+        $name:ident for $type:ty {
             kind = sized,
             in = $value:expr,
             le = $le_bytes:expr,
-            be = $be_bytes:expr,
-            minimum_bytes = $minimum_bytes:expr
+            be = $be_bytes:expr
         }
     )*) => { paste::paste! { $(
         mod [<$name _sized_tests>] {
@@ -183,11 +272,79 @@ macro_rules! symmetric_tests {
 
         symmetric_tests! {
             $name for $type {
+                kind = round_trip,
+                in = $value,
+                le = $le_bytes,
+                be = $be_bytes
+            }
+        }
+
+        symmetric_tests! {
+            $name for $type {
                 kind = sized,
+                in = $value,
+                le = $le_bytes,
+                be = $be_bytes
+            }
+        }
+    )* };
+}
+
+macro_rules! symmetric_tests_unsized {
+    ($(
+        $name:ident for $type:ty {
+            in = $value:expr,
+            le = $le_bytes:expr,
+            be = $be_bytes:expr,
+            minimum_bytes = $minimum_bytes:expr
+        }
+    )*) => { $(
+        symmetric_tests! {
+            $name for $type {
+                kind = common,
                 in = $value,
                 le = $le_bytes,
                 be = $be_bytes,
                 minimum_bytes = $minimum_bytes
+            }
+        }
+
+        symmetric_tests! {
+            $name for $type {
+                kind = round_trip,
+                in = $value,
+                le = $le_bytes,
+                be = $be_bytes
+            }
+        }
+    )* };
+}
+
+macro_rules! symmetric_tests_unsized_native_endian {
+    ($(
+        $name:ident for $type:ty {
+            in = $value:expr,
+            le = $le_bytes:expr,
+            be = $be_bytes:expr,
+            minimum_bytes = $minimum_bytes:expr
+        }
+    )*) => { $(
+        symmetric_tests! {
+            $name for $type {
+                kind = common,
+                in = $value,
+                le = $le_bytes,
+                be = $be_bytes,
+                minimum_bytes = $minimum_bytes
+            }
+        }
+
+        symmetric_tests! {
+            $name for $type {
+                kind = round_trip_native_endian,
+                in = $value,
+                le = $le_bytes,
+                be = $be_bytes
             }
         }
     )* };
@@ -665,9 +822,6 @@ struct TransparentU32( u32 );
 struct TransparentU128( u128 );
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct NonTransparentU8( u8 );
-
-#[derive(Readable, Writable, PartialEq, Eq, Debug)]
 struct DerivedRefStr< 'a >( &'a str );
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
@@ -713,6 +867,17 @@ struct DerivedRefSliceU8UntilEof< 'a >(
 struct DerivedRefStrUntilEof< 'a >(
     #[speedy(length = ..)]
     &'a str
+);
+
+#[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedRefSlicePackedTuple< 'a >(
+    &'a [DerivedPackedTuple]
+);
+
+#[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedRefSlicePackedTupleUntilEof< 'a >(
+    #[speedy(length = ..)]
+    &'a [DerivedPackedTuple]
 );
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
@@ -1558,23 +1723,20 @@ symmetric_tests! {
     }
 }
 
-symmetric_tests! {
+symmetric_tests_unsized! {
     ref_str for &str {
-        kind = common,
         in = "Hello",
         le = [5, 0, 0, 0, 72, 101, 108, 108, 111],
         be = [0, 0, 0, 5, 72, 101, 108, 108, 111],
         minimum_bytes = 4
     }
     derived_ref_str for DerivedRefStr {
-        kind = common,
         in = DerivedRefStr( "Hello" ),
         le = [5, 0, 0, 0, 72, 101, 108, 108, 111],
         be = [0, 0, 0, 5, 72, 101, 108, 108, 111],
         minimum_bytes = 4
     }
     ref_slice_u8 for &[u8] {
-        kind = common,
         in = &[10, 11],
         le = [
             2, 0, 0, 0,
@@ -1589,7 +1751,6 @@ symmetric_tests! {
         minimum_bytes = 4
     }
     derived_ref_slice_u8 for DerivedRefSliceU8 {
-        kind = common,
         in = DerivedRefSliceU8( &[10, 11] ),
         le = [
             2, 0, 0, 0,
@@ -1604,105 +1765,90 @@ symmetric_tests! {
         minimum_bytes = 4
     }
     derived_struct_with_ref_slice_u8_with_length for DerivedRefSliceU8WithCount {
-        kind = common,
         in = DerivedRefSliceU8WithCount { length: 2, data: &[1, 0, 0, 1] },
         le = [2, 1, 0, 0, 1],
         be = [2, 1, 0, 0, 1],
         minimum_bytes = 1
     }
     derived_struct_with_ref_str_with_length for DerivedRefStrWithCount {
-        kind = common,
         in = DerivedRefStrWithCount { length: 2, data: "ABCD" },
         le = [2, b'A', b'B', b'C', b'D'],
         be = [2, b'A', b'B', b'C', b'D'],
         minimum_bytes = 1
     }
     derived_string_until_eof_empty for DerivedStringUntilEof {
-        kind = common,
         in = DerivedStringUntilEof( "".into() ),
         le = [],
         be = [],
         minimum_bytes = 0
     }
     derived_string_until_eof_non_empty for DerivedStringUntilEof {
-        kind = common,
         in = DerivedStringUntilEof( "Hello".into() ),
         le = [72, 101, 108, 108, 111],
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
     derived_vec_until_eof_empty for DerivedVecUntilEof {
-        kind = common,
         in = DerivedVecUntilEof( b"".into() ),
         le = [],
         be = [],
         minimum_bytes = 0
     }
     derived_vec_until_eof_non_empty for DerivedVecUntilEof {
-        kind = common,
         in = DerivedVecUntilEof( b"Hello".into() ),
         le = [72, 101, 108, 108, 111],
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
     derived_cow_str_until_eof_empty for DerivedCowStrUntilEof {
-        kind = common,
         in = DerivedCowStrUntilEof( "".into() ),
         le = [],
         be = [],
         minimum_bytes = 0
     }
     derived_cow_str_until_eof_non_empty for DerivedCowStrUntilEof {
-        kind = common,
         in = DerivedCowStrUntilEof( "Hello".into() ),
         le = [72, 101, 108, 108, 111],
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
     derived_cow_slice_until_eof_empty for DerivedCowSliceUntilEof {
-        kind = common,
         in = DerivedCowSliceUntilEof( Cow::Borrowed( b"" ) ),
         le = [],
         be = [],
         minimum_bytes = 0
     }
     derived_cow_slice_until_eof_non_empty for DerivedCowSliceUntilEof {
-        kind = common,
         in = DerivedCowSliceUntilEof( Cow::Borrowed( b"Hello" ) ),
         le = [72, 101, 108, 108, 111],
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
     derived_btreeset_until_eof_empty for DerivedBTreeSetUntilEof {
-        kind = common,
         in = DerivedBTreeSetUntilEof( BTreeSet::new() ),
         le = [],
         be = [],
         minimum_bytes = 0
     }
     derived_btreeset_until_eof_non_empty for DerivedBTreeSetUntilEof {
-        kind = common,
         in = DerivedBTreeSetUntilEof( vec![ 10, 20 ].into_iter().collect() ),
         le = [10, 0, 20, 0],
         be = [0, 10, 0, 20],
         minimum_bytes = 0
     }
     derived_ref_slice_u8_until_eof for DerivedRefSliceU8UntilEof {
-        kind = common,
         in = DerivedRefSliceU8UntilEof( b"Hello" ),
         le = [72, 101, 108, 108, 111],
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
     derived_ref_str_until_eof for DerivedRefStrUntilEof {
-        kind = common,
         in = DerivedRefStrUntilEof( "Hello" ),
         le = [72, 101, 108, 108, 111],
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
     vec_packed_tuple for Vec< DerivedPackedTuple > {
-        kind = common,
         in = vec![
             DerivedPackedTuple( 33, 66 ),
             DerivedPackedTuple( 100, 200 ),
@@ -1720,7 +1866,6 @@ symmetric_tests! {
         minimum_bytes = 4
     }
     vec_packed_recursive_tuple for Vec< DerivedPackedRecursiveTuple > {
-        kind = common,
         in = vec![
             DerivedPackedRecursiveTuple( DerivedPackedTuple( 33, 66 ), DerivedPackedTuple( 34, 67 ) ),
             DerivedPackedRecursiveTuple( DerivedPackedTuple( 100, 200 ), DerivedPackedTuple( 101, 201 ) ),
@@ -1738,7 +1883,6 @@ symmetric_tests! {
         minimum_bytes = 4
     }
     vec_transparent_u16 for Vec< TransparentU16 > {
-        kind = common,
         in = vec![
             TransparentU16( 33 ),
             TransparentU16( 100 ),
@@ -1756,7 +1900,6 @@ symmetric_tests! {
         minimum_bytes = 4
     }
     cow_slice_packed_tuple for Cow< [DerivedPackedTuple] > {
-        kind = common,
         in = Cow::Owned( vec![
             DerivedPackedTuple( 33, 66 ),
             DerivedPackedTuple( 100, 200 ),
@@ -1774,7 +1917,6 @@ symmetric_tests! {
         minimum_bytes = 4
     }
     cow_slice_packed_recursive_tuple for Cow< [DerivedPackedRecursiveTuple] > {
-        kind = common,
         in = Cow::Owned( vec![
             DerivedPackedRecursiveTuple( DerivedPackedTuple( 33, 66 ), DerivedPackedTuple( 34, 67 ) ),
             DerivedPackedRecursiveTuple( DerivedPackedTuple( 100, 200 ), DerivedPackedTuple( 101, 201 ) ),
@@ -1792,7 +1934,6 @@ symmetric_tests! {
         minimum_bytes = 4
     }
     cow_slice_transparent_u16 for Cow< [TransparentU16] > {
-        kind = common,
         in = Cow::Owned( vec![
             TransparentU16( 33 ),
             TransparentU16( 100 ),
@@ -1806,6 +1947,58 @@ symmetric_tests! {
             0, 0, 0, 2,
             0, 33,
             0, 100,
+        ],
+        minimum_bytes = 4
+    }
+}
+
+symmetric_tests_unsized_native_endian! {
+    derived_ref_slice_packed_tuple for DerivedRefSlicePackedTuple {
+        in = DerivedRefSlicePackedTuple( &[
+            DerivedPackedTuple( 33, 66 ),
+            DerivedPackedTuple( 100, 200 ),
+        ]),
+        le = [
+            2, 0, 0, 0,
+            33, 0, 66, 0,
+            100, 0, 200, 0,
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33, 0, 66,
+            0, 100, 0, 200,
+        ],
+        minimum_bytes = 4
+    }
+    derived_ref_slice_packed_tuple_until_eof for DerivedRefSlicePackedTupleUntilEof {
+        in = DerivedRefSlicePackedTupleUntilEof( &[
+            DerivedPackedTuple( 33, 66 ),
+            DerivedPackedTuple( 100, 200 ),
+        ]),
+        le = [
+            33, 0, 66, 0,
+            100, 0, 200, 0,
+        ],
+        be = [
+            0, 33, 0, 66,
+            0, 100, 0, 200,
+        ],
+        minimum_bytes = 0
+    }
+    ref_slice_derived_packed_tuple for &[DerivedPackedTuple] {
+        in = &[
+            DerivedPackedTuple( 33, 66 ),
+            DerivedPackedTuple( 100, 200 ),
+        ],
+        le = [
+            2, 0, 0, 0,
+            33, 0, 66, 0,
+            100, 0, 200, 0,
+        ],
+        be = [
+            0, 0, 0, 2,
+            0, 33, 0, 66,
+            0, 100, 0, 200,
         ],
         minimum_bytes = 4
     }
@@ -1977,3 +2170,58 @@ fn test_derive_packed() {
     assert!( <DerivedPackedRecursiveTuple as Readable< Endianness >>::speedy_is_primitive() );
     assert!( <DerivedPackedRecursiveTuple as Writable< Endianness >>::speedy_is_primitive() );
 }
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct NonTransparentU8( u8 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+struct TransparentNonPrimitive( Vec< u8 > );
+
+#[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
+struct NonPrimitive( u8 );
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+#[repr(packed)]
+struct PackedNonPrimitive( NonPrimitive );
+
+// Source: https://users.rust-lang.org/t/a-macro-to-assert-that-a-type-does-not-implement-trait-bounds/31179
+macro_rules! assert_not_impl {
+    ($x:ty, $($t:path),+ $(,)*) => {
+        const _: fn() -> () = || {
+            struct Check<T: ?Sized>(T);
+            trait AmbiguousIfImpl<A> { fn some_item() { } }
+
+            impl<T: ?Sized> AmbiguousIfImpl<()> for Check<T> { }
+            impl<T: ?Sized $(+ $t)*> AmbiguousIfImpl<u8> for Check<T> { }
+
+            <Check::<$x> as AmbiguousIfImpl<_>>::some_item()
+        };
+    };
+}
+
+macro_rules! assert_impl {
+    ($x:ty, $($t:path),+ $(,)*) => {
+        const _: fn() -> () = || {
+            struct Check where $x: $($t),+;
+        };
+    };
+}
+
+assert_not_impl!( (u8, u8), speedy::private::Primitive< () > );
+assert_not_impl!( Vec< u8 >, speedy::private::Primitive< () > );
+assert_not_impl!( NonTransparentU8, speedy::private::Primitive< () > );
+assert_not_impl!( TransparentNonPrimitive, speedy::private::Primitive< () > );
+assert_not_impl!( NonPrimitive, speedy::private::Primitive< () > );
+assert_not_impl!( PackedNonPrimitive, speedy::private::Primitive< () > );
+assert_not_impl!( DerivedRefSlicePackedTuple, speedy::private::Primitive< () > );
+assert_not_impl!( DerivedRefSlicePackedTupleUntilEof, speedy::private::Primitive< () > );
+assert_not_impl!( &[DerivedPackedTuple], speedy::private::Primitive< () > );
+
+assert_impl!( u8, speedy::private::Primitive< () > );
+assert_impl!( TransparentU8, speedy::private::Primitive< () > );
+assert_impl!( TransparentU16, speedy::private::Primitive< () > );
+assert_impl!( TransparentU32, speedy::private::Primitive< () > );
+assert_impl!( TransparentU128, speedy::private::Primitive< () > );
+assert_impl!( DerivedPackedTuple, speedy::private::Primitive< () > );
+assert_impl!( DerivedPackedRecursiveTuple, speedy::private::Primitive< () > );

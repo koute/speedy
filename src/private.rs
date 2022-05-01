@@ -27,9 +27,11 @@ pub use crate::error::{
     error_invalid_enum_variant,
     error_invalid_str_utf8,
     error_unsized,
+    error_endianness_mismatch,
 
     get_error_kind,
 };
+pub use crate::utils::Primitive;
 
 #[inline]
 pub fn vec_to_string< E >( bytes: Vec< u8 > ) -> Result< String, E > where E: From< Error > {

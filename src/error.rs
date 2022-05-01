@@ -38,6 +38,7 @@ pub enum ErrorKind {
     },
 
     Unsized,
+    EndiannessMismatch,
     IoError( io::Error )
 }
 
@@ -102,6 +103,7 @@ impl fmt::Display for Error {
             ErrorKind::LengthIsNotTheSameAsLengthAttribute { field_name } => write!( fmt, "the length of '{}' is not the same as its 'length' attribute", field_name ),
             ErrorKind::ExpectedConstant { constant } => write!( fmt, "expected a predefined {} bytes(s) long constant", constant.len() ),
             ErrorKind::Unsized => write!( fmt, "type is unsized hence requires zero-copy deserialization; use `read_from_buffer` or similar to deserialize it" ),
+            ErrorKind::EndiannessMismatch => write!( fmt, "endianness mismatch" ),
             ErrorKind::IoError( ref error ) => write!( fmt, "{}", error )
         }
     }
@@ -204,4 +206,9 @@ pub fn error_expected_constant< T >( constant: &'static [u8] ) -> T where T: Fro
 #[cold]
 pub fn error_unsized< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::Unsized ) )
+}
+
+#[cold]
+pub fn error_endianness_mismatch< T >() -> T where T: From< Error > {
+    T::from( Error::new( ErrorKind::EndiannessMismatch ) )
 }
