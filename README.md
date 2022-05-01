@@ -6,7 +6,7 @@ The goal of this crate is to provide fast, simple and easy binary serialization.
 
 ## Benchmarks
 
-See [serde-bench](https://github.com/koute/serde-bench) for benchmarks.
+See [rust_serialization_benchmark](https://github.com/djkoloski/rust_serialization_benchmark) for benchmarks.
 
 ## Example
 
