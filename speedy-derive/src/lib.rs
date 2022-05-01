@@ -446,7 +446,7 @@ struct EnumAttributes {
     peek_tag: bool
 }
 
-fn is_transparent( attrs: &[syn::Attribute] ) -> bool {
+fn check_repr( attrs: &[syn::Attribute], value: &str ) -> bool {
     let mut result = false;
     for raw_attr in attrs {
         let path = raw_attr.path.clone().into_token_stream().to_string();
@@ -454,24 +454,18 @@ fn is_transparent( attrs: &[syn::Attribute] ) -> bool {
             continue;
         }
 
-        result = raw_attr.tokens.clone().into_token_stream().to_string() == "(transparent)";
+        result = raw_attr.tokens.clone().into_token_stream().to_string() == value;
     }
 
     result
 }
 
+fn is_transparent( attrs: &[syn::Attribute] ) -> bool {
+    check_repr( attrs, "(transparent)" )
+}
+
 fn is_packed( attrs: &[syn::Attribute] ) -> bool {
-    let mut result = false;
-    for raw_attr in attrs {
-        let path = raw_attr.path.clone().into_token_stream().to_string();
-        if path != "repr" {
-            continue;
-        }
-
-        result = raw_attr.tokens.clone().into_token_stream().to_string() == "(packed)";
-    }
-
-    result
+    check_repr( attrs, "(packed)" )
 }
 
 fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::Error > where T: syn::parse::Parse {
