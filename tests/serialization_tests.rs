@@ -2176,6 +2176,23 @@ fn test_regex() {
     assert_eq!( regex.as_str(), deserialized.as_str() );
 }
 
+#[cfg(feature = "uuid")]
+#[test]
+fn test_uuid() {
+    use speedy::{
+        Readable,
+        Writable
+    };
+
+    let uid = uuid::Uuid::parse_str("99ac1675-12ef-495b-bf56-606ebe5e3e71").unwrap();
+    let buffer = uid.write_to_vec().unwrap();
+    assert_eq!( buffer, &[0x99, 0xAC, 0x16, 0x75, 0x12, 0xEF, 0x49, 0x5B, 0xBF, 0x56, 0x60, 0x6E, 0xBE, 0x5E, 0x3E, 0x71] );
+
+    let deserialized = uuid::Uuid::read_from_buffer( &buffer ).unwrap();
+    assert_eq!( uid.to_string(), deserialized.to_string() );
+}
+
+
 #[test]
 fn test_derived_struct_with_default_on_eof() {
     use speedy::{

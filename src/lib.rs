@@ -30,6 +30,9 @@ mod ext_regex;
 #[cfg(feature = "indexmap")]
 mod ext_indexmap;
 
+#[cfg(feature = "uuid")]
+mod ext_uuid;
+
 #[doc(hidden)]
 pub mod private;
 
