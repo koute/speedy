@@ -614,27 +614,27 @@ struct Struct< 'a > {
 
 impl< 'a > Struct< 'a > {
     fn new( fields: &'a syn::Fields, attrs: Vec< StructAttribute > ) -> Result< Self, syn::Error > {
-        let attrs_c = collect_struct_attributes( attrs )?;
+        let attrs = collect_struct_attributes( attrs )?;
         let structure = match fields {
             syn::Fields::Unit => {
                 Struct {
                     fields: Vec::new(),
                     kind: StructKind::Unit,
-                    non_exhaustive: attrs_c.non_exhaustive
+                    non_exhaustive: attrs.non_exhaustive
                 }
             },
             syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
                 Struct {
                     fields: get_fields( named.into_iter() )?,
                     kind: StructKind::Named,
-                    non_exhaustive: attrs_c.non_exhaustive
+                    non_exhaustive: attrs.non_exhaustive
                 }
             },
             syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
                 Struct {
                     fields: get_fields( unnamed.into_iter() )?,
                     kind: StructKind::Unnamed,
-                    non_exhaustive: attrs_c.non_exhaustive
+                    non_exhaustive: attrs.non_exhaustive
                 }
             }
         };
