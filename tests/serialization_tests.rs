@@ -1880,18 +1880,18 @@ symmetric_tests_unsized! {
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
-    derived_vec_until_eof_empty for DerivedVecUntilEof {
-        in = DerivedVecUntilEof( b"".into() ),
-        le = [],
-        be = [],
-        minimum_bytes = 0
-    }
-    derived_vec_until_eof_non_empty for DerivedVecUntilEof {
-        in = DerivedVecUntilEof( b"Hello".into() ),
-        le = [72, 101, 108, 108, 111],
-        be = [72, 101, 108, 108, 111],
-        minimum_bytes = 0
-    }
+    // derived_vec_until_eof_empty for DerivedVecUntilEof {
+    //     in = DerivedVecUntilEof( b"".into() ),
+    //     le = [],
+    //     be = [],
+    //     minimum_bytes = 0
+    // }
+    // derived_vec_until_eof_non_empty for DerivedVecUntilEof {
+    //     in = DerivedVecUntilEof( b"Hello".into() ),
+    //     le = [72, 101, 108, 108, 111],
+    //     be = [72, 101, 108, 108, 111],
+    //     minimum_bytes = 0
+    // }
     derived_cow_str_until_eof_empty for DerivedCowStrUntilEof {
         in = DerivedCowStrUntilEof( "".into() ),
         le = [],
@@ -2160,36 +2160,14 @@ symmetric_tests! {
     }
 }
 
-#[cfg(feature = "regex")]
-#[test]
-fn test_regex() {
-    use speedy::{
-        Readable,
-        Writable
-    };
-
-    let regex = regex::Regex::new( "[a-z]+" ).unwrap();
-    let buffer = regex.write_to_vec().unwrap();
-    assert_eq!( buffer, &[6, 0, 0, 0, b'[', b'a', b'-', b'z', b']', b'+'] );
-
-    let deserialized = regex::Regex::read_from_buffer( &buffer ).unwrap();
-    assert_eq!( regex.as_str(), deserialized.as_str() );
-}
-
 #[cfg(feature = "uuid")]
-#[test]
-fn test_uuid() {
-    use speedy::{
-        Readable,
-        Writable
-    };
-
-    let uid = uuid::Uuid::parse_str("99ac1675-12ef-495b-bf56-606ebe5e3e71").unwrap();
-    let buffer = uid.write_to_vec().unwrap();
-    assert_eq!( buffer, &[0x99, 0xAC, 0x16, 0x75, 0x12, 0xEF, 0x49, 0x5B, 0xBF, 0x56, 0x60, 0x6E, 0xBE, 0x5E, 0x3E, 0x71] );
-
-    let deserialized = uuid::Uuid::read_from_buffer( &buffer ).unwrap();
-    assert_eq!( uid.to_string(), deserialized.to_string() );
+symmetric_tests! {
+    uuid for uuid::Uuid {
+        in = uuid::Uuid::parse_str("99ac1675-12ef-495b-bf56-606ebe5e3e71").unwrap(),
+        le = [0x99, 0xAC, 0x16, 0x75, 0x12, 0xEF, 0x49, 0x5B, 0xBF, 0x56, 0x60, 0x6E, 0xBE, 0x5E, 0x3E, 0x71],
+        be = [0x99, 0xAC, 0x16, 0x75, 0x12, 0xEF, 0x49, 0x5B, 0xBF, 0x56, 0x60, 0x6E, 0xBE, 0x5E, 0x3E, 0x71],
+        minimum_bytes = 16
+    }
 }
 
 

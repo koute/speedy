@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use {
     crate::{
         Context,
@@ -19,11 +17,9 @@ impl< 'a, C > Readable< 'a, C > for Uuid
 {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let buffer: Vec<u8> = reader.read_vec(UUID_SIZE)?;
-        Ok(Uuid::from_bytes(
-            buffer.try_into()
-                .map_err(|_| crate::error::Error::custom( format!( "failed to read a uuid") ).into())?
-            ))
+        let mut buffer = [0; UUID_SIZE];
+        reader.read_bytes(&mut buffer)?;
+        Ok(Uuid::from_bytes(buffer))
     }
 
     #[inline]
