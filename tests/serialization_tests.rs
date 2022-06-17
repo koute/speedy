@@ -1880,18 +1880,18 @@ symmetric_tests_unsized! {
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
     }
-    // derived_vec_until_eof_empty for DerivedVecUntilEof {
-    //     in = DerivedVecUntilEof( b"".into() ),
-    //     le = [],
-    //     be = [],
-    //     minimum_bytes = 0
-    // }
-    // derived_vec_until_eof_non_empty for DerivedVecUntilEof {
-    //     in = DerivedVecUntilEof( b"Hello".into() ),
-    //     le = [72, 101, 108, 108, 111],
-    //     be = [72, 101, 108, 108, 111],
-    //     minimum_bytes = 0
-    // }
+    derived_vec_until_eof_empty for DerivedVecUntilEof {
+        in = DerivedVecUntilEof( b"".into() ),
+        le = [],
+        be = [],
+        minimum_bytes = 0
+    }
+    derived_vec_until_eof_non_empty for DerivedVecUntilEof {
+        in = DerivedVecUntilEof( b"Hello".into() ),
+        le = [72, 101, 108, 108, 111],
+        be = [72, 101, 108, 108, 111],
+        minimum_bytes = 0
+    }
     derived_cow_str_until_eof_empty for DerivedCowStrUntilEof {
         in = DerivedCowStrUntilEof( "".into() ),
         le = [],
