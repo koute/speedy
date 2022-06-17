@@ -2160,6 +2160,22 @@ symmetric_tests! {
     }
 }
 
+#[cfg(feature = "regex")]
+#[test]
+fn test_regex() {
+    use speedy::{
+        Readable,
+        Writable
+    };
+
+    let regex = regex::Regex::new( "[a-z]+" ).unwrap();
+    let buffer = regex.write_to_vec().unwrap();
+    assert_eq!( buffer, &[6, 0, 0, 0, b'[', b'a', b'-', b'z', b']', b'+'] );
+
+    let deserialized = regex::Regex::read_from_buffer( &buffer ).unwrap();
+    assert_eq!( regex.as_str(), deserialized.as_str() );
+}
+
 #[cfg(feature = "uuid")]
 symmetric_tests! {
     uuid for uuid::Uuid {
