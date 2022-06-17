@@ -97,6 +97,7 @@ Out-of-box the following types are supported:
 |      `std::net::IpAddr` |    `{is_ipv4: u8, value: {u32 or u128}}` |
 |   `std::time::Duration` |         `{secs: u64, subsec_nanos: u32}` |
 | `std::time::SystemTime` | `std::time::Duration` since `UNIX_EPOCH` |
+|            `uuid::Uuid` |                               `[u8; 16]` |
 
 These are stable and will not change in the future.
 
