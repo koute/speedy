@@ -1273,9 +1273,9 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
     }
 }
 
-fn non_exhaustive_field_body( body: TokenStream , num_field: u8) -> TokenStream {
+fn non_exhaustive_field_body( body: TokenStream , num_field: usize) -> TokenStream {
     quote! {
-        if _struct_size_ >= #num_field {
+        if _struct_size_ > #num_field {
             #body?
         } else {
             std::default::Default::default()
@@ -1283,7 +1283,7 @@ fn non_exhaustive_field_body( body: TokenStream , num_field: u8) -> TokenStream 
     }
 }
 
-fn read_field_body( field: &Field, is_parent_non_exhaustive: bool, num_field: u8 ) -> TokenStream {
+fn read_field_body( field: &Field, is_parent_non_exhaustive: bool, num_field: usize ) -> TokenStream {
     if field.skip {
         return quote! {
             std::default::Default::default()
@@ -1317,8 +1317,6 @@ fn read_field_body( field: &Field, is_parent_non_exhaustive: bool, num_field: u8
                     Some( quote! { #body? } )
                 }
             }
-
-            
         }
     };
 
@@ -1527,10 +1525,15 @@ fn read_field_body( field: &Field, is_parent_non_exhaustive: bool, num_field: u8
         body
     };
 
-    if field.default_on_eof {
-        default_on_eof_body( body )
+    if is_parent_non_exhaustive {
+        non_exhaustive_field_body( body, num_field )
     } else {
-        quote! { #body? }
+        // we do not need to handle default_on_eof when parent is non_exhaustive (because default_on_eof is applied on all fields)
+        if field.default_on_eof {
+            default_on_eof_body( body )
+        } else {
+            quote! { #body? }
+        }
     }
 }
 
@@ -1540,7 +1543,9 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
     let mut minimum_bytes_needed = Vec::new();
 
     if st.non_exhaustive {
-        field_readers.push( quote! { let _struct_size_: u8 = speedy::private::read_length_u8( _reader_ ) } );
+        field_readers.push( quote! { 
+            let _struct_size_: usize = speedy::private::read_length_u64_varint( _reader_ )?; 
+        } );
     }
 
     let mut num_field = 0;
@@ -1569,8 +1574,10 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
         StructKind::Named => quote! { { #initializer } }
     };
 
+    
     let minimum_bytes_needed = if st.non_exhaustive {
-        quote! { 1 + sum( minimum_bytes_needed ) }
+        // varint64 is at least 1 byte, everything else is optional
+        quote! { 1 }
     } else {
         sum( minimum_bytes_needed )
     };
@@ -1702,7 +1709,9 @@ fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
     }
 
     if st.non_exhaustive {
-        field_writers[0] = quote! { speedy::private::write_length_u8(#field_count) };
+        field_writers[0] = quote! { 
+            speedy::private::write_length_u64_varint(#field_count, _writer_ )?;
+        };
     }
 
     let body = quote! { #(#field_writers)* };
