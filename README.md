@@ -165,6 +165,18 @@ to the default value for its type and the EOF will be ignored.
 Specifies a static string of bytes which will be written or has to be present
 when reading before a given field.
 
+## Struct attributes
+
+### `#[speedy(non_exhaustive)]`
+
+The number of field in the structure is written before the struct fields.
+This allows you to append fields to a struct without losing the ability to read data written with the old struct.
+Warning : this is not retroactive, meaning if a struct did not have this tag before, 
+you won't be able to read serialized data serialized without this attribute.
+This features add one byte in front of each serialized structs.
+Please note that you can't use this attribute for structs with more than 127 fields at the moment.
+
+
 ## Enum attributes
 
 ### `#[speedy(tag_type = $ty)]`
