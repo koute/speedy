@@ -26,7 +26,7 @@ jobs:
     - name: install-clippy
       run: rustup component add clippy
     - name: clippy
-      run: cargo clippy --manifest-path wql/Cargo.toml -- -W clippy::pedantic
+      run: cargo clippy -- -W clippy::pedantic
       
   build:
     runs-on: ubuntu-latest

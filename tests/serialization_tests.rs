@@ -1,11 +1,11 @@
 use std::borrow::Cow;
-use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
 use std::num::NonZeroU32;
+use std::ops::Range;
 
 #[allow(unused_imports)]
-use speedy::{Readable, Writable, Endianness};
+use speedy::{Endianness, Readable, Writable};
 
 macro_rules! symmetric_tests {
     ($(
@@ -355,11 +355,11 @@ struct DerivedStruct {
     /// A doc comment.
     a: u8,
     b: u16,
-    c: u32
+    c: u32,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedTupleStruct( u8, u16, u32 );
+struct DerivedTupleStruct(u8, u16, u32);
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedUnitStruct;
@@ -372,7 +372,7 @@ enum DerivedSimpleEnum {
     /// A doc comment.
     A,
     B = 10,
-    C
+    C,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -380,7 +380,7 @@ enum DerivedSimpleEnum {
 enum DerivedSimpleEnumTagTypeU7 {
     A,
     B,
-    C = 0x7f
+    C = 0x7f,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -388,7 +388,7 @@ enum DerivedSimpleEnumTagTypeU7 {
 enum DerivedSimpleEnumTagTypeU8 {
     A,
     B = 0xab,
-    C
+    C,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -396,7 +396,7 @@ enum DerivedSimpleEnumTagTypeU8 {
 enum DerivedSimpleEnumTagTypeU16 {
     A,
     B = 0xabcd,
-    C
+    C,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -404,7 +404,7 @@ enum DerivedSimpleEnumTagTypeU16 {
 enum DerivedSimpleEnumTagTypeU32 {
     A,
     B = 0xabcdef01,
-    C
+    C,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -413,51 +413,54 @@ enum DerivedSimpleEnumTagTypeU32 {
 enum DerivedSimpleEnumTagTypeU64 {
     A,
     B = 0xabcdef0123456789_u64,
-    C
+    C,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 #[speedy(tag_type = u64_varint)]
 enum DerivedSimpleEnumTagTypeVarInt64 {
     A,
-    B = 0x1234
+    B = 0x1234,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 enum DerivedEnum {
     A,
-    B( u8, u16, u32 ),
+    B(u8, u16, u32),
     C {
         /// A doc comment.
         a: u8,
         b: u16,
-        c: u32
-    }
+        c: u32,
+    },
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithLifetimeBytes< 'a > {
-    bytes: Cow< 'a, [u8] >
+struct DerivedStructWithLifetimeBytes<'a> {
+    bytes: Cow<'a, [u8]>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithLifetimeStr< 'a > {
-    inner: Cow< 'a, str >
+struct DerivedStructWithLifetimeStr<'a> {
+    inner: Cow<'a, str>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithGenericCow< 'a, T: 'a + ToOwned + ?Sized > where <T as ToOwned>::Owned: Debug {
-    inner: Cow< 'a, T >
+struct DerivedStructWithGenericCow<'a, T: 'a + ToOwned + ?Sized>
+where
+    <T as ToOwned>::Owned: Debug,
+{
+    inner: Cow<'a, T>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithGenericRef< 'a, T: 'a + ?Sized > {
-    inner: &'a T
+struct DerivedStructWithGenericRef<'a, T: 'a + ?Sized> {
+    inner: &'a T,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithGeneric< T > {
-    inner: T
+struct DerivedStructWithGeneric<T> {
+    inner: T,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -466,172 +469,168 @@ struct DerivedStructWithDefaultOnEof {
     #[speedy(default_on_eof)]
     b: u16,
     #[speedy(default_on_eof)]
-    c: u32
+    c: u32,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedRecursiveStruct {
-    inner: Vec< DerivedRecursiveStruct >
+    inner: Vec<DerivedRecursiveStruct>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithCount {
     length: u8,
     #[speedy(length = length * 2)]
-    data: Vec< bool >
+    data: Vec<bool>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithStringWithCount {
     length: u8,
     #[speedy(length = length * 2)]
-    data: String
+    data: String,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithCowSliceWithCount< 'a > {
+struct DerivedStructWithCowSliceWithCount<'a> {
     length: u8,
     #[speedy(length = length * 2)]
-    data: Cow< 'a, [bool] >
+    data: Cow<'a, [bool]>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithCowStrWithCount< 'a > {
+struct DerivedStructWithCowStrWithCount<'a> {
     length: u8,
     #[speedy(length = length * 2)]
-    data: Cow< 'a, str >
+    data: Cow<'a, str>,
 }
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedRefSliceU8WithCount< 'a > {
+struct DerivedRefSliceU8WithCount<'a> {
     length: u8,
     #[speedy(length = length * 2)]
-    data: &'a [u8]
+    data: &'a [u8],
 }
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedRefStrWithCount< 'a > {
+struct DerivedRefStrWithCount<'a> {
     length: u8,
     #[speedy(length = length * 2)]
-    data: &'a str
+    data: &'a str,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithHashMapWithCount {
     length: u8,
     #[speedy(length = length / 4)]
-    data: HashMap< u8, u8 >
+    data: HashMap<u8, u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithBTreeMapWithCount {
     length: u8,
     #[speedy(length = length / 4)]
-    data: BTreeMap< u8, u8 >
+    data: BTreeMap<u8, u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithHashSetWithCount {
     length: u8,
     #[speedy(length = length / 4)]
-    data: HashSet< u8 >
+    data: HashSet<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithBTreeSetWithCount {
     length: u8,
     #[speedy(length = length / 4)]
-    data: BTreeSet< u8 >
+    data: BTreeSet<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithCowHashMapWithCount< 'a > {
+struct DerivedStructWithCowHashMapWithCount<'a> {
     length: u8,
     #[speedy(length = length / 4)]
-    data: Cow< 'a, HashMap< u8, u8 > >
+    data: Cow<'a, HashMap<u8, u8>>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithCowBTreeMapWithCount< 'a > {
+struct DerivedStructWithCowBTreeMapWithCount<'a> {
     length: u8,
     #[speedy(length = length / 4)]
-    data: Cow< 'a, BTreeMap< u8, u8 > >
+    data: Cow<'a, BTreeMap<u8, u8>>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithCowHashSetWithCount< 'a > {
+struct DerivedStructWithCowHashSetWithCount<'a> {
     length: u8,
     #[speedy(length = length / 4)]
-    data: Cow< 'a, HashSet< u8 > >
+    data: Cow<'a, HashSet<u8>>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithCowBTreeSetWithCount< 'a > {
+struct DerivedStructWithCowBTreeSetWithCount<'a> {
     length: u8,
     #[speedy(length = length / 4)]
-    data: Cow< 'a, BTreeSet< u8 > >
+    data: Cow<'a, BTreeSet<u8>>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedTupleStructWithVecWithCount(
-    u8,
-    #[speedy(length = t0 * 2)]
-    Vec< bool >
-);
+struct DerivedTupleStructWithVecWithCount(u8, #[speedy(length = t0 * 2)] Vec<bool>);
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithDefaultOnEof {
     #[speedy(default_on_eof)]
-    data: Vec< u8 >
+    data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithCountWithDefaultOnEof {
     length: u8,
     #[speedy(length = length, default_on_eof)]
-    data: Vec< u8 >
+    data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithLengthTypeU7 {
     #[speedy(length_type = u7)]
-    data: Vec< u8 >
+    data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithLengthTypeU8 {
     #[speedy(length_type = u8)]
-    data: Vec< u8 >
+    data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithLengthTypeU16 {
     #[speedy(length_type = u16)]
-    data: Vec< u8 >
+    data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithLengthTypeU32 {
     #[speedy(length_type = u32)]
-    data: Vec< u8 >
+    data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithLengthTypeU64 {
     #[speedy(length_type = u64)]
-    data: Vec< u8 >
+    data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithVecWithLengthTypeVarInt64 {
     #[speedy(length_type = u64_varint)]
-    data: Vec< u8 >
+    data: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithOptionVecWithLengthTypeU16 {
     #[speedy(length_type = u16)]
-    data: Option< Vec< u8 > >
+    data: Option<Vec<u8>>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -639,12 +638,12 @@ struct DerivedStructWithOptionVecWithLengthTypeU16 {
 enum DerivedEnumWithCustomTag {
     #[speedy(tag = 20)]
     A = 10,
-    B
+    B,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithOptionU16 {
-    data: Option< u16 >
+    data: Option<u16>,
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -652,77 +651,76 @@ struct DerivedStructWithSkippedField {
     a: u8,
     #[speedy(skip)]
     _b: u8,
-    c: u8
+    c: u8,
 }
 
 mod inner {
     use speedy::{Readable, Writable};
 
     #[derive(Readable, Writable)]
-    struct Private {
-    }
+    struct Private {}
 
     // This is here only to make sure it compiles.
     #[derive(Readable, Writable)]
     pub struct Public {
-        field: Vec< Private >
+        field: Vec<Private>,
     }
 }
 
 #[derive(Clone, PartialEq, Debug, Readable, Writable)]
-struct Newtype( u16 );
+struct Newtype(u16);
 
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithArray< T > {
-    data: [T; 4]
+struct DerivedStructWithArray<T> {
+    data: [T; 4],
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithConstantPrefixString {
     #[speedy(constant_prefix = "ABC")]
-    value: ()
+    value: (),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithConstantPrefixByteString {
     #[speedy(constant_prefix = b"ABC")]
-    value: ()
+    value: (),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithConstantPrefixChar {
     #[speedy(constant_prefix = '苺')]
-    value: ()
+    value: (),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithConstantPrefixByte {
     #[speedy(constant_prefix = b'A')]
-    value: ()
+    value: (),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithConstantPrefixBoolTrue {
     #[speedy(constant_prefix = true)]
-    value: ()
+    value: (),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithConstantPrefixBoolFalse {
     #[speedy(constant_prefix = false)]
-    value: ()
+    value: (),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithConstantPrefixU8 {
     #[speedy(constant_prefix = 10_u8)]
-    value: ()
+    value: (),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithConstantPrefixI8 {
     #[speedy(constant_prefix = -1_i8)]
-    value: ()
+    value: (),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
@@ -730,183 +728,175 @@ struct DerivedStructWithConstantPrefixI8 {
 #[speedy(peek_tag)]
 enum DerivedEnumWithPeekTagU8 {
     #[speedy(tag = 1)]
-    One( u8 ),
+    One(u8),
     #[speedy(tag = 2)]
-    Two( u8 )
+    Two(u8),
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
 #[speedy(tag_type = u8)]
 enum DerivedRecursiveEnum {
     None,
-    Some( Box< DerivedRecursiveEnum > )
+    Some(Box<DerivedRecursiveEnum>),
 }
 
 // This is here only to make sure it compiles.
 #[derive(PartialEq, Debug, Readable, Writable)]
-struct DerivedStructWithTwoDifferentCows< 'a > {
-    a: Cow< 'a, BTreeMap< u8, u8 > >,
-    b: Cow< 'a, [u8] >
+struct DerivedStructWithTwoDifferentCows<'a> {
+    a: Cow<'a, BTreeMap<u8, u8>>,
+    b: Cow<'a, [u8]>,
 }
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericVec< T >( Vec< T > );
+struct DerivedTupleStructWithGenericVec<T>(Vec<T>);
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericHashMap< K, V >( HashMap< K, V > ) where K: std::hash::Hash + Eq;
+struct DerivedTupleStructWithGenericHashMap<K, V>(HashMap<K, V>)
+where
+    K: std::hash::Hash + Eq;
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericHashSet< T >( HashSet< T > ) where T: std::hash::Hash + Eq;
+struct DerivedTupleStructWithGenericHashSet<T>(HashSet<T>)
+where
+    T: std::hash::Hash + Eq;
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericBTreeMap< K, V >( BTreeMap< K, V > ) where K: Ord;
+struct DerivedTupleStructWithGenericBTreeMap<K, V>(BTreeMap<K, V>)
+where
+    K: Ord;
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericBTreeSet< T >( BTreeSet< T > ) where T: Ord;
+struct DerivedTupleStructWithGenericBTreeSet<T>(BTreeSet<T>)
+where
+    T: Ord;
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericCowHashMap< 'a, K, V >( Cow< 'a, HashMap< K, V > > ) where K: std::hash::Hash + Eq + Clone, V: Clone;
+struct DerivedTupleStructWithGenericCowHashMap<'a, K, V>(Cow<'a, HashMap<K, V>>)
+where
+    K: std::hash::Hash + Eq + Clone,
+    V: Clone;
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericCowHashSet< 'a, T >( Cow< 'a, HashSet< T > > ) where T: std::hash::Hash + Eq + Clone;
+struct DerivedTupleStructWithGenericCowHashSet<'a, T>(Cow<'a, HashSet<T>>)
+where
+    T: std::hash::Hash + Eq + Clone;
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericCowBTreeMap< 'a, K, V >( Cow< 'a, BTreeMap< K, V > > ) where K: Ord + Clone, V: Clone;
+struct DerivedTupleStructWithGenericCowBTreeMap<'a, K, V>(Cow<'a, BTreeMap<K, V>>)
+where
+    K: Ord + Clone,
+    V: Clone;
 
 #[derive(Readable, Writable)]
-struct DerivedTupleStructWithGenericCowBTreeSet< 'a, T >( Cow< 'a, BTreeSet< T > > ) where T: Ord + Clone;
+struct DerivedTupleStructWithGenericCowBTreeSet<'a, T>(Cow<'a, BTreeSet<T>>)
+where
+    T: Ord + Clone;
 
 macro_rules! atomic_wrapper {
     ($name:ident, $base_ty:ident) => {
         #[derive(Debug, Readable, Writable)]
-        struct $name( std::sync::atomic::$name );
+        struct $name(std::sync::atomic::$name);
 
         impl $name {
-            pub fn new( value: $base_ty ) -> Self {
-                $name( value.into() )
+            pub fn new(value: $base_ty) -> Self {
+                $name(value.into())
             }
         }
 
         impl PartialEq for $name {
-            fn eq( &self, rhs: &$name ) -> bool {
-                self.0.load( std::sync::atomic::Ordering::SeqCst ) ==
-                rhs.0.load( std::sync::atomic::Ordering::SeqCst )
+            fn eq(&self, rhs: &$name) -> bool {
+                self.0.load(std::sync::atomic::Ordering::SeqCst)
+                    == rhs.0.load(std::sync::atomic::Ordering::SeqCst)
             }
         }
-    }
+    };
 }
 
-atomic_wrapper!( AtomicI8, i8 );
-atomic_wrapper!( AtomicU8, u8 );
-atomic_wrapper!( AtomicI16, i16 );
-atomic_wrapper!( AtomicU16, u16 );
-atomic_wrapper!( AtomicI32, i32 );
-atomic_wrapper!( AtomicU32, u32 );
-atomic_wrapper!( AtomicI64, i64 );
-atomic_wrapper!( AtomicU64, u64 );
+atomic_wrapper!(AtomicI8, i8);
+atomic_wrapper!(AtomicU8, u8);
+atomic_wrapper!(AtomicI16, i16);
+atomic_wrapper!(AtomicU16, u16);
+atomic_wrapper!(AtomicI32, i32);
+atomic_wrapper!(AtomicU32, u32);
+atomic_wrapper!(AtomicI64, i64);
+atomic_wrapper!(AtomicU64, u64);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
-struct TransparentU8( u8 );
+struct TransparentU8(u8);
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
-struct TransparentU16( u16 );
+struct TransparentU16(u16);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
-struct TransparentU32( u32 );
+struct TransparentU32(u32);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
-struct TransparentU128( u128 );
+struct TransparentU128(u128);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedRefStr< 'a >( &'a str );
+struct DerivedRefStr<'a>(&'a str);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedRefSliceU8< 'a >( &'a [u8] );
+struct DerivedRefSliceU8<'a>(&'a [u8]);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedStringUntilEof(
-    #[speedy(length = ..)]
-    String
-);
+struct DerivedStringUntilEof(#[speedy(length = ..)] String);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedVecUntilEof(
-    #[speedy(length = ..)]
-    Vec< u8 >
-);
+struct DerivedVecUntilEof(#[speedy(length = ..)] Vec<u8>);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedCowSliceUntilEof< 'a >(
-    #[speedy(length = ..)]
-    Cow< 'a, [u8] >
-);
+struct DerivedCowSliceUntilEof<'a>(#[speedy(length = ..)] Cow<'a, [u8]>);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedCowStrUntilEof< 'a >(
-    #[speedy(length = ..)]
-    Cow< 'a, str >
-);
+struct DerivedCowStrUntilEof<'a>(#[speedy(length = ..)] Cow<'a, str>);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedBTreeSetUntilEof(
-    #[speedy(length = ..)]
-    BTreeSet< u16 >
-);
+struct DerivedBTreeSetUntilEof(#[speedy(length = ..)] BTreeSet<u16>);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedRefSliceU8UntilEof< 'a >(
-    #[speedy(length = ..)]
-    &'a [u8]
-);
+struct DerivedRefSliceU8UntilEof<'a>(#[speedy(length = ..)] &'a [u8]);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedRefStrUntilEof< 'a >(
-    #[speedy(length = ..)]
-    &'a str
-);
+struct DerivedRefStrUntilEof<'a>(#[speedy(length = ..)] &'a str);
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedRefSlicePackedTuple< 'a >(
-    &'a [DerivedPackedTuple]
-);
+struct DerivedRefSlicePackedTuple<'a>(&'a [DerivedPackedTuple]);
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
-struct DerivedRefSlicePackedTupleUntilEof< 'a >(
-    #[speedy(length = ..)]
-    &'a [DerivedPackedTuple]
-);
+struct DerivedRefSlicePackedTupleUntilEof<'a>(#[speedy(length = ..)] &'a [DerivedPackedTuple]);
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(packed)]
-struct DerivedPackedTuple( u16, u16 );
+struct DerivedPackedTuple(u16, u16);
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(packed)]
-struct DerivedPackedRecursiveTuple( DerivedPackedTuple, DerivedPackedTuple );
+struct DerivedPackedRecursiveTuple(DerivedPackedTuple, DerivedPackedTuple);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(C)]
-struct DeriveCWithU8( u8 );
+struct DeriveCWithU8(u8);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(C)]
-struct DeriveCWithU16( u16 );
+struct DeriveCWithU16(u16);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(C)]
-struct DeriveCWithU16U16( u16, u16 );
+struct DeriveCWithU16U16(u16, u16);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(C)]
-struct DeriveCWithU16U8( u16, u8 );
+struct DeriveCWithU16U8(u16, u8);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(C)]
-struct DeriveCWithDeriveC( DeriveCWithU16 );
+struct DeriveCWithDeriveC(DeriveCWithU16);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(packed)]
@@ -922,15 +912,15 @@ struct DeriveCDummy;
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
-pub struct DeriveVecGenericTransparent< T >( Vec< T > );
+pub struct DeriveVecGenericTransparent<T>(Vec<T>);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
-pub struct DeriveArrayTransparent( [u8; 16] );
+pub struct DeriveArrayTransparent([u8; 16]);
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(packed)]
-struct PackedU16( u16 );
+struct PackedU16(u16);
 
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
@@ -2163,17 +2153,14 @@ symmetric_tests! {
 #[cfg(feature = "regex")]
 #[test]
 fn test_regex() {
-    use speedy::{
-        Readable,
-        Writable
-    };
+    use speedy::{Readable, Writable};
 
-    let regex = regex::Regex::new( "[a-z]+" ).unwrap();
+    let regex = regex::Regex::new("[a-z]+").unwrap();
     let buffer = regex.write_to_vec().unwrap();
-    assert_eq!( buffer, &[6, 0, 0, 0, b'[', b'a', b'-', b'z', b']', b'+'] );
+    assert_eq!(buffer, &[6, 0, 0, 0, b'[', b'a', b'-', b'z', b']', b'+']);
 
-    let deserialized = regex::Regex::read_from_buffer( &buffer ).unwrap();
-    assert_eq!( regex.as_str(), deserialized.as_str() );
+    let deserialized = regex::Regex::read_from_buffer(&buffer).unwrap();
+    assert_eq!(regex.as_str(), deserialized.as_str());
 }
 
 #[cfg(feature = "uuid")]
@@ -2186,44 +2173,81 @@ symmetric_tests! {
     }
 }
 
-
 #[test]
 fn test_derived_struct_with_default_on_eof() {
-    use speedy::{
-       Readable,
-       Endianness
-    };
+    use speedy::{Endianness, Readable};
 
-    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[0xAA] ).unwrap();
-    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0, c: 0 } );
+    let deserialized: DerivedStructWithDefaultOnEof =
+        Readable::read_from_buffer_with_ctx(Endianness::LittleEndian, &[0xAA]).unwrap();
+    assert_eq!(
+        deserialized,
+        DerivedStructWithDefaultOnEof {
+            a: 0xAA,
+            b: 0,
+            c: 0
+        }
+    );
 
-    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[0xAA, 0xBB] ).unwrap();
-    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0, c: 0 } );
+    let deserialized: DerivedStructWithDefaultOnEof =
+        Readable::read_from_buffer_with_ctx(Endianness::LittleEndian, &[0xAA, 0xBB]).unwrap();
+    assert_eq!(
+        deserialized,
+        DerivedStructWithDefaultOnEof {
+            a: 0xAA,
+            b: 0,
+            c: 0
+        }
+    );
 
-    let deserialized: DerivedStructWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[0xAA, 0xBB, 0xCC] ).unwrap();
-    assert_eq!( deserialized, DerivedStructWithDefaultOnEof { a: 0xAA, b: 0xCCBB, c: 0 } );
+    let deserialized: DerivedStructWithDefaultOnEof =
+        Readable::read_from_buffer_with_ctx(Endianness::LittleEndian, &[0xAA, 0xBB, 0xCC]).unwrap();
+    assert_eq!(
+        deserialized,
+        DerivedStructWithDefaultOnEof {
+            a: 0xAA,
+            b: 0xCCBB,
+            c: 0
+        }
+    );
 
-    let deserialized: DerivedStructWithVecWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[] ).unwrap();
-    assert_eq!( deserialized, DerivedStructWithVecWithDefaultOnEof { data: vec![] } );
+    let deserialized: DerivedStructWithVecWithDefaultOnEof =
+        Readable::read_from_buffer_with_ctx(Endianness::LittleEndian, &[]).unwrap();
+    assert_eq!(
+        deserialized,
+        DerivedStructWithVecWithDefaultOnEof { data: vec![] }
+    );
 
-    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[2, 0xAA, 0xBB] ).unwrap();
-    assert_eq!( deserialized, DerivedStructWithVecWithCountWithDefaultOnEof { length: 2, data: vec![0xAA, 0xBB] } );
+    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof =
+        Readable::read_from_buffer_with_ctx(Endianness::LittleEndian, &[2, 0xAA, 0xBB]).unwrap();
+    assert_eq!(
+        deserialized,
+        DerivedStructWithVecWithCountWithDefaultOnEof {
+            length: 2,
+            data: vec![0xAA, 0xBB]
+        }
+    );
 
-    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &[2, 0xAA] ).unwrap();
-    assert_eq!( deserialized, DerivedStructWithVecWithCountWithDefaultOnEof { length: 2, data: vec![] } );
+    let deserialized: DerivedStructWithVecWithCountWithDefaultOnEof =
+        Readable::read_from_buffer_with_ctx(Endianness::LittleEndian, &[2, 0xAA]).unwrap();
+    assert_eq!(
+        deserialized,
+        DerivedStructWithVecWithCountWithDefaultOnEof {
+            length: 2,
+            data: vec![]
+        }
+    );
 }
 
 #[test]
 fn test_length_mismatch_with_length_attribute() {
-    use speedy::{
-        Endianness,
-        Writable
-    };
+    use speedy::{Endianness, Writable};
 
     let err = DerivedStructWithVecWithCount {
         length: 0,
-        data: vec![ true ]
-    }.write_to_vec_with_ctx( Endianness::LittleEndian ).unwrap_err();
+        data: vec![true],
+    }
+    .write_to_vec_with_ctx(Endianness::LittleEndian)
+    .unwrap_err();
 
     assert_eq!(
         err.to_string(),
@@ -2233,97 +2257,98 @@ fn test_length_mismatch_with_length_attribute() {
 
 #[test]
 fn test_zero_non_zero() {
-    let error = NonZeroU32::read_from_buffer( &[0, 0, 0, 0] ).unwrap_err();
-    match speedy::private::get_error_kind( &error ) {
-        speedy::private::ErrorKind::ZeroNonZero => {},
-        error => panic!( "Unexpected error: {:?}", error )
+    let error = NonZeroU32::read_from_buffer(&[0, 0, 0, 0]).unwrap_err();
+    match speedy::private::get_error_kind(&error) {
+        speedy::private::ErrorKind::ZeroNonZero => {}
+        error => panic!("Unexpected error: {:?}", error),
     }
 }
 
 #[test]
 fn test_vec_with_length_type_u7_read_out_of_range_length() {
-    let error = DerivedStructWithVecWithLengthTypeU7::read_from_buffer( &[0x80] ).unwrap_err();
-    match speedy::private::get_error_kind( &error ) {
-        speedy::private::ErrorKind::OutOfRangeLength => {},
-        error => panic!( "Unexpected error: {:?}", error )
+    let error = DerivedStructWithVecWithLengthTypeU7::read_from_buffer(&[0x80]).unwrap_err();
+    match speedy::private::get_error_kind(&error) {
+        speedy::private::ErrorKind::OutOfRangeLength => {}
+        error => panic!("Unexpected error: {:?}", error),
     }
 }
 
 #[test]
 fn test_prefix_constant_mismatch() {
-    let error = DerivedStructWithConstantPrefixString::read_from_buffer( &[0x41, 0x42] ).unwrap_err();
-    match speedy::private::get_error_kind( &error ) {
-        speedy::private::ErrorKind::InputBufferIsTooSmall { .. } => {},
-        error => panic!( "Unexpected error: {:?}", error )
+    let error = DerivedStructWithConstantPrefixString::read_from_buffer(&[0x41, 0x42]).unwrap_err();
+    match speedy::private::get_error_kind(&error) {
+        speedy::private::ErrorKind::InputBufferIsTooSmall { .. } => {}
+        error => panic!("Unexpected error: {:?}", error),
     }
 
-    let error = DerivedStructWithConstantPrefixString::read_from_buffer( &[0x41, 0x42, 0x00] ).unwrap_err();
-    match speedy::private::get_error_kind( &error ) {
-        speedy::private::ErrorKind::ExpectedConstant { .. } => {},
-        error => panic!( "Unexpected error: {:?}", error )
+    let error =
+        DerivedStructWithConstantPrefixString::read_from_buffer(&[0x41, 0x42, 0x00]).unwrap_err();
+    match speedy::private::get_error_kind(&error) {
+        speedy::private::ErrorKind::ExpectedConstant { .. } => {}
+        error => panic!("Unexpected error: {:?}", error),
     }
 }
 
 #[test]
 fn test_minimum_bytes_needed() {
-    use speedy::{
-        Readable,
-        Endianness
-    };
+    use speedy::{Endianness, Readable};
 
-    assert_eq!( <DerivedStructWithDefaultOnEof as Readable< Endianness >>::minimum_bytes_needed(), 1 );
+    assert_eq!(
+        <DerivedStructWithDefaultOnEof as Readable<Endianness>>::minimum_bytes_needed(),
+        1
+    );
 }
 
 #[test]
 fn test_derive_transparent() {
-    assert!( <TransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( <TransparentU16 as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( !<NonTransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!(<TransparentU8 as Readable<Endianness>>::speedy_is_primitive());
+    assert!(<TransparentU16 as Readable<Endianness>>::speedy_is_primitive());
+    assert!(!<NonTransparentU8 as Readable<Endianness>>::speedy_is_primitive());
 
-    assert!( <TransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( <TransparentU16 as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( !<NonTransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!(<TransparentU8 as Writable<Endianness>>::speedy_is_primitive());
+    assert!(<TransparentU16 as Writable<Endianness>>::speedy_is_primitive());
+    assert!(!<NonTransparentU8 as Writable<Endianness>>::speedy_is_primitive());
 }
 
 #[test]
 fn test_derive_packed() {
-    assert!( !<DerivedTupleStruct as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( <DerivedPackedTuple as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( !<DerivedTupleStruct as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( <DerivedPackedTuple as Writable< Endianness >>::speedy_is_primitive() );
+    assert!(!<DerivedTupleStruct as Readable<Endianness>>::speedy_is_primitive());
+    assert!(<DerivedPackedTuple as Readable<Endianness>>::speedy_is_primitive());
+    assert!(!<DerivedTupleStruct as Writable<Endianness>>::speedy_is_primitive());
+    assert!(<DerivedPackedTuple as Writable<Endianness>>::speedy_is_primitive());
 
-    assert!( <DerivedPackedRecursiveTuple as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( <DerivedPackedRecursiveTuple as Writable< Endianness >>::speedy_is_primitive() );
+    assert!(<DerivedPackedRecursiveTuple as Readable<Endianness>>::speedy_is_primitive());
+    assert!(<DerivedPackedRecursiveTuple as Writable<Endianness>>::speedy_is_primitive());
 }
 
 #[test]
 fn test_derive_c() {
-    assert!( <DeriveCWithU8 as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( <DeriveCWithU16 as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( <DeriveCWithU16U16 as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( <DeriveCWithDeriveC as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( !<DeriveCWithU16U8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!(<DeriveCWithU8 as Readable<Endianness>>::speedy_is_primitive());
+    assert!(<DeriveCWithU16 as Readable<Endianness>>::speedy_is_primitive());
+    assert!(<DeriveCWithU16U16 as Readable<Endianness>>::speedy_is_primitive());
+    assert!(<DeriveCWithDeriveC as Readable<Endianness>>::speedy_is_primitive());
+    assert!(!<DeriveCWithU16U8 as Readable<Endianness>>::speedy_is_primitive());
 
-    assert!( <DeriveCWithU8 as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( <DeriveCWithU16 as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( <DeriveCWithU16U16 as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( <DeriveCWithDeriveC as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( !<DeriveCWithU16U8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!(<DeriveCWithU8 as Writable<Endianness>>::speedy_is_primitive());
+    assert!(<DeriveCWithU16 as Writable<Endianness>>::speedy_is_primitive());
+    assert!(<DeriveCWithU16U16 as Writable<Endianness>>::speedy_is_primitive());
+    assert!(<DeriveCWithDeriveC as Writable<Endianness>>::speedy_is_primitive());
+    assert!(!<DeriveCWithU16U8 as Writable<Endianness>>::speedy_is_primitive());
 }
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-struct NonTransparentU8( u8 );
+struct NonTransparentU8(u8);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(transparent)]
-struct TransparentNonZeroCopyable( Vec< u8 > );
+struct TransparentNonZeroCopyable(Vec<u8>);
 
 #[derive(Copy, Clone, Readable, Writable, PartialEq, Eq, Debug)]
-struct NonZeroCopyable( u8 );
+struct NonZeroCopyable(u8);
 
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(packed)]
-struct PackedNonZeroCopyable( NonZeroCopyable );
+struct PackedNonZeroCopyable(NonZeroCopyable);
 
 // Source: https://users.rust-lang.org/t/a-macro-to-assert-that-a-type-does-not-implement-trait-bounds/31179
 macro_rules! assert_not_impl {
@@ -2348,54 +2373,72 @@ macro_rules! assert_impl {
     };
 }
 
-assert_not_impl!( (u8, u8), speedy::private::ZeroCopyable< () > );
-assert_not_impl!( Vec< u8 >, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( NonTransparentU8, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( TransparentNonZeroCopyable, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( NonZeroCopyable, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( PackedNonZeroCopyable, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( DerivedRefSlicePackedTuple, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( DerivedRefSlicePackedTupleUntilEof, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( &[DerivedPackedTuple], speedy::private::ZeroCopyable< () > );
-assert_not_impl!( u16, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( u32, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( u64, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( u128, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( i16, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( i32, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( i64, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( i128, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( f32, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( f64, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( TransparentU16, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( TransparentU32, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( TransparentU128, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( &'static [u16], speedy::Readable< 'static, speedy::LittleEndian > );
+assert_not_impl!((u8, u8), speedy::private::ZeroCopyable<()>);
+assert_not_impl!(Vec<u8>, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(NonTransparentU8, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(
+    TransparentNonZeroCopyable,
+    speedy::private::ZeroCopyable<()>
+);
+assert_not_impl!(NonZeroCopyable, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(PackedNonZeroCopyable, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(
+    DerivedRefSlicePackedTuple,
+    speedy::private::ZeroCopyable<()>
+);
+assert_not_impl!(
+    DerivedRefSlicePackedTupleUntilEof,
+    speedy::private::ZeroCopyable<()>
+);
+assert_not_impl!(&[DerivedPackedTuple], speedy::private::ZeroCopyable<()>);
+assert_not_impl!(u16, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(u32, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(u64, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(u128, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(i16, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(i32, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(i64, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(i128, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(f32, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(f64, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(TransparentU16, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(TransparentU32, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(TransparentU128, speedy::private::ZeroCopyable<()>);
+assert_not_impl!(
+    &'static [u16],
+    speedy::Readable<'static, speedy::LittleEndian>
+);
 
-assert_impl!( u8, speedy::private::ZeroCopyable< () > );
-assert_impl!( i8, speedy::private::ZeroCopyable< () > );
-assert_impl!( TransparentU8, speedy::private::ZeroCopyable< () > );
-assert_impl!( DerivedPackedTuple, speedy::private::ZeroCopyable< () > );
-assert_impl!( DerivedPackedRecursiveTuple, speedy::private::ZeroCopyable< () > );
-assert_impl!( &'static [PackedU16], speedy::Readable< 'static, speedy::LittleEndian > );
+assert_impl!(u8, speedy::private::ZeroCopyable<()>);
+assert_impl!(i8, speedy::private::ZeroCopyable<()>);
+assert_impl!(TransparentU8, speedy::private::ZeroCopyable<()>);
+assert_impl!(DerivedPackedTuple, speedy::private::ZeroCopyable<()>);
+assert_impl!(
+    DerivedPackedRecursiveTuple,
+    speedy::private::ZeroCopyable<()>
+);
+assert_impl!(
+    &'static [PackedU16],
+    speedy::Readable<'static, speedy::LittleEndian>
+);
 
 #[test]
 fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    static COUNTER: AtomicU64 = AtomicU64::new( 0 );
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-    struct WithDrop( u8 );
+    struct WithDrop(u8);
     impl Drop for WithDrop {
-        fn drop( &mut self ) {
-            COUNTER.fetch_add( 1, Ordering::SeqCst );
+        fn drop(&mut self) {
+            COUNTER.fetch_add(1, Ordering::SeqCst);
         }
     }
 
     #[derive(Readable, Writable, PartialEq, Eq, Debug)]
-    struct Struct( Vec< WithDrop > );
+    struct Struct(Vec<WithDrop>);
 
-    Struct::read_from_stream_unbuffered( &mut &[0, 0, 0, 10, 1, 2][..] ).unwrap_err();
-    assert_eq!( COUNTER.load( Ordering::SeqCst ), 2 );
+    Struct::read_from_stream_unbuffered(&mut &[0, 0, 0, 10, 1, 2][..]).unwrap_err();
+    assert_eq!(COUNTER.load(Ordering::SeqCst), 2);
 }
