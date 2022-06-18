@@ -1,0 +1,92 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "*" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  Formatting:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: FMT
+      run: cargo fmt -- --check
+      
+  Linting:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: install-clippy
+      run: rustup component add clippy
+    - name: clippy
+      run: cargo clippy --manifest-path wql/Cargo.toml -- -W clippy::pedantic
+      
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --verbose
+      
+  test-stable:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Stable tests
+      run: cargo test --verbose
+      
+  test-nightly:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+    - uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --features external_doc
+    - uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: -p static-tests --release
+  
+  bench:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Cache cargo registry
+      uses: actions/cache@v1
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo build
+      uses: actions/cache@v1
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: bench
+      run: cargo bench
+
+    - uses: actions/upload-artifact@v1
+      with:
+        name: rsstable_${{ github.sha }}_bench
+        path: ./target/criterion
