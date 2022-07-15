@@ -63,6 +63,7 @@ macro_rules! symmetric_tests {
                 assert_eq!( <$type as Readable< Endianness >>::minimum_bytes_needed(), $minimum_bytes );
             }
 
+            #[cfg(not(miri))]
             #[test]
             fn write_to_file_le() {
                 let file = tempfile::NamedTempFile::new().unwrap();
@@ -72,6 +73,7 @@ macro_rules! symmetric_tests {
                 assert_eq!( std::fs::read( &path ).unwrap(), $le_bytes );
             }
 
+            #[cfg(not(miri))]
             #[test]
             fn write_to_file_be() {
                 let file = tempfile::NamedTempFile::new().unwrap();
@@ -268,6 +270,7 @@ macro_rules! symmetric_tests {
                 }
             }
 
+            #[cfg(not(miri))]
             #[test]
             fn round_trip_file_le() {
                 let file = tempfile::NamedTempFile::new().unwrap();
@@ -278,6 +281,7 @@ macro_rules! symmetric_tests {
                 assert_eq!( original, deserialized );
             }
 
+            #[cfg(not(miri))]
             #[test]
             fn round_trip_file_be() {
                 let file = tempfile::NamedTempFile::new().unwrap();
