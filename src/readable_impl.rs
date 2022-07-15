@@ -19,7 +19,7 @@ impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
-        reader.read_collection( length )
+        reader.read_key_value_collection( length )
     }
 
     #[inline]
@@ -53,7 +53,7 @@ impl< 'a, C, K, V, S > Readable< 'a, C > for HashMap< K, V, S >
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let length = crate::private::read_length( reader )?;
-        reader.read_collection( length )
+        reader.read_key_value_collection( length )
     }
 
     #[inline]

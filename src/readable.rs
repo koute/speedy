@@ -116,6 +116,21 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
+    fn read_bytes_borrowed_from_reader< 'r >( &'r mut self, length: usize ) -> Option< Result< &'r [u8], C::Error > > {
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Some( Err( error_end_of_input() ) );
+        }
+
+        let slice;
+        unsafe {
+            slice = std::slice::from_raw_parts( self.ptr, length );
+            self.ptr = self.ptr.add( length );
+        }
+
+        Some( Ok( slice ) )
+    }
+
+    #[inline(always)]
     fn read_bytes_borrowed_until_eof( &mut self ) -> Option< &'a [u8] > {
         let length = self.end as usize - self.ptr as usize;
         let slice;
@@ -224,6 +239,21 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
             self.ptr = self.ptr.add( length );
         }
         Ok(())
+    }
+
+    #[inline(always)]
+    fn read_bytes_borrowed_from_reader< 'reader >( &'reader mut self, length: usize ) -> Option< Result< &'reader [u8], C::Error > > {
+        if self.can_read_at_least( length ) == Some( false ) {
+            return Some( Err( error_end_of_input() ) );
+        }
+
+        let slice;
+        unsafe {
+            slice = std::slice::from_raw_parts( self.ptr, length );
+            self.ptr = self.ptr.add( length );
+        }
+
+        Some( Ok( slice ) )
     }
 
     #[inline(always)]

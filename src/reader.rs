@@ -55,6 +55,11 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
+    fn read_bytes_borrowed_from_reader< 'r >( &'r mut self, _length: usize ) -> Option< Result< &'r [u8], C::Error > > {
+        None
+    }
+
+    #[inline(always)]
     fn read_bytes_borrowed_until_eof( &mut self ) -> Option< &'a [u8] > {
         None
     }
@@ -586,7 +591,52 @@ pub trait Reader< 'a, C: Context >: Sized {
         where U: FromIterator< T >,
               T: Readable< 'a, C >
     {
+        if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !self.endianness().conversion_necessary()) {
+            if let Some( bytesize ) = length.checked_mul( std::mem::size_of::< T >() ) {
+                if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
+                    let bytes = bytes?;
+                    let slice = unsafe { std::slice::from_raw_parts(
+                        bytes.as_ptr().cast::< T >(),
+                        length
+                    )};
+
+                    return Ok( slice.into_iter().map( |value|
+                        unsafe { std::ptr::read_unaligned( value ) }
+                    ).collect() );
+                }
+            }
+        }
+
         (0..length).into_iter().map( |_| self.read_value::< T >() ).collect()
+    }
+
+    #[inline]
+    fn read_key_value_collection< K, V, U >( &mut self, length: usize ) -> Result< U, C::Error >
+        where U: FromIterator< (K, V) >,
+              K: Readable< 'a, C >,
+              V: Readable< 'a, C >
+    {
+        #[repr(packed)]
+        struct Pair< K, V >( K, V );
+
+        if K::speedy_is_primitive() && V::speedy_is_primitive() && ((mem::size_of::< K >() == 1 && mem::size_of::< V >() == 1) || !self.endianness().conversion_necessary()) {
+            if let Some( bytesize ) = length.checked_mul( std::mem::size_of::< Pair< K, V > >() ) {
+                if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
+                    let bytes = bytes?;
+                    let slice = unsafe { std::slice::from_raw_parts(
+                        bytes.as_ptr().cast::< Pair< K, V > >(),
+                        length
+                    )};
+
+                    return Ok( slice.into_iter().map( |pair| {
+                        let pair = unsafe { std::ptr::read_unaligned( pair ) };
+                        (pair.0, pair.1)
+                    }).collect() );
+                }
+            }
+        }
+
+        self.read_collection( length )
     }
 
     #[inline]

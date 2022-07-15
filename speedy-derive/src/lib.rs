@@ -1337,11 +1337,37 @@ fn read_field_body( field: &Field ) -> TokenStream {
         }
     };
 
+    let read_key_value_collection = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_key_value_collection( _length_ )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_collection_until_eof()
+            }}
+        }
+    };
+
     let read_cow_collection = || {
         if let Some( ref read_length_body ) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_collection( _length_ ).map( std::borrow::Cow::Owned )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_collection_until_eof().map( std::borrow::Cow::Owned )
+            }}
+        }
+    };
+
+    let read_cow_key_value_collection = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_key_value_collection( _length_ ).map( std::borrow::Cow::Owned )
             }}
         } else {
             quote! {{
@@ -1447,12 +1473,12 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Ty::CowSlice( .. ) => read_cow_slice(),
         Ty::CowStr( .. ) => read_cow_str(),
         Ty::HashMap( .. ) |
+        Ty::BTreeMap( .. )  => read_key_value_collection(),
         Ty::HashSet( .. ) |
-        Ty::BTreeMap( .. ) |
         Ty::BTreeSet( .. ) => read_collection(),
         Ty::CowHashMap( .. ) |
+        Ty::CowBTreeMap( .. ) => read_cow_key_value_collection(),
         Ty::CowHashSet( .. ) |
-        Ty::CowBTreeMap( .. ) |
         Ty::CowBTreeSet( .. ) => read_cow_collection(),
         Ty::RefSliceU8( .. ) => read_ref_slice_u8(),
         Ty::RefSlice( _, inner_ty ) => read_ref_slice( inner_ty ),
