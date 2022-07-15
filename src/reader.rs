@@ -628,13 +628,15 @@ pub trait Reader< 'a, C: Context >: Sized {
               T: Readable< 'a, C >
     {
         if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !self.endianness().conversion_necessary()) {
-            if let Some( bytesize ) = length.checked_mul( std::mem::size_of::< T >() ) {
-                if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
-                    let bytes = bytes?;
-                    unsafe {
-                        let pointer = bytes.as_ptr().cast::< T >();
-                        return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut T ), end: pointer.add( length ) }.collect() );
-                    }
+            let bytesize = length.checked_mul( std::mem::size_of::< T >() ).ok_or_else( || {
+                crate::error::error_too_big_usize_for_this_architecture() // TODO: Use different error maybe?
+            })?;
+
+            if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
+                let bytes = bytes?;
+                unsafe {
+                    let pointer = bytes.as_ptr().cast::< T >();
+                    return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut T ), end: pointer.add( length ) }.collect() );
                 }
             }
         }
@@ -652,13 +654,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         struct Pair< K, V >( K, V );
 
         if K::speedy_is_primitive() && V::speedy_is_primitive() && ((mem::size_of::< K >() == 1 && mem::size_of::< V >() == 1) || !self.endianness().conversion_necessary()) {
-            if let Some( bytesize ) = length.checked_mul( std::mem::size_of::< Pair< K, V > >() ) {
-                if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
-                    let bytes = bytes?;
-                    unsafe {
-                        let pointer = bytes.as_ptr().cast::< Pair< K, V > >();
-                        return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut Pair< K, V > ), end: pointer.add( length ) }.map( |pair| (pair.0, pair.1) ).collect() );
-                    }
+            let bytesize = length.checked_mul( std::mem::size_of::< Pair< K, V > >() ).ok_or_else( || {
+                crate::error::error_too_big_usize_for_this_architecture()
+            })?;
+
+            if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
+                let bytes = bytes?;
+                unsafe {
+                    let pointer = bytes.as_ptr().cast::< Pair< K, V > >();
+                    return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut Pair< K, V > ), end: pointer.add( length ) }.map( |pair| (pair.0, pair.1) ).collect() );
                 }
             }
         }
