@@ -62,6 +62,24 @@ macro_rules! symmetric_tests {
             fn minimum_bytes() {
                 assert_eq!( <$type as Readable< Endianness >>::minimum_bytes_needed(), $minimum_bytes );
             }
+
+            #[test]
+            fn write_to_file_le() {
+                let file = tempfile::NamedTempFile::new().unwrap();
+                let path = file.path();
+                let original: $type = $value;
+                original.write_to_file_with_ctx( Endianness::LittleEndian, &path ).unwrap();
+                assert_eq!( std::fs::read( &path ).unwrap(), $le_bytes );
+            }
+
+            #[test]
+            fn write_to_file_be() {
+                let file = tempfile::NamedTempFile::new().unwrap();
+                let path = file.path();
+                let original: $type = $value;
+                original.write_to_file_with_ctx( Endianness::BigEndian, &path ).unwrap();
+                assert_eq!( std::fs::read( &path ).unwrap(), $be_bytes );
+            }
         }
     )* } };
 
@@ -248,6 +266,26 @@ macro_rules! symmetric_tests {
                 } else {
                     assert_eq!( cursor.position(), total_length as u64 );
                 }
+            }
+
+            #[test]
+            fn round_trip_file_le() {
+                let file = tempfile::NamedTempFile::new().unwrap();
+                let path = file.path();
+                let original: $type = $value;
+                original.write_to_file_with_ctx( Endianness::LittleEndian, &path ).unwrap();
+                let deserialized: $type = Readable::read_from_file_with_ctx( Endianness::LittleEndian, &path ).unwrap();
+                assert_eq!( original, deserialized );
+            }
+
+            #[test]
+            fn round_trip_file_be() {
+                let file = tempfile::NamedTempFile::new().unwrap();
+                let path = file.path();
+                let original: $type = $value;
+                original.write_to_file_with_ctx( Endianness::BigEndian, &path ).unwrap();
+                let deserialized: $type = Readable::read_from_file_with_ctx( Endianness::BigEndian, &path ).unwrap();
+                assert_eq!( original, deserialized );
             }
         }
     )* } };
