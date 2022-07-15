@@ -1319,8 +1319,14 @@ symmetric_tests! {
         be = [0],
         minimum_bytes = 1
     }
-    hashmap for HashMap< u16, bool > {
+    hashmap_u16_bool for HashMap< u16, bool > {
         in = vec![ (10, true) ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1],
+        minimum_bytes = 4
+    }
+    hashmap_u16_u8 for HashMap< u16, u8 > {
+        in = vec![ (10, 1) ].into_iter().collect(),
         le = [1, 0, 0, 0, 10, 0, 1],
         be = [0, 0, 0, 1, 0, 10, 1],
         minimum_bytes = 4
@@ -1331,8 +1337,14 @@ symmetric_tests! {
         be = [0, 0, 0, 1, 0, 10],
         minimum_bytes = 4
     }
-    btreemap for BTreeMap< u16, bool > {
+    btreemap_u16_bool for BTreeMap< u16, bool > {
         in = vec![ (10, true), (20, false) ].into_iter().collect(),
+        le = [2, 0, 0, 0, 10, 0, 1, 20, 0, 0],
+        be = [0, 0, 0, 2, 0, 10, 1, 0, 20, 0],
+        minimum_bytes = 4
+    }
+    btreemap_u16_u8 for BTreeMap< u16, u8 > {
+        in = vec![ (10, 1), (20, 0) ].into_iter().collect(),
         le = [2, 0, 0, 0, 10, 0, 1, 20, 0, 0],
         be = [0, 0, 0, 2, 0, 10, 1, 0, 20, 0],
         minimum_bytes = 4
