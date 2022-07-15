@@ -11,6 +11,42 @@ use crate::error::error_end_of_input;
 use crate::error::IsEof;
 use crate::utils::SwapBytes;
 
+struct RawCopyIter< T > {
+    pointer: std::ptr::NonNull< T >,
+    end: *const T
+}
+
+impl< T > Iterator for RawCopyIter< T > {
+    type Item = T;
+    #[inline(always)]
+    fn next( &mut self ) -> Option< Self::Item > {
+        if self.pointer.as_ptr() as *const T == self.end {
+            return None;
+        } else {
+            unsafe {
+                let old = self.pointer.as_ptr();
+                self.pointer = std::ptr::NonNull::new_unchecked( old.add( 1 ) );
+                Some( std::ptr::read_unaligned( old ) )
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn size_hint( &self ) -> (usize, Option< usize >) {
+        let length = self.len();
+        (length, Some( length ))
+    }
+}
+
+impl< T > ExactSizeIterator for RawCopyIter< T > {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        let bytesize = self.end as usize - self.pointer.as_ptr() as usize;
+        bytesize / std::mem::size_of::< T >()
+    }
+}
+impl< T > std::iter::FusedIterator for RawCopyIter< T > {}
+
 pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
     fn peek_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
@@ -595,14 +631,10 @@ pub trait Reader< 'a, C: Context >: Sized {
             if let Some( bytesize ) = length.checked_mul( std::mem::size_of::< T >() ) {
                 if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
                     let bytes = bytes?;
-                    let slice = unsafe { std::slice::from_raw_parts(
-                        bytes.as_ptr().cast::< T >(),
-                        length
-                    )};
-
-                    return Ok( slice.into_iter().map( |value|
-                        unsafe { std::ptr::read_unaligned( value ) }
-                    ).collect() );
+                    unsafe {
+                        let pointer = bytes.as_ptr().cast::< T >();
+                        return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut T ), end: pointer.add( length ) }.collect() );
+                    }
                 }
             }
         }
@@ -623,15 +655,10 @@ pub trait Reader< 'a, C: Context >: Sized {
             if let Some( bytesize ) = length.checked_mul( std::mem::size_of::< Pair< K, V > >() ) {
                 if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
                     let bytes = bytes?;
-                    let slice = unsafe { std::slice::from_raw_parts(
-                        bytes.as_ptr().cast::< Pair< K, V > >(),
-                        length
-                    )};
-
-                    return Ok( slice.into_iter().map( |pair| {
-                        let pair = unsafe { std::ptr::read_unaligned( pair ) };
-                        (pair.0, pair.1)
-                    }).collect() );
+                    unsafe {
+                        let pointer = bytes.as_ptr().cast::< Pair< K, V > >();
+                        return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut Pair< K, V > ), end: pointer.add( length ) }.map( |pair| (pair.0, pair.1) ).collect() );
+                    }
                 }
             }
         }
