@@ -2399,3 +2399,27 @@ fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {
     Struct::read_from_stream_unbuffered( &mut &[0, 0, 0, 10, 1, 2][..] ).unwrap_err();
     assert_eq!( COUNTER.load( Ordering::SeqCst ), 2 );
 }
+
+#[test]
+fn test_zero_copy_cow_deserialization() {
+    let input: Vec< u8 > = vec![
+        2, 0, 0, 0,
+        33, 0,
+        100, 0,
+    ];
+
+    let value_borrowed: Cow< [u16] > = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &input ).unwrap();
+    let value_owned: Cow< [u16] > = Readable::read_from_buffer_copying_data_with_ctx( Endianness::LittleEndian, &input ).unwrap();
+
+    match value_borrowed {
+        Cow::Owned( _ ) => panic!(),
+        Cow::Borrowed( value ) => assert_eq!( value, &[33, 100] )
+    }
+
+    std::mem::drop( input );
+
+    match value_owned {
+        Cow::Owned( value ) => assert_eq!( value, &[33, 100] ),
+        Cow::Borrowed( _ ) => panic!()
+    }
+}
