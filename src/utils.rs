@@ -34,8 +34,8 @@ impl SwapBytes for f32 {
             int: u32
         }
 
+        let mut u = Union { float: self };
         unsafe {
-            let mut u = Union { float: self };
             u.int = u.int.swap_bytes();
             u.float
         }
@@ -50,8 +50,8 @@ impl SwapBytes for f64 {
             int: u64
         }
 
+        let mut u = Union { float: self };
         unsafe {
-            let mut u = Union { float: self };
             u.int = u.int.swap_bytes();
             u.float
         }
