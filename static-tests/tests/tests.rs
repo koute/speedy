@@ -9,19 +9,19 @@ use static_test::static_test;
 #[static_test]
 fn read_u16_from_buffer_when_buffer_length_is_known_and_is_big_enough(slice: &[u8]) {
     assume!(slice.len() == 2);
-    static_assert!(u16::read_from_buffer_with_ctx(Endianness::NATIVE, slice).is_ok());
+    static_assert!(u16::load_with_ctx(Endianness::NATIVE, slice).is_ok());
 }
 
 #[static_test]
 fn read_u16_from_buffer_when_buffer_length_is_known_and_is_not_big_enough_1(slice: &[u8]) {
     assume!(slice.len() == 1);
-    static_assert!(u16::read_from_buffer_with_ctx(Endianness::NATIVE, slice).is_err());
+    static_assert!(u16::load_with_ctx(Endianness::NATIVE, slice).is_err());
 }
 
 #[static_test]
 fn read_u16_from_buffer_when_buffer_length_is_known_and_is_not_big_enough_2(slice: &[u8]) {
     assume!(slice.len() == 1);
-    match u16::read_from_buffer_with_ctx(Endianness::NATIVE, slice) {
+    match u16::load_with_ctx(Endianness::NATIVE, slice) {
         Ok(_) => static_unreachable!(),
         Err(error) => match get_error_kind(&error) {
             ErrorKind::InputBufferIsTooSmall {
@@ -39,7 +39,7 @@ fn read_u16_from_buffer_when_buffer_length_is_known_and_is_not_big_enough_2(slic
 #[static_test]
 fn read_vec_u8_from_buffer_when_buffer_length_is_known_and_is_not_big_enough(slice: &[u8]) {
     assume!(slice.len() == 3);
-    match Vec::<u8>::read_from_buffer_with_ctx(Endianness::NATIVE, slice) {
+    match Vec::<u8>::load_with_ctx(Endianness::NATIVE, slice) {
         Ok(_) => {}
         Err(error) => match get_error_kind(&error) {
             ErrorKind::InputBufferIsTooSmall {
@@ -56,7 +56,7 @@ fn read_vec_u8_from_buffer_when_buffer_length_is_known_and_is_not_big_enough(sli
 
 #[static_test]
 fn read_vec_u8_from_buffer_when_buffer_length_is_not_known(slice: &[u8]) {
-    match Vec::<u8>::read_from_buffer_with_ctx(Endianness::NATIVE, slice) {
+    match Vec::<u8>::load_with_ctx(Endianness::NATIVE, slice) {
         Ok(_) => {}
         Err(error) => match get_error_kind(&error) {
             ErrorKind::InputBufferIsTooSmall { expected_size, .. } => {
@@ -70,7 +70,7 @@ fn read_vec_u8_from_buffer_when_buffer_length_is_not_known(slice: &[u8]) {
 
 #[static_test]
 fn read_cow_u8_from_buffer_when_buffer_length_is_not_known(slice: &[u8]) {
-    match Cow::<[u8]>::read_from_buffer_with_ctx(Endianness::NATIVE, slice) {
+    match Cow::<[u8]>::load_with_ctx(Endianness::NATIVE, slice) {
         Ok(_) => {}
         Err(error) => match get_error_kind(&error) {
             ErrorKind::InputBufferIsTooSmall { expected_size, .. } => {

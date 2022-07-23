@@ -57,7 +57,7 @@ fn read_speedy_megabyte_buffer_cow_borrowed(b: &mut Bencher) {
     buffer = black_box(buffer);
     b.iter(|| {
         let deserialized: Cow<[u8]> =
-            Readable::read_from_buffer_with_ctx(Endianness::NATIVE, &buffer).unwrap();
+            Readable::load_with_ctx(Endianness::NATIVE, &buffer).unwrap();
         deserialized
     })
 }
@@ -71,7 +71,7 @@ fn read_speedy_megabyte_buffer_cow_owned(b: &mut Bencher) {
     buffer = black_box(buffer);
     b.iter(|| {
         let deserialized: Cow<[u8]> =
-            Readable::read_from_buffer_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
+            Readable::load_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
         deserialized
     })
 }
@@ -101,7 +101,7 @@ fn read_speedy_megabyte_buffer_vec_non_primitive(b: &mut Bencher) {
     buffer = black_box(buffer);
     b.iter(|| {
         let deserialized: Vec<Byte> =
-            Readable::read_from_buffer_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
+            Readable::load_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
         deserialized
     })
 }
@@ -135,7 +135,7 @@ fn read_speedy_many_small_structs(b: &mut Bencher) {
     buffer = black_box(buffer);
     b.iter(|| {
         let deserialized: Vec<Dummy> =
-            Readable::read_from_buffer_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
+            Readable::load_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
         deserialized
     })
 }
@@ -191,7 +191,7 @@ fn read_varint_random(b: &mut Bencher) {
     buffer = black_box(buffer);
     b.iter(|| {
         let deserialized: Vec<VarInt64> =
-            Readable::read_from_buffer_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
+            Readable::load_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
         deserialized
     })
 }
@@ -210,7 +210,7 @@ fn read_varint_always_one_byte(b: &mut Bencher) {
     buffer = black_box(buffer);
     b.iter(|| {
         let deserialized: Vec<VarInt64> =
-            Readable::read_from_buffer_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
+            Readable::load_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
         deserialized
     })
 }
@@ -229,7 +229,7 @@ fn read_varint_always_eight_bytes(b: &mut Bencher) {
     buffer = black_box(buffer);
     b.iter(|| {
         let deserialized: Vec<VarInt64> =
-            Readable::read_from_buffer_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
+            Readable::load_copying_data_with_ctx(Endianness::NATIVE, &buffer).unwrap();
         deserialized
     })
 }

@@ -193,7 +193,7 @@ fn test_glam() {
         ($T:ty, $ctor:ident, $($values:literal),+) => {{
             let original = <$T>::$ctor($($values as _),+);
             let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
-            let deserialized = <$T>::read_from_buffer_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+            let deserialized = <$T>::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
             assert_eq!(original, deserialized);
         }}
     }
@@ -223,7 +223,7 @@ fn test_glam() {
             let original = BVec2::new(a, b);
             let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
             let deserialized =
-                BVec2::read_from_buffer_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+                BVec2::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
             assert_eq!(original, deserialized);
         }
     }
@@ -234,7 +234,7 @@ fn test_glam() {
                 let original = BVec3::new(a, b, c);
                 let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
                 let deserialized =
-                    BVec3::read_from_buffer_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+                    BVec3::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
                 assert_eq!(original, deserialized);
             }
         }
@@ -247,7 +247,7 @@ fn test_glam() {
                     let original = BVec4::new(a, b, c, d);
                     let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
                     let deserialized =
-                        BVec4::read_from_buffer_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+                        BVec4::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
                     assert_eq!(original, deserialized);
                 }
             }
@@ -264,7 +264,7 @@ fn test_glam() {
             let original = <$T>::from_cols_array(&cols);
             let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
             let deserialized =
-                <$T>::read_from_buffer_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+                <$T>::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
             assert_eq!(original, deserialized);
         }};
     }
