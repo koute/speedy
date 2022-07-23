@@ -227,7 +227,7 @@ mod tests {
 
         impl io::Read for TestStream {
             fn read(&mut self, output: &mut [u8]) -> Result<usize, io::Error> {
-                if self.position >= self.buffer.len() || output.len() == 0 {
+                if self.position >= self.buffer.len() || output.is_empty() {
                     return Ok(0);
                 }
 

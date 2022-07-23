@@ -289,12 +289,12 @@ impl<'ctx, 'r, 'a, C: Context> Reader<'r, C> for CopyingBufferReader<'ctx, 'a, C
 
     #[inline(always)]
     fn context(&self) -> &C {
-        &self.context
+        self.context
     }
 
     #[inline(always)]
     fn context_mut(&mut self) -> &mut C {
-        &mut self.context
+        self.context
     }
 }
 
@@ -339,7 +339,7 @@ where
             }
         }
 
-        if self.buffer.len() > 0 {
+        if !self.buffer.is_empty() {
             let length = std::cmp::min(self.buffer.len(), output.len());
             self.buffer.consume_into(&mut output[..length]);
             output = &mut output[length..];

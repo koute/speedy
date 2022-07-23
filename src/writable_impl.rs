@@ -289,7 +289,7 @@ where
 
     #[inline]
     fn bytes_needed(&self) -> Result<usize, C::Error> {
-        <[T] as Writable<C>>::bytes_needed(self.as_ref())
+        <[T] as Writable<C>>::bytes_needed(self)
     }
 }
 
@@ -739,13 +739,13 @@ where
     where
         W: ?Sized + Writer<C>,
     {
-        let value: &str = &**self;
+        let value: &str = self;
         value.write_to(writer)
     }
 
     #[inline]
     fn bytes_needed(&self) -> Result<usize, C::Error> {
-        let value: &str = &**self;
+        let value: &str = self;
         Writable::<C>::bytes_needed(value)
     }
 }
