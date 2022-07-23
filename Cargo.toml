@@ -1,5 +1,5 @@
 [package]
-name = "rmw-speedy"
+name = "speedy"
 version = "0.8.3"
 authors = ["Jan Bujak <j@exia.io>"]
 repository = "https://github.com/koute/speedy"
