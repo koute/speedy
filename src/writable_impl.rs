@@ -352,30 +352,30 @@ impl<C: Context> Writable<C> for () {
 }
 
 macro_rules! impl_for_tuple {
-    ($($name:ident),+) => {
-        impl< C: Context, $($name: Writable< C >),+ > Writable< C > for ($($name,)+) {
-            #[inline]
-            fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-                #[allow(non_snake_case)]
-                let &($(ref $name,)+) = self;
-                $(
-                    $name.write_to( writer )?;
-                )+
-                Ok(())
-            }
+  ($($name:ident),+) => {
+    impl< C: Context, $($name: Writable< C >),+ > Writable< C > for ($($name,)+) {
+      #[inline]
+      fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        #[allow(non_snake_case)]
+        let &($(ref $name,)+) = self;
+        $(
+          $name.write_to( writer )?;
+        )+
+          Ok(())
+      }
 
-            #[inline]
-            fn bytes_needed( &self ) -> Result< usize, C::Error > {
-                #[allow(non_snake_case)]
-                let &($(ref $name,)+) = self;
-                let mut size = 0;
-                $(
-                    size += Writable::< C >::bytes_needed( $name )?;
-                )+
-                Ok( size )
-            }
-        }
+      #[inline]
+      fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        #[allow(non_snake_case)]
+        let &($(ref $name,)+) = self;
+        let mut size = 0;
+        $(
+          size += Writable::< C >::bytes_needed( $name )?;
+        )+
+          Ok( size )
+      }
     }
+  }
 }
 
 impl_for_tuple!(A0);
@@ -645,6 +645,50 @@ where
     }
 }
 
+impl<C, T, const N: usize> Writable<C> for [T; N]
+where
+    C: Context,
+    T: Writable<C> + num_traits::NumCast,
+{
+    #[inline]
+    fn write_to<W>(&self, writer: &mut W) -> Result<(), C::Error>
+    where
+        W: ?Sized + Writer<C>,
+    {
+        for item in self {
+            item.write_to(writer)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn bytes_needed(&self) -> Result<usize, C::Error> {
+        Ok(std::mem::size_of::<T>() * N)
+    }
+}
+
+/*
+impl<C, T, const N: usize> Writable<C> for [T; N]
+where
+    C: Context,
+    T: Writable<C>,
+{
+    #[inline]
+    fn write_to<W>(&self, writer: &mut W) -> Result<(), C::Error>
+    where
+        W: ?Sized + Writer<C>,
+    {
+        for item in self {
+            item.write_to(writer)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn bytes_needed(&self) -> Result<usize, C::Error> {
+        Ok(std::mem::size_of::<T>() * N)
+    }
+}
 macro_rules! impl_for_array {
     ($count:tt) => {
         impl<C, T> Writable<C> for [T; $count]
@@ -674,7 +718,6 @@ macro_rules! impl_for_array {
         }
     };
 }
-
 impl_for_array!(1);
 impl_for_array!(2);
 impl_for_array!(3);
@@ -691,6 +734,8 @@ impl_for_array!(13);
 impl_for_array!(14);
 impl_for_array!(15);
 impl_for_array!(16);
+impl_for_array!(32);
+*/
 
 impl<C, T> Writable<C> for Box<T>
 where
