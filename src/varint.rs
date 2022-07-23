@@ -358,11 +358,8 @@ fn test_varint64_bruteforce() {
             let serialized_le = value
                 .write_to_vec_with_ctx(crate::Endianness::LittleEndian)
                 .unwrap();
-            let deserialized = VarInt64::load_with_ctx(
-                crate::Endianness::LittleEndian,
-                &serialized_le,
-            )
-            .unwrap();
+            let deserialized =
+                VarInt64::load_with_ctx(crate::Endianness::LittleEndian, &serialized_le).unwrap();
             assert_eq!(deserialized, value);
 
             let serialized_be = value

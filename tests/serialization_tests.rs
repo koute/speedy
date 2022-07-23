@@ -2337,8 +2337,7 @@ fn test_prefix_constant_mismatch() {
         error => panic!("Unexpected error: {:?}", error),
     }
 
-    let error =
-        DerivedStructWithConstantPrefixString::load(&[0x41, 0x42, 0x00]).unwrap_err();
+    let error = DerivedStructWithConstantPrefixString::load(&[0x41, 0x42, 0x00]).unwrap_err();
     match speedy::private::get_error_kind(&error) {
         speedy::private::ErrorKind::ExpectedConstant { .. } => {}
         error => panic!("Unexpected error: {:?}", error),

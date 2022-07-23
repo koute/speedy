@@ -222,8 +222,7 @@ fn test_glam() {
         for b in [false, true] {
             let original = BVec2::new(a, b);
             let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
-            let deserialized =
-                BVec2::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+            let deserialized = BVec2::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
             assert_eq!(original, deserialized);
         }
     }
@@ -233,8 +232,7 @@ fn test_glam() {
             for c in [false, true] {
                 let original = BVec3::new(a, b, c);
                 let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
-                let deserialized =
-                    BVec3::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+                let deserialized = BVec3::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
                 assert_eq!(original, deserialized);
             }
         }
@@ -263,8 +261,7 @@ fn test_glam() {
 
             let original = <$T>::from_cols_array(&cols);
             let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
-            let deserialized =
-                <$T>::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+            let deserialized = <$T>::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
             assert_eq!(original, deserialized);
         }};
     }

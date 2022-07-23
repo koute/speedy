@@ -118,8 +118,7 @@ mod tests {
     fn simple_read_bytes_from_buffer_owned() {
         let data = vec![2, 0, 0, 0, 12, 34];
         let value: Cow<[u8]> =
-            Readable::load_copying_data_with_ctx(Endianness::LittleEndian, &data)
-                .unwrap();
+            Readable::load_copying_data_with_ctx(Endianness::LittleEndian, &data).unwrap();
         assert_eq!(&*value, &[12, 34]);
         assert_ne!(value.as_ptr(), data[4..].as_ptr());
     }
@@ -127,8 +126,7 @@ mod tests {
     #[test]
     fn simple_read_bytes_from_buffer_borrowed() {
         let data = vec![2, 0, 0, 0, 12, 34];
-        let value: Cow<[u8]> =
-            Readable::load_with_ctx(Endianness::LittleEndian, &data).unwrap();
+        let value: Cow<[u8]> = Readable::load_with_ctx(Endianness::LittleEndian, &data).unwrap();
         assert_eq!(&*value, &[12, 34]);
         assert_eq!(value.as_ptr(), data[4..].as_ptr());
     }
@@ -205,8 +203,7 @@ mod tests {
     fn read_write_string() {
         let original: String = "Hello world!".to_owned();
         let serialized = original.write_to_vec_with_ctx(Endianness::NATIVE).unwrap();
-        let deserialized: String =
-            String::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
+        let deserialized: String = String::load_with_ctx(Endianness::NATIVE, &serialized).unwrap();
         assert_eq!(original, deserialized);
     }
 

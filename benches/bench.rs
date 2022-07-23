@@ -56,8 +56,7 @@ fn read_speedy_megabyte_buffer_cow_borrowed(b: &mut Bencher) {
 
     buffer = black_box(buffer);
     b.iter(|| {
-        let deserialized: Cow<[u8]> =
-            Readable::load_with_ctx(Endianness::NATIVE, &buffer).unwrap();
+        let deserialized: Cow<[u8]> = Readable::load_with_ctx(Endianness::NATIVE, &buffer).unwrap();
         deserialized
     })
 }
