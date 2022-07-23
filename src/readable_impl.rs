@@ -1,25 +1,25 @@
-use std::mem;
-use std::borrow::{Cow, ToOwned};
-use std::ops::Range;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::hash::{BuildHasher, Hash};
+use std::{
+    borrow::{Cow, ToOwned},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    hash::{BuildHasher, Hash},
+    mem,
+    ops::Range,
+};
 
-use crate::readable::Readable;
-use crate::reader::Reader;
+use crate::{
+    context::Context, endianness::Endianness, readable::Readable, reader::Reader, utils::SwapBytes,
+};
 
-use crate::context::Context;
-use crate::utils::SwapBytes;
-use crate::endianness::Endianness;
-
-impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
-    where C: Context,
-          K: Readable< 'a, C > + Ord,
-          V: Readable< 'a, C >,
+impl<'a, C, K, V> Readable<'a, C> for BTreeMap<K, V>
+where
+    C: Context,
+    K: Readable<'a, C> + Ord,
+    V: Readable<'a, C>,
 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let length = crate::private::read_length( reader )?;
-        reader.read_key_value_collection( length )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let length = crate::private::read_length(reader)?;
+        reader.read_key_value_collection(length)
     }
 
     #[inline]
@@ -28,14 +28,15 @@ impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
     }
 }
 
-impl< 'a, C, T > Readable< 'a, C > for BTreeSet< T >
-    where C: Context,
-          T: Readable< 'a, C > + Ord
+impl<'a, C, T> Readable<'a, C> for BTreeSet<T>
+where
+    C: Context,
+    T: Readable<'a, C> + Ord,
 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let length = crate::private::read_length( reader )?;
-        reader.read_collection( length )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let length = crate::private::read_length(reader)?;
+        reader.read_collection(length)
     }
 
     #[inline]
@@ -44,16 +45,17 @@ impl< 'a, C, T > Readable< 'a, C > for BTreeSet< T >
     }
 }
 
-impl< 'a, C, K, V, S > Readable< 'a, C > for HashMap< K, V, S >
-    where C: Context,
-          K: Readable< 'a, C > + Eq + Hash,
-          V: Readable< 'a, C >,
-          S: BuildHasher + Default
+impl<'a, C, K, V, S> Readable<'a, C> for HashMap<K, V, S>
+where
+    C: Context,
+    K: Readable<'a, C> + Eq + Hash,
+    V: Readable<'a, C>,
+    S: BuildHasher + Default,
 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let length = crate::private::read_length( reader )?;
-        reader.read_key_value_collection( length )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let length = crate::private::read_length(reader)?;
+        reader.read_key_value_collection(length)
     }
 
     #[inline]
@@ -62,15 +64,16 @@ impl< 'a, C, K, V, S > Readable< 'a, C > for HashMap< K, V, S >
     }
 }
 
-impl< 'a, C, T, S > Readable< 'a, C > for HashSet< T, S >
-    where C: Context,
-          T: Readable< 'a, C > + Eq + Hash,
-          S: BuildHasher + Default
+impl<'a, C, T, S> Readable<'a, C> for HashSet<T, S>
+where
+    C: Context,
+    T: Readable<'a, C> + Eq + Hash,
+    S: BuildHasher + Default,
 {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let length = crate::private::read_length( reader )?;
-        reader.read_collection( length )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let length = crate::private::read_length(reader)?;
+        reader.read_collection(length)
     }
 
     #[inline]
@@ -79,14 +82,14 @@ impl< 'a, C, T, S > Readable< 'a, C > for HashSet< T, S >
     }
 }
 
-impl< 'a, C: Context > Readable< 'a, C > for bool {
+impl<'a, C: Context> Readable<'a, C> for bool {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
         let value = reader.read_u8()?;
         if value == 0 {
-            Ok( false )
+            Ok(false)
         } else {
-            Ok( true )
+            Ok(true)
         }
     }
 
@@ -96,11 +99,11 @@ impl< 'a, C: Context > Readable< 'a, C > for bool {
     }
 }
 
-impl< 'a, C: Context > Readable< 'a, C > for char {
+impl<'a, C: Context> Readable<'a, C> for char {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
         let value = reader.read_u32()?;
-        std::char::from_u32( value ).ok_or_else( crate::error::error_out_of_range_char )
+        std::char::from_u32(value).ok_or_else(crate::error::error_out_of_range_char)
     }
 
     #[inline]
@@ -111,15 +114,15 @@ impl< 'a, C: Context > Readable< 'a, C > for char {
 
 macro_rules! impl_for_primitive {
     ($type:ty, $getter:ident, $endianness_swap:ident) => {
-        impl< 'a, C: Context > Readable< 'a, C > for $type {
+        impl<'a, C: Context> Readable<'a, C> for $type {
             #[inline(always)]
-            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+            fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
                 reader.$getter()
             }
 
             #[inline]
             fn minimum_bytes_needed() -> usize {
-                mem::size_of::< Self >()
+                mem::size_of::<Self>()
             }
 
             #[doc(hidden)]
@@ -130,90 +133,96 @@ macro_rules! impl_for_primitive {
 
             #[doc(hidden)]
             #[inline]
-            unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
-                std::slice::from_raw_parts( slice.as_ptr() as *const $type, slice.len() / mem::size_of::< Self >() )
+            unsafe fn speedy_slice_from_bytes(slice: &[u8]) -> &[Self] {
+                std::slice::from_raw_parts(
+                    slice.as_ptr() as *const $type,
+                    slice.len() / mem::size_of::<Self>(),
+                )
             }
 
             #[doc(hidden)]
             #[inline(always)]
-            fn speedy_flip_endianness( itself: *mut Self ) {
+            fn speedy_flip_endianness(itself: *mut Self) {
                 unsafe {
-                    std::ptr::write_unaligned( itself, std::ptr::read_unaligned( itself ).swap_bytes() );
+                    std::ptr::write_unaligned(
+                        itself,
+                        std::ptr::read_unaligned(itself).swap_bytes(),
+                    );
                 }
             }
 
             #[doc(hidden)]
             #[inline(always)]
-            fn speedy_convert_slice_endianness( endianness: Endianness, slice: &mut [$type] ) {
-                endianness.$endianness_swap( slice );
+            fn speedy_convert_slice_endianness(endianness: Endianness, slice: &mut [$type]) {
+                endianness.$endianness_swap(slice);
             }
         }
-    }
+    };
 }
 
-impl_for_primitive!( i8, read_i8, swap_slice_i8 );
-impl_for_primitive!( i16, read_i16, swap_slice_i16 );
-impl_for_primitive!( i32, read_i32, swap_slice_i32 );
-impl_for_primitive!( i64, read_i64, swap_slice_i64 );
-impl_for_primitive!( i128, read_i128, swap_slice_i128 );
-impl_for_primitive!( u8, read_u8, swap_slice_u8 );
-impl_for_primitive!( u16, read_u16, swap_slice_u16 );
-impl_for_primitive!( u32, read_u32, swap_slice_u32 );
-impl_for_primitive!( u64, read_u64, swap_slice_u64 );
-impl_for_primitive!( u128, read_u128, swap_slice_u128 );
-impl_for_primitive!( f32, read_f32, swap_slice_f32 );
-impl_for_primitive!( f64, read_f64, swap_slice_f64 );
+impl_for_primitive!(i8, read_i8, swap_slice_i8);
+impl_for_primitive!(i16, read_i16, swap_slice_i16);
+impl_for_primitive!(i32, read_i32, swap_slice_i32);
+impl_for_primitive!(i64, read_i64, swap_slice_i64);
+impl_for_primitive!(i128, read_i128, swap_slice_i128);
+impl_for_primitive!(u8, read_u8, swap_slice_u8);
+impl_for_primitive!(u16, read_u16, swap_slice_u16);
+impl_for_primitive!(u32, read_u32, swap_slice_u32);
+impl_for_primitive!(u64, read_u64, swap_slice_u64);
+impl_for_primitive!(u128, read_u128, swap_slice_u128);
+impl_for_primitive!(f32, read_f32, swap_slice_f32);
+impl_for_primitive!(f64, read_f64, swap_slice_f64);
 
-impl< 'a, C: Context > Readable< 'a, C > for usize {
+impl<'a, C: Context> Readable<'a, C> for usize {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let value = u64::read_from( reader )?;
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let value = u64::read_from(reader)?;
         if value > std::usize::MAX as u64 {
-            return Err( crate::error::error_too_big_usize_for_this_architecture() );
+            return Err(crate::error::error_too_big_usize_for_this_architecture());
         }
-        Ok( value as usize )
+        Ok(value as usize)
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
-        <u64 as Readable< 'a, C >>::minimum_bytes_needed()
+        <u64 as Readable<'a, C>>::minimum_bytes_needed()
     }
 }
 
-impl< 'a, C: Context > Readable< 'a, C > for String {
+impl<'a, C: Context> Readable<'a, C> for String {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let bytes: Vec< u8 > = reader.read_value()?;
-        let value = crate::private::vec_to_string( bytes )?;
-        Ok( value )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let bytes: Vec<u8> = reader.read_value()?;
+        let value = crate::private::vec_to_string(bytes)?;
+        Ok(value)
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
-        <Vec< u8 > as Readable< 'a, C >>::minimum_bytes_needed()
+        <Vec<u8> as Readable<'a, C>>::minimum_bytes_needed()
     }
 }
 
-impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
+impl<'a, C: Context> Readable<'a, C> for Cow<'a, str> {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let length = crate::private::read_length( reader )?;
-        let bytes: Cow< 'a, [u8] > = reader.read_cow( length )?;
-        let value = crate::private::cow_bytes_to_cow_str( bytes )?;
-        Ok( value )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let length = crate::private::read_length(reader)?;
+        let bytes: Cow<'a, [u8]> = reader.read_cow(length)?;
+        let value = crate::private::cow_bytes_to_cow_str(bytes)?;
+        Ok(value)
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
-        <String as Readable< 'a, C >>::minimum_bytes_needed()
+        <String as Readable<'a, C>>::minimum_bytes_needed()
     }
 }
 
-impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
+impl<'a, C: Context, T: Readable<'a, C>> Readable<'a, C> for Vec<T> {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let length = crate::private::read_length( reader )?;
-        reader.read_vec( length )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let length = crate::private::read_length(reader)?;
+        reader.read_vec(length)
     }
 
     #[inline]
@@ -222,44 +231,47 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     }
 }
 
-impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] > where [T]: ToOwned< Owned = Vec< T > > {
+impl<'a, C: Context, T: Readable<'a, C>> Readable<'a, C> for Cow<'a, [T]>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let length = crate::private::read_length( reader )?;
-        reader.read_cow( length )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let length = crate::private::read_length(reader)?;
+        reader.read_cow(length)
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
-        <Vec< T > as Readable< 'a, C >>::minimum_bytes_needed()
+        <Vec<T> as Readable<'a, C>>::minimum_bytes_needed()
     }
 }
 
-impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Range< T > {
+impl<'a, C: Context, T: Readable<'a, C>> Readable<'a, C> for Range<T> {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
         let start = reader.read_value()?;
         let end = reader.read_value()?;
-        Ok( start..end )
+        Ok(start..end)
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
-        <T as Readable< 'a, C >>::minimum_bytes_needed() * 2
+        <T as Readable<'a, C>>::minimum_bytes_needed() * 2
     }
 }
 
-impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Option< T > {
+impl<'a, C: Context, T: Readable<'a, C>> Readable<'a, C> for Option<T> {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
         let flag = reader.read_value()?;
         let value = if flag {
-            Some( reader.read_value()? )
+            Some(reader.read_value()?)
         } else {
             None
         };
 
-        Ok( value )
+        Ok(value)
     }
 
     #[inline]
@@ -268,9 +280,9 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Option< T > {
     }
 }
 
-impl< 'a, C: Context > Readable< 'a, C > for () {
+impl<'a, C: Context> Readable<'a, C> for () {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( _: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(_: &mut R) -> Result<Self, C::Error> {
         Ok(())
     }
 
@@ -305,26 +317,26 @@ macro_rules! impl_for_tuple {
     }
 }
 
-impl_for_tuple!( A0 );
-impl_for_tuple!( A0, A1 );
-impl_for_tuple!( A0, A1, A2 );
-impl_for_tuple!( A0, A1, A2, A3 );
-impl_for_tuple!( A0, A1, A2, A3, A4 );
-impl_for_tuple!( A0, A1, A2, A3, A4, A5 );
-impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6 );
-impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7 );
-impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8 );
-impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9 );
-impl_for_tuple!( A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 );
+impl_for_tuple!(A0);
+impl_for_tuple!(A0, A1);
+impl_for_tuple!(A0, A1, A2);
+impl_for_tuple!(A0, A1, A2, A3);
+impl_for_tuple!(A0, A1, A2, A3, A4);
+impl_for_tuple!(A0, A1, A2, A3, A4, A5);
+impl_for_tuple!(A0, A1, A2, A3, A4, A5, A6);
+impl_for_tuple!(A0, A1, A2, A3, A4, A5, A6, A7);
+impl_for_tuple!(A0, A1, A2, A3, A4, A5, A6, A7, A8);
+impl_for_tuple!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9);
+impl_for_tuple!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
 
-impl< 'a, C: Context > Readable< 'a, C > for Endianness {
+impl<'a, C: Context> Readable<'a, C> for Endianness {
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
         let value = reader.read_u8()?;
         match value {
-            0 => Ok( Endianness::LittleEndian ),
-            1 => Ok( Endianness::BigEndian ),
-            _ => Err( crate::error::error_invalid_enum_variant() )
+            0 => Ok(Endianness::LittleEndian),
+            1 => Ok(Endianness::BigEndian),
+            _ => Err(crate::error::error_invalid_enum_variant()),
         }
     }
 
@@ -336,62 +348,65 @@ impl< 'a, C: Context > Readable< 'a, C > for Endianness {
 
 macro_rules! impl_for_non_zero {
     ($type:ident, $base_type:ty) => {
-        impl< 'a, C: Context > Readable< 'a, C > for std::num::$type {
+        impl<'a, C: Context> Readable<'a, C> for std::num::$type {
             #[inline]
-            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+            fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
                 let value: $base_type = reader.read_value()?;
-                std::num::$type::new( value ).ok_or_else( crate::error::error_zero_non_zero )
+                std::num::$type::new(value).ok_or_else(crate::error::error_zero_non_zero)
             }
 
             #[inline]
             fn minimum_bytes_needed() -> usize {
-                mem::size_of::< $base_type >()
+                mem::size_of::<$base_type>()
             }
         }
-    }
+    };
 }
 
-impl_for_non_zero!( NonZeroU8, u8 );
-impl_for_non_zero!( NonZeroU16, u16 );
-impl_for_non_zero!( NonZeroU32, u32 );
-impl_for_non_zero!( NonZeroU64, u64 );
-impl_for_non_zero!( NonZeroI8, i8 );
-impl_for_non_zero!( NonZeroI16, i16 );
-impl_for_non_zero!( NonZeroI32, i32 );
-impl_for_non_zero!( NonZeroI64, i64 );
+impl_for_non_zero!(NonZeroU8, u8);
+impl_for_non_zero!(NonZeroU16, u16);
+impl_for_non_zero!(NonZeroU32, u32);
+impl_for_non_zero!(NonZeroU64, u64);
+impl_for_non_zero!(NonZeroI8, i8);
+impl_for_non_zero!(NonZeroI16, i16);
+impl_for_non_zero!(NonZeroI32, i32);
+impl_for_non_zero!(NonZeroI64, i64);
 
 macro_rules! impl_for_atomic {
     ($type:ident, $base_type:ty) => {
-        impl< 'a, C: Context > Readable< 'a, C > for std::sync::atomic::$type {
+        impl<'a, C: Context> Readable<'a, C> for std::sync::atomic::$type {
             #[inline(always)]
-            fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+            fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
                 let value: $base_type = reader.read_value()?;
-                Ok( value.into() )
+                Ok(value.into())
             }
 
             #[inline]
             fn minimum_bytes_needed() -> usize {
-                mem::size_of::< $base_type >()
+                mem::size_of::<$base_type>()
             }
         }
-    }
+    };
 }
 
-impl_for_atomic!( AtomicI8, i8 );
-impl_for_atomic!( AtomicI16, i16 );
-impl_for_atomic!( AtomicI32, i32 );
-impl_for_atomic!( AtomicI64, i64 );
+impl_for_atomic!(AtomicI8, i8);
+impl_for_atomic!(AtomicI16, i16);
+impl_for_atomic!(AtomicI32, i32);
+impl_for_atomic!(AtomicI64, i64);
 
-impl_for_atomic!( AtomicU8, u8 );
-impl_for_atomic!( AtomicU16, u16 );
-impl_for_atomic!( AtomicU32, u32 );
-impl_for_atomic!( AtomicU64, u64 );
+impl_for_atomic!(AtomicU8, u8);
+impl_for_atomic!(AtomicU16, u16);
+impl_for_atomic!(AtomicU32, u32);
+impl_for_atomic!(AtomicU64, u64);
 
-impl< 'a, C > Readable< 'a, C > for std::net::Ipv4Addr where C: Context {
+impl<'a, C> Readable<'a, C> for std::net::Ipv4Addr
+where
+    C: Context,
+{
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
         let value = reader.read_u32()?;
-        Ok( value.into() )
+        Ok(value.into())
     }
 
     #[inline]
@@ -400,16 +415,19 @@ impl< 'a, C > Readable< 'a, C > for std::net::Ipv4Addr where C: Context {
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for std::net::Ipv6Addr where C: Context {
+impl<'a, C> Readable<'a, C> for std::net::Ipv6Addr
+where
+    C: Context,
+{
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
         let mut octets = [0; 16];
-        reader.read_bytes( &mut octets )?;
+        reader.read_bytes(&mut octets)?;
         if !reader.endianness().conversion_necessary() {
             octets.reverse();
         }
 
-        Ok( octets.into() )
+        Ok(octets.into())
     }
 
     #[inline]
@@ -418,29 +436,80 @@ impl< 'a, C > Readable< 'a, C > for std::net::Ipv6Addr where C: Context {
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for std::net::IpAddr where C: Context {
+impl<'a, C> Readable<'a, C> for std::net::SocketAddrV4
+where
+    C: Context,
+{
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let kind = reader.read_u8()?;
-        match kind {
-            0 => Ok( std::net::IpAddr::V4( reader.read_value()? ) ),
-            1 => Ok( std::net::IpAddr::V6( reader.read_value()? ) ),
-            _ => Err( crate::error::error_invalid_enum_variant() )
-        }
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        Ok(Self::new(
+            std::net::Ipv4Addr::read_from(reader)?,
+            reader.read_u16()?,
+        ))
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
-        5
+        6
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for std::time::Duration where C: Context {
+impl<'a, C> Readable<'a, C> for std::net::SocketAddrV6
+where
+    C: Context,
+{
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        Ok(Self::new(
+            std::net::Ipv6Addr::read_from(reader)?,
+            reader.read_u16()?,
+            0,
+            0,
+        ))
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        18
+    }
+}
+
+macro_rules! impl_for_addr {
+    ($type:ident, $min_bytes:expr) => {
+        impl<'a, C> Readable<'a, C> for std::net::$type
+        where
+            C: Context,
+        {
+            #[inline]
+            fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+                let kind = reader.read_u8()?;
+                match kind {
+                    0 => Ok(std::net::$type::V4(reader.read_value()?)),
+                    1 => Ok(std::net::$type::V6(reader.read_value()?)),
+                    _ => Err(crate::error::error_invalid_enum_variant()),
+                }
+            }
+
+            #[inline]
+            fn minimum_bytes_needed() -> usize {
+                $min_bytes
+            }
+        }
+    };
+}
+
+impl_for_addr!(IpAddr, 5);
+impl_for_addr!(SocketAddr, 7);
+
+impl<'a, C> Readable<'a, C> for std::time::Duration
+where
+    C: Context,
+{
+    #[inline]
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
         let secs = reader.read_u64()?;
         let nanos = reader.read_u32()?;
-        Ok( std::time::Duration::new( secs, nanos ) )
+        Ok(std::time::Duration::new(secs, nanos))
     }
 
     #[inline]
@@ -449,11 +518,16 @@ impl< 'a, C > Readable< 'a, C > for std::time::Duration where C: Context {
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for std::time::SystemTime where C: Context {
+impl<'a, C> Readable<'a, C> for std::time::SystemTime
+where
+    C: Context,
+{
     #[inline]
-    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
-        let duration = std::time::Duration::read_from( reader )?;
-        std::time::SystemTime::UNIX_EPOCH.checked_add( duration ).ok_or_else( crate::error::error_invalid_system_time )
+    fn read_from<R: Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let duration = std::time::Duration::read_from(reader)?;
+        std::time::SystemTime::UNIX_EPOCH
+            .checked_add(duration)
+            .ok_or_else(crate::error::error_invalid_system_time)
     }
 
     #[inline]
@@ -463,31 +537,90 @@ impl< 'a, C > Readable< 'a, C > for std::time::SystemTime where C: Context {
 }
 
 macro_rules! repeat {
-    (1, $expr:expr) => { [$expr] };
-    (2, $expr:expr) => { [$expr, $expr] };
-    (3, $expr:expr) => { [$expr, $expr, $expr] };
-    (4, $expr:expr) => { [$expr, $expr, $expr, $expr] };
-    (5, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr] };
-    (6, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr] };
-    (7, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (8, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (9, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (10, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (11, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (12, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (13, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (14, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (15, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (16, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
+    (1, $expr:expr) => {
+        [$expr]
+    };
+    (2, $expr:expr) => {
+        [$expr, $expr]
+    };
+    (3, $expr:expr) => {
+        [$expr, $expr, $expr]
+    };
+    (4, $expr:expr) => {
+        [$expr, $expr, $expr, $expr]
+    };
+    (5, $expr:expr) => {
+        [$expr, $expr, $expr, $expr, $expr]
+    };
+    (6, $expr:expr) => {
+        [$expr, $expr, $expr, $expr, $expr, $expr]
+    };
+    (7, $expr:expr) => {
+        [$expr, $expr, $expr, $expr, $expr, $expr, $expr]
+    };
+    (8, $expr:expr) => {
+        [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr]
+    };
+    (9, $expr:expr) => {
+        [
+            $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr,
+        ]
+    };
+    (10, $expr:expr) => {
+        [
+            $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr,
+        ]
+    };
+    (11, $expr:expr) => {
+        [
+            $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr,
+        ]
+    };
+    (12, $expr:expr) => {
+        [
+            $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr,
+        ]
+    };
+    (13, $expr:expr) => {
+        [
+            $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr,
+            $expr,
+        ]
+    };
+    (14, $expr:expr) => {
+        [
+            $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr,
+            $expr, $expr,
+        ]
+    };
+    (15, $expr:expr) => {
+        [
+            $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr,
+            $expr, $expr, $expr,
+        ]
+    };
+    (16, $expr:expr) => {
+        [
+            $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr,
+            $expr, $expr, $expr, $expr,
+        ]
+    };
 }
 
 macro_rules! impl_for_array {
     ($count:tt) => {
-        impl< 'a, C, T > Readable< 'a, C > for [T; $count] where C: Context, T: Readable< 'a, C > {
+        impl<'a, C, T> Readable<'a, C> for [T; $count]
+        where
+            C: Context,
+            T: Readable<'a, C>,
+        {
             #[inline(always)]
-            fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
-                let array = repeat!( $count, reader.read_value()? );
-                Ok( array )
+            fn read_from<R>(reader: &mut R) -> Result<Self, C::Error>
+            where
+                R: Reader<'a, C>,
+            {
+                let array = repeat!($count, reader.read_value()?);
+                Ok(array)
             }
 
             #[inline]
@@ -495,33 +628,37 @@ macro_rules! impl_for_array {
                 T::minimum_bytes_needed() * $count
             }
         }
-    }
+    };
 }
 
-impl_for_array!( 1 );
-impl_for_array!( 2 );
-impl_for_array!( 3 );
-impl_for_array!( 4 );
-impl_for_array!( 5 );
-impl_for_array!( 6 );
-impl_for_array!( 7 );
-impl_for_array!( 8 );
-impl_for_array!( 9 );
-impl_for_array!( 10 );
-impl_for_array!( 11 );
-impl_for_array!( 12 );
-impl_for_array!( 13 );
-impl_for_array!( 14 );
-impl_for_array!( 15 );
-impl_for_array!( 16 );
+impl_for_array!(1);
+impl_for_array!(2);
+impl_for_array!(3);
+impl_for_array!(4);
+impl_for_array!(5);
+impl_for_array!(6);
+impl_for_array!(7);
+impl_for_array!(8);
+impl_for_array!(9);
+impl_for_array!(10);
+impl_for_array!(11);
+impl_for_array!(12);
+impl_for_array!(13);
+impl_for_array!(14);
+impl_for_array!(15);
+impl_for_array!(16);
 
-impl< 'a, C, T > Readable< 'a, C > for Box< T >
-    where C: Context,
-          T: Readable< 'a, C >
+impl<'a, C, T> Readable<'a, C> for Box<T>
+where
+    C: Context,
+    T: Readable<'a, C>,
 {
     #[inline]
-    fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
-        Ok( Box::new( T::read_from( reader )? ) )
+    fn read_from<R>(reader: &mut R) -> Result<Self, C::Error>
+    where
+        R: Reader<'a, C>,
+    {
+        Ok(Box::new(T::read_from(reader)?))
     }
 
     #[inline]
@@ -530,33 +667,41 @@ impl< 'a, C, T > Readable< 'a, C > for Box< T >
     }
 }
 
-impl< 'a, C, T > Readable< 'a, C > for Box< [T] >
-    where C: Context,
-          T: Readable< 'a, C >
+impl<'a, C, T> Readable<'a, C> for Box<[T]>
+where
+    C: Context,
+    T: Readable<'a, C>,
 {
     #[inline]
-    fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
-        let data = Vec::< T >::read_from( reader )?;
-        Ok( data.into() )
+    fn read_from<R>(reader: &mut R) -> Result<Self, C::Error>
+    where
+        R: Reader<'a, C>,
+    {
+        let data = Vec::<T>::read_from(reader)?;
+        Ok(data.into())
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
-        Vec::< T >::minimum_bytes_needed()
+        Vec::<T>::minimum_bytes_needed()
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for Box< str >
-    where C: Context
+impl<'a, C> Readable<'a, C> for Box<str>
+where
+    C: Context,
 {
     #[inline]
-    fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
-        let data = String::read_from( reader )?;
-        Ok( data.into() )
+    fn read_from<R>(reader: &mut R) -> Result<Self, C::Error>
+    where
+        R: Reader<'a, C>,
+    {
+        let data = String::read_from(reader)?;
+        Ok(data.into())
     }
 
     #[inline]
     fn minimum_bytes_needed() -> usize {
-        <String as Readable< 'a, C >>::minimum_bytes_needed()
+        <String as Readable<'a, C>>::minimum_bytes_needed()
     }
 }
