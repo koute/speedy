@@ -43,7 +43,7 @@ fn main() {
 
     let bytes = original.write_to_vec().unwrap();
     let deserialized: Struct =
-        Struct::read_from_buffer( &bytes ).unwrap();
+        Struct::load( &bytes ).unwrap();
 
     assert_eq!( original, deserialized );
 }
