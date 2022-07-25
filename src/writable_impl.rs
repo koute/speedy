@@ -108,8 +108,10 @@ where
     }
 }
 
+pub trait FixedSize {}
 macro_rules! impl_for_primitive {
     ($type:ty, $write_name:ident) => {
+        impl FixedSize for $type {}
         impl<C: Context> Writable<C> for $type {
             #[inline(always)]
             fn write_to<T: ?Sized + Writer<C>>(&self, writer: &mut T) -> Result<(), C::Error> {
@@ -648,7 +650,7 @@ where
 impl<C, T, const N: usize> Writable<C> for [T; N]
 where
     C: Context,
-    T: Writable<C> + num_traits::NumCast,
+    T: Writable<C> + FixedSize,
 {
     #[inline]
     fn write_to<W>(&self, writer: &mut W) -> Result<(), C::Error>
@@ -670,53 +672,53 @@ where
 /*
 impl<C, T, const N: usize> Writable<C> for [T; N]
 where
-    C: Context,
-    T: Writable<C>,
+C: Context,
+T: Writable<C>,
 {
-    #[inline]
-    fn write_to<W>(&self, writer: &mut W) -> Result<(), C::Error>
-    where
-        W: ?Sized + Writer<C>,
-    {
-        for item in self {
-            item.write_to(writer)?;
-        }
-        Ok(())
-    }
+#[inline]
+fn write_to<W>(&self, writer: &mut W) -> Result<(), C::Error>
+where
+W: ?Sized + Writer<C>,
+{
+for item in self {
+item.write_to(writer)?;
+}
+Ok(())
+}
 
-    #[inline]
-    fn bytes_needed(&self) -> Result<usize, C::Error> {
-        Ok(std::mem::size_of::<T>() * N)
-    }
+#[inline]
+fn bytes_needed(&self) -> Result<usize, C::Error> {
+Ok(std::mem::size_of::<T>() * N)
+}
 }
 macro_rules! impl_for_array {
-    ($count:tt) => {
-        impl<C, T> Writable<C> for [T; $count]
-        where
-            C: Context,
-            T: Writable<C>,
-        {
-            #[inline]
-            fn write_to<W>(&self, writer: &mut W) -> Result<(), C::Error>
-            where
-                W: ?Sized + Writer<C>,
-            {
-                for item in self {
-                    item.write_to(writer)?;
-                }
-                Ok(())
-            }
+($count:tt) => {
+impl<C, T> Writable<C> for [T; $count]
+where
+C: Context,
+T: Writable<C>,
+{
+#[inline]
+fn write_to<W>(&self, writer: &mut W) -> Result<(), C::Error>
+where
+W: ?Sized + Writer<C>,
+{
+for item in self {
+item.write_to(writer)?;
+}
+Ok(())
+}
 
-            #[inline]
-            fn bytes_needed(&self) -> Result<usize, C::Error> {
-                let mut size = 0;
-                for item in self {
-                    size += Writable::<C>::bytes_needed(item)?;
-                }
-                Ok(size)
-            }
-        }
-    };
+#[inline]
+fn bytes_needed(&self) -> Result<usize, C::Error> {
+let mut size = 0;
+for item in self {
+size += Writable::<C>::bytes_needed(item)?;
+}
+Ok(size)
+}
+}
+};
 }
 impl_for_array!(1);
 impl_for_array!(2);
