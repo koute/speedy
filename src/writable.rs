@@ -278,15 +278,17 @@ pub trait Writable<C: Context> {
         let mut context = C::default();
         let capacity = self.bytes_needed()?;
         let mut bin = unsafe { Box::<[u8]>::new_uninit_slice(capacity).assume_init() };
-        let ptr = bin.as_mut_ptr();
         let mut writer = BufferCollector {
             context: &mut context,
             buffer: &mut bin,
             position: 0,
         };
         self.write_to(&mut writer)?;
-        let slice_ptr = core::ptr::slice_from_raw_parts_mut(ptr as _, writer.position);
-        let bin = unsafe { Box::from_raw(slice_ptr) };
-        Ok(bin)
+        let pos = writer.position;
+        Ok(if pos == capacity {
+            bin
+        } else {
+            bin[..pos].into()
+        })
     }
 }
