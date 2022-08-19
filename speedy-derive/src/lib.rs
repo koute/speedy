@@ -47,6 +47,7 @@ mod kw {
     syn::custom_keyword!( skip );
     syn::custom_keyword!( constant_prefix );
     syn::custom_keyword!( peek_tag );
+    syn::custom_keyword!( varint );
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -223,21 +224,44 @@ fn test_is_guaranteed_non_recursive() {
     assert_test!( false, Vec< T > );
 }
 
-fn is_primitive_ty( ty: &syn::Type ) -> bool {
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum PrimitiveTy {
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128
+}
+
+fn parse_primitive_ty( ty: &syn::Type ) -> Option< PrimitiveTy > {
     match ty {
         syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
             if segments.len() != 1 {
-                return false;
+                return None;
             }
 
             let segment = &segments[ 0 ];
             let ident = segment.ident.to_string();
             match ident.as_str() {
-                "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64" | "i128" => true,
-                _ => false
+                "u8" => Some( PrimitiveTy::U8 ),
+                "u16" => Some( PrimitiveTy::U16 ),
+                "u32" => Some( PrimitiveTy::U32 ),
+                "u64" => Some( PrimitiveTy::U64 ),
+                "u128" => Some( PrimitiveTy::U128 ),
+                "i8" => Some( PrimitiveTy::I8 ),
+                "i16" => Some( PrimitiveTy::I16 ),
+                "i32" => Some( PrimitiveTy::I32 ),
+                "i64" => Some( PrimitiveTy::I64 ),
+                "i128" => Some( PrimitiveTy::I128 ),
+                _ => None
             }
         },
-        _ => false
+        _ => None
     }
 }
 
@@ -272,7 +296,7 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Tr
                 (Trait::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
                 (Trait::Writable, false) => None,
                 (Trait::ZeroCopyable { is_packed }, _) => {
-                    if is_packed && is_primitive_ty( ty ) {
+                    if is_packed && parse_primitive_ty( ty ).is_some() {
                         None
                     } else {
                         Some( quote! { #ty: speedy::private::ZeroCopyable< T_ > } )
@@ -631,6 +655,7 @@ struct Field< 'a > {
     length_type: Option< BasicType >,
     ty: Opt< Ty >,
     skip: bool,
+    varint: bool,
     constant_prefix: Option< syn::LitByteStr >
 }
 
@@ -670,7 +695,9 @@ impl< 'a > Field< 'a > {
             | Ty::RefSliceU8( _ )
             | Ty::RefStr( _ )
             | Ty::String
-            | Ty::CowStr( .. ) => vec![],
+            | Ty::CowStr( .. )
+            | Ty::Primitive( .. )
+                => vec![],
             | Ty::Ty( _ ) => vec![ self.raw_ty.clone() ]
         }
     }
@@ -715,6 +742,9 @@ enum FieldAttribute {
     ConstantPrefix {
         key_span: Span,
         prefix: syn::LitByteStr
+    },
+    VarInt {
+        key_span: Span
     }
 }
 
@@ -802,6 +832,11 @@ impl syn::parse::Parse for FieldAttribute {
                 key_span: key_token.span(),
                 prefix: syn::LitByteStr::new( &prefix, value_span )
             }
+        } else if lookahead.peek( kw::varint ) {
+            let key_token = input.parse::< kw::varint >()?;
+            FieldAttribute::VarInt {
+                key_span: key_token.span()
+            }
         } else {
             return Err( lookahead.error() )
         };
@@ -845,6 +880,7 @@ enum Ty {
 
     Array( syn::Type, u32 ),
 
+    Primitive( PrimitiveTy ),
     Ty( syn::Type )
 }
 
@@ -937,6 +973,10 @@ fn parse_ty( ty: &syn::Type ) -> Ty {
 }
 
 fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
+    if let Some( ty ) = parse_primitive_ty( ty ) {
+        return Some( Ty::Primitive( ty ) );
+    }
+
     match *ty {
         syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
             let name = &segments[ 0 ].ident;
@@ -1050,6 +1090,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             let mut length = None;
             let mut length_type = None;
             let mut skip = false;
+            let mut varint = false;
             let mut constant_prefix = None;
             for attr in parse_attributes::< FieldAttribute >( &field.attrs )? {
                 match attr {
@@ -1090,6 +1131,14 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                             return Err( syn::Error::new( key_span, message ) );
                         }
                         constant_prefix = Some( prefix );
+                    },
+                    FieldAttribute::VarInt { key_span } => {
+                        if parse_primitive_ty( &field.ty ) != Some( PrimitiveTy::U64 ) {
+                            let message = "The 'varint' attribute can only be used on fields of type 'u64'";
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+
+                        varint = true;
                     }
                 }
             }
@@ -1148,6 +1197,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::RefStr( .. ) )
                     | Opt::Plain( Ty::Array( .. ) )
                     | Opt::Option( Ty::Array( .. ) )
+                    | Opt::Plain( Ty::Primitive( .. ) )
+                    | Opt::Option( Ty::Primitive( .. ) )
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
@@ -1197,6 +1248,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
 
                     | Opt::Plain( Ty::Array( .. ) )
                     | Opt::Option( Ty::Array( .. ) )
+                    | Opt::Plain( Ty::Primitive( .. ) )
+                    | Opt::Option( Ty::Primitive( .. ) )
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
@@ -1223,6 +1276,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 length_type: length_type.map( snd ),
                 ty,
                 skip,
+                varint,
                 constant_prefix
             })
         });
@@ -1456,6 +1510,12 @@ fn read_field_body( field: &Field ) -> TokenStream {
         ])})() }
     };
 
+    let read_u64_varint = || {
+        quote! {{
+            _reader_.read_u64_varint()
+        }}
+    };
+
     let read_option = |tokens: TokenStream|
         quote! {{
             _reader_.read_u8().and_then( |_flag_| {
@@ -1484,6 +1544,8 @@ fn read_field_body( field: &Field ) -> TokenStream {
         Ty::RefSlice( _, inner_ty ) => read_ref_slice( inner_ty ),
         Ty::RefStr( .. ) => read_ref_str(),
         Ty::Array( _, length ) => read_array( *length ),
+        Ty::Primitive( .. ) if field.varint => read_u64_varint(),
+        Ty::Primitive( .. ) |
         Ty::Ty( .. ) => {
             assert!( field.length.is_none() );
             quote! { _reader_.read_value() }
@@ -1588,6 +1650,11 @@ fn write_field_body( field: &Field ) -> TokenStream {
             _writer_.write_slice( &#name[..] )?;
         }};
 
+    let write_u64_varint = ||
+        quote! {{
+            _writer_.write_u64_varint( *#name )?;
+        }};
+
     let write_option = |tokens: TokenStream|
         quote! {{
             if let Some( ref #name ) = #name {
@@ -1617,6 +1684,8 @@ fn write_field_body( field: &Field ) -> TokenStream {
         Ty::CowBTreeMap( .. ) |
         Ty::CowBTreeSet( .. ) => write_collection(),
         Ty::Array( .. ) => write_array(),
+        Ty::Primitive( .. ) if field.varint => write_u64_varint(),
+        Ty::Primitive( .. ) |
         Ty::Ty( .. ) => {
             assert!( field.length.is_none() );
             quote! { _writer_.write_value( #name )?; }
@@ -1833,6 +1902,8 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
                         let length = *length as usize;
                         quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() * #length }
                     },
+                    | Ty::Primitive( .. ) if field.varint => quote! { 1 },
+                    | Ty::Primitive( .. )
                     | Ty::Ty( .. ) => {
                         let raw_ty = &field.raw_ty;
                         quote! { <#raw_ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() }

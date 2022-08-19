@@ -974,6 +974,12 @@ pub struct DeriveArrayTransparent( [u8; 16] );
 #[repr(packed)]
 struct PackedU16( u16 );
 
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedStructWithVarInt {
+    #[speedy(varint)]
+    value: u64
+}
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -1866,6 +1872,24 @@ symmetric_tests! {
         le = [33, 0],
         be = [0, 33],
         minimum_bytes = 2
+    }
+    derived_struct_with_varint_0 for DerivedStructWithVarInt {
+        in = DerivedStructWithVarInt { value: 0 },
+        le = [0],
+        be = [0],
+        minimum_bytes = 1
+    }
+    derived_struct_with_varint_127 for DerivedStructWithVarInt {
+        in = DerivedStructWithVarInt { value: 127 },
+        le = [127],
+        be = [127],
+        minimum_bytes = 1
+    }
+    derived_struct_with_varint_128 for DerivedStructWithVarInt {
+        in = DerivedStructWithVarInt { value: 128 },
+        le = [0b10000000, 0b10000000],
+        be = [0b10000000, 0b10000000],
+        minimum_bytes = 1
     }
 }
 
