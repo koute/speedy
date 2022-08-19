@@ -151,6 +151,10 @@ Possible values:
   - `u32` (default)
   - `u64_varint`
 
+### `#[speedy(varint)]`
+
+Can be used only on `u64` fields. Forces the field to be serialized as a varint.
+
 ### `#[speedy(skip)]`
 
 Skips a given field when reading and writing.
