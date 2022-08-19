@@ -1935,13 +1935,13 @@ symmetric_tests_unsized! {
         minimum_bytes = 0
     }
     derived_vec_until_eof_empty for DerivedVecUntilEof {
-        in = DerivedVecUntilEof( b"".into() ),
+        in = DerivedVecUntilEof( vec![] ),
         le = [],
         be = [],
         minimum_bytes = 0
     }
     derived_vec_until_eof_non_empty for DerivedVecUntilEof {
-        in = DerivedVecUntilEof( b"Hello".into() ),
+        in = DerivedVecUntilEof( b"Hello".to_vec() ),
         le = [72, 101, 108, 108, 111],
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
