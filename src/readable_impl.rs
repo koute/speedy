@@ -235,6 +235,54 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] 
     }
 }
 
+impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, HashSet< T > > where T: Readable< 'a, C > + Clone + Hash + Eq {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( Cow::Owned( reader.read_value()? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <HashSet< T > as Readable< 'a, C >>::minimum_bytes_needed()
+    }
+}
+
+impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, BTreeSet< T > > where T: Readable< 'a, C > + Clone + Ord {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( Cow::Owned( reader.read_value()? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <BTreeSet< T > as Readable< 'a, C >>::minimum_bytes_needed()
+    }
+}
+
+impl< 'a, C: Context, K: Readable< 'a, C >, V: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, HashMap< K, V > > where K: Readable< 'a, C > + Clone + Hash + Eq, V: Readable< 'a, C > + Clone {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( Cow::Owned( reader.read_value()? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <HashMap< K, V > as Readable< 'a, C >>::minimum_bytes_needed()
+    }
+}
+
+impl< 'a, C: Context, K: Readable< 'a, C >, V: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, BTreeMap< K, V > > where K: Readable< 'a, C > + Clone + Ord, V: Readable< 'a, C > + Clone {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( Cow::Owned( reader.read_value()? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <BTreeMap< K, V > as Readable< 'a, C >>::minimum_bytes_needed()
+    }
+}
+
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Range< T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {

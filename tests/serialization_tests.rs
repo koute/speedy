@@ -1379,8 +1379,20 @@ symmetric_tests! {
         be = [0, 0, 0, 1, 0, 10, 1],
         minimum_bytes = 4
     }
+    cow_hashmap_u16_u8 for Cow< HashMap< u16, u8 > > {
+        in = Cow::Owned( vec![ (10, 1) ].into_iter().collect() ),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1],
+        minimum_bytes = 4
+    }
     hashset for HashSet< u16 > {
         in = vec![ 10 ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0],
+        be = [0, 0, 0, 1, 0, 10],
+        minimum_bytes = 4
+    }
+    cow_hashset for Cow< HashSet< u16 > > {
+        in = Cow::Owned( vec![ 10 ].into_iter().collect() ),
         le = [1, 0, 0, 0, 10, 0],
         be = [0, 0, 0, 1, 0, 10],
         minimum_bytes = 4
@@ -1397,8 +1409,20 @@ symmetric_tests! {
         be = [0, 0, 0, 2, 0, 10, 1, 0, 20, 0],
         minimum_bytes = 4
     }
+    cow_btreemap_u16_u8 for Cow< BTreeMap< u16, u8 > > {
+        in = Cow::Owned( vec![ (10, 1), (20, 0) ].into_iter().collect() ),
+        le = [2, 0, 0, 0, 10, 0, 1, 20, 0, 0],
+        be = [0, 0, 0, 2, 0, 10, 1, 0, 20, 0],
+        minimum_bytes = 4
+    }
     btreeset for BTreeSet< u16 > {
         in = vec![ 10, 20 ].into_iter().collect(),
+        le = [2, 0, 0, 0, 10, 0, 20, 0],
+        be = [0, 0, 0, 2, 0, 10, 0, 20],
+        minimum_bytes = 4
+    }
+    cow_btreeset for Cow< BTreeSet< u16 > > {
+        in = Cow::Owned( vec![ 10, 20 ].into_iter().collect() ),
         le = [2, 0, 0, 0, 10, 0, 20, 0],
         be = [0, 0, 0, 2, 0, 10, 0, 20],
         minimum_bytes = 4
