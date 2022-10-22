@@ -2380,11 +2380,13 @@ fn test_minimum_bytes_needed() {
 fn test_derive_transparent() {
     assert!( <TransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
     assert!( <TransparentU16 as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( !<NonTransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <NonTransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( !<ManualU8 as Readable< Endianness >>::speedy_is_primitive() );
 
     assert!( <TransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
     assert!( <TransparentU16 as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( !<NonTransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <NonTransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( !<ManualU8 as Writable< Endianness >>::speedy_is_primitive() );
 }
 
 #[test]
@@ -2413,6 +2415,43 @@ fn test_derive_c() {
     assert!( !<DeriveCWithU16U8 as Writable< Endianness >>::speedy_is_primitive() );
 }
 
+#[test]
+fn test_derive_primitive() {
+    assert!( <ThreeF32 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <ThreeF32 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <FourU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <FourU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <SimpleComposite as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <SimpleComposite as Writable< Endianness >>::speedy_is_primitive() );
+}
+
+#[derive(PartialEq, Eq, Debug)]
+struct ManualU8( u8 );
+
+impl< 'a, C: speedy::Context > Readable< 'a, C > for ManualU8 {
+    #[inline]
+    fn read_from< R: speedy::Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( ManualU8( reader.read_u8()? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        1
+    }
+}
+
+impl< C: speedy::Context > speedy::Writable< C > for ManualU8 {
+    #[inline]
+    fn write_to< T: ?Sized + speedy::Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
+        writer.write_u8( self.0 )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 1 )
+    }
+}
+
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 struct NonTransparentU8( u8 );
 
@@ -2426,6 +2465,29 @@ struct NonZeroCopyable( u8 );
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(packed)]
 struct PackedNonZeroCopyable( NonZeroCopyable );
+
+#[derive(Readable, Writable, PartialEq, Debug)]
+struct ThreeF32 {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct FourU8 {
+    x0: u8,
+    x1: u8,
+    x2: u8,
+    x3: u8,
+}
+
+#[derive(Readable, Writable, PartialEq, Debug)]
+struct SimpleComposite {
+    v0: ThreeF32,
+    v1: ThreeF32,
+    v2: ThreeF32,
+    normal: ThreeF32,
+}
 
 // Source: https://users.rust-lang.org/t/a-macro-to-assert-that-a-type-does-not-implement-trait-bounds/31179
 macro_rules! assert_not_impl {
@@ -2482,7 +2544,28 @@ assert_impl!( DerivedPackedRecursiveTuple, speedy::private::ZeroCopyable< () > )
 assert_impl!( &'static [PackedU16], speedy::Readable< 'static, speedy::LittleEndian > );
 
 #[test]
-fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {
+fn test_incomplete_read_into_vec_triggers_drop_for_already_read_items() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new( 0 );
+
+    #[derive(Readable, Writable, PartialEq, Eq, Debug)]
+    struct WithDrop( ManualU8 );
+    impl Drop for WithDrop {
+        fn drop( &mut self ) {
+            COUNTER.fetch_add( 1, Ordering::SeqCst );
+        }
+    }
+
+    #[derive(Readable, Writable, PartialEq, Eq, Debug)]
+    struct Struct( Vec< WithDrop > );
+
+    Struct::read_from_stream_unbuffered( &mut &[0, 0, 0, 10, 1, 2][..] ).unwrap_err();
+    assert_eq!( COUNTER.load( Ordering::SeqCst ), 2 );
+}
+
+#[test]
+fn test_incomplete_read_into_vec_does_not_trigger_drop_for_already_read_items_if_they_are_primitive() {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static COUNTER: AtomicU64 = AtomicU64::new( 0 );
@@ -2499,7 +2582,7 @@ fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {
     struct Struct( Vec< WithDrop > );
 
     Struct::read_from_stream_unbuffered( &mut &[0, 0, 0, 10, 1, 2][..] ).unwrap_err();
-    assert_eq!( COUNTER.load( Ordering::SeqCst ), 2 );
+    assert_eq!( COUNTER.load( Ordering::SeqCst ), 0 );
 }
 
 #[test]

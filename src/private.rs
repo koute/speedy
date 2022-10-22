@@ -33,6 +33,8 @@ pub use crate::error::{
 };
 pub use crate::utils::ZeroCopyable;
 
+pub use memoffset::offset_of;
+
 #[inline]
 pub fn vec_to_string< E >( bytes: Vec< u8 > ) -> Result< String, E > where E: From< Error > {
     String::from_utf8( bytes ).map_err( error_invalid_string_utf8 )

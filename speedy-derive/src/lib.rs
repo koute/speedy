@@ -64,6 +64,12 @@ enum Trait {
     ZeroCopyable { is_packed: bool }
 }
 
+fn uses_generics( input: &syn::DeriveInput ) -> bool {
+    input.generics.type_params().next().is_some() ||
+    input.generics.lifetimes().next().is_some() ||
+    input.generics.const_params().next().is_some()
+}
+
 fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> bool {
     match ty {
         syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
@@ -235,7 +241,9 @@ enum PrimitiveTy {
     I16,
     I32,
     I64,
-    I128
+    I128,
+    F32,
+    F64
 }
 
 fn parse_primitive_ty( ty: &syn::Type ) -> Option< PrimitiveTy > {
@@ -258,6 +266,8 @@ fn parse_primitive_ty( ty: &syn::Type ) -> Option< PrimitiveTy > {
                 "i32" => Some( PrimitiveTy::I32 ),
                 "i64" => Some( PrimitiveTy::I64 ),
                 "i128" => Some( PrimitiveTy::I128 ),
+                "f32" => Some( PrimitiveTy::F32 ),
+                "f64" => Some( PrimitiveTy::F64 ),
                 _ => None
             }
         },
@@ -660,6 +670,16 @@ struct Field< 'a > {
 }
 
 impl< 'a > Field< 'a > {
+    fn is_simple( &self ) -> bool {
+        parse_primitive_ty( self.raw_ty ).is_some() &&
+        self.default_on_eof == false &&
+        self.length.is_none() &&
+        self.length_type.is_none() &&
+        self.skip == false &&
+        self.varint == false &&
+        self.constant_prefix.is_none()
+    }
+
     fn var_name( &self ) -> syn::Ident {
         if let Some( name ) = self.name {
             name.clone()
@@ -1947,13 +1967,14 @@ fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     }
 }
 
-fn generate_is_primitive( fields: &[Field] ) -> TokenStream {
+fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool ) -> TokenStream {
     if fields.is_empty() {
         return quote! { true };
     }
 
     let mut is_primitive = Vec::new();
     let mut fields_size = Vec::new();
+    let mut fields_offsets = Vec::new();
     for field in fields {
         if !is_primitive.is_empty() {
             is_primitive.push( quote! { && });
@@ -1961,17 +1982,39 @@ fn generate_is_primitive( fields: &[Field] ) -> TokenStream {
         }
 
         let ty = &field.raw_ty;
-        is_primitive.push( quote! {
-            <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
-        });
+        if is_writable {
+            is_primitive.push( quote! {
+                <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
+            });
+        } else {
+            is_primitive.push( quote! {
+                <#ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
+            });
+        }
+
         fields_size.push( quote! {
             std::mem::size_of::< #ty >()
+        });
+
+        let name = field.name();
+        fields_offsets.push( quote! {
+            speedy::private::offset_of!( Self, #name )
         });
     }
 
     is_primitive.push( quote! {
         && (#(#fields_size)*) == std::mem::size_of::< Self >()
     });
+
+    if check_order {
+        for window in fields_offsets.windows( 2 ) {
+            let a = &window[0];
+            let b = &window[1];
+            is_primitive.push( quote! {
+                && #a <= #b
+            });
+        }
+    }
 
     quote! {
         #(#is_primitive)*
@@ -1989,6 +2032,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let is_ty_packed = is_packed( &input.attrs );
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
             let is_ty_c = is_c( &input.attrs );
+            let is_ty_simple = structure.fields.iter().all( |field| field.is_simple() );
             let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
                 #body
@@ -2022,8 +2066,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         }
                     }
                 }
-            } else if is_ty_packed || is_ty_c {
-                let is_primitive = generate_is_primitive( &structure.fields );
+            } else if is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && structure.fields.len() <= 4) {
+                let is_primitive = generate_is_primitive( &structure.fields, false, !is_ty_packed && !is_ty_c );
                 let mut body_flip_endianness = Vec::new();
                 for field in &structure.fields {
                     let ty = &field.raw_ty;
@@ -2205,12 +2249,13 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let is_ty_packed = is_packed( &input.attrs );
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
             let is_ty_c = is_c( &input.attrs );
+            let is_ty_simple = st.fields.iter().all( |field| field.is_simple() );
             let assignments = assign_to_variables( &st.fields, is_ty_packed );
             let (body, _) = writable_body( &mut types, &st );
 
             let impl_primitive =
-                if is_ty_transparent || is_ty_packed || is_ty_c {
-                    let is_primitive = generate_is_primitive( &st.fields );
+                if is_ty_transparent || is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && st.fields.len() <= 4) {
+                    let is_primitive = generate_is_primitive( &st.fields, true, !is_ty_transparent && !is_ty_packed && !is_ty_c );
                     quote! {
                         #[inline(always)]
                         fn speedy_is_primitive() -> bool {
