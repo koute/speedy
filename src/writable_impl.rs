@@ -2,6 +2,7 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::hash::Hash;
 
 use crate::endianness::Endianness;
 use crate::writable::Writable;
@@ -275,6 +276,54 @@ impl< 'a, C: Context, T: Writable< C > > Writable< C > for &'a [T] where [T]: To
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
         <[T] as Writable::< C >>::bytes_needed( self.as_ref() )
+    }
+}
+
+impl< 'r, C, T > Writable< C > for Cow< 'r, HashSet< T > > where C: Context, T: Writable< C > + Clone + Hash + Eq {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        (&**self).write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Writable::< C >::bytes_needed( &**self )
+    }
+}
+
+impl< 'r, C, T > Writable< C > for Cow< 'r, BTreeSet< T > > where C: Context, T: Writable< C > + Clone + Ord {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        (&**self).write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Writable::< C >::bytes_needed( &**self )
+    }
+}
+
+impl< 'r, C, K, V > Writable< C > for Cow< 'r, HashMap< K, V > > where C: Context, K: Writable< C > + Clone + Hash + Eq, V: Writable< C > + Clone {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        (&**self).write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Writable::< C >::bytes_needed( &**self )
+    }
+}
+
+impl< 'r, C, K, V > Writable< C > for Cow< 'r, BTreeMap< K, V > > where C: Context, K: Writable< C > + Clone + Ord, V: Writable< C > + Clone {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        (&**self).write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Writable::< C >::bytes_needed( &**self )
     }
 }
 

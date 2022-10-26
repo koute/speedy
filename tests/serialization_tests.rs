@@ -62,6 +62,26 @@ macro_rules! symmetric_tests {
             fn minimum_bytes() {
                 assert_eq!( <$type as Readable< Endianness >>::minimum_bytes_needed(), $minimum_bytes );
             }
+
+            #[cfg(not(miri))]
+            #[test]
+            fn write_to_file_le() {
+                let file = tempfile::NamedTempFile::new().unwrap();
+                let path = file.path();
+                let original: $type = $value;
+                original.write_to_file_with_ctx( Endianness::LittleEndian, &path ).unwrap();
+                assert_eq!( std::fs::read( &path ).unwrap(), $le_bytes );
+            }
+
+            #[cfg(not(miri))]
+            #[test]
+            fn write_to_file_be() {
+                let file = tempfile::NamedTempFile::new().unwrap();
+                let path = file.path();
+                let original: $type = $value;
+                original.write_to_file_with_ctx( Endianness::BigEndian, &path ).unwrap();
+                assert_eq!( std::fs::read( &path ).unwrap(), $be_bytes );
+            }
         }
     )* } };
 
@@ -248,6 +268,28 @@ macro_rules! symmetric_tests {
                 } else {
                     assert_eq!( cursor.position(), total_length as u64 );
                 }
+            }
+
+            #[cfg(not(miri))]
+            #[test]
+            fn round_trip_file_le() {
+                let file = tempfile::NamedTempFile::new().unwrap();
+                let path = file.path();
+                let original: $type = $value;
+                original.write_to_file_with_ctx( Endianness::LittleEndian, &path ).unwrap();
+                let deserialized: $type = Readable::read_from_file_with_ctx( Endianness::LittleEndian, &path ).unwrap();
+                assert_eq!( original, deserialized );
+            }
+
+            #[cfg(not(miri))]
+            #[test]
+            fn round_trip_file_be() {
+                let file = tempfile::NamedTempFile::new().unwrap();
+                let path = file.path();
+                let original: $type = $value;
+                original.write_to_file_with_ctx( Endianness::BigEndian, &path ).unwrap();
+                let deserialized: $type = Readable::read_from_file_with_ctx( Endianness::BigEndian, &path ).unwrap();
+                assert_eq!( original, deserialized );
             }
         }
     )* } };
@@ -932,6 +974,12 @@ pub struct DeriveArrayTransparent( [u8; 16] );
 #[repr(packed)]
 struct PackedU16( u16 );
 
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct DerivedStructWithVarInt {
+    #[speedy(varint)]
+    value: u64
+}
+
 symmetric_tests! {
     vec_u8 for Vec< u8 > {
         in = vec![ 10, 11 ],
@@ -1319,8 +1367,20 @@ symmetric_tests! {
         be = [0],
         minimum_bytes = 1
     }
-    hashmap for HashMap< u16, bool > {
+    hashmap_u16_bool for HashMap< u16, bool > {
         in = vec![ (10, true) ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1],
+        minimum_bytes = 4
+    }
+    hashmap_u16_u8 for HashMap< u16, u8 > {
+        in = vec![ (10, 1) ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1],
+        minimum_bytes = 4
+    }
+    cow_hashmap_u16_u8 for Cow< HashMap< u16, u8 > > {
+        in = Cow::Owned( vec![ (10, 1) ].into_iter().collect() ),
         le = [1, 0, 0, 0, 10, 0, 1],
         be = [0, 0, 0, 1, 0, 10, 1],
         minimum_bytes = 4
@@ -1331,14 +1391,38 @@ symmetric_tests! {
         be = [0, 0, 0, 1, 0, 10],
         minimum_bytes = 4
     }
-    btreemap for BTreeMap< u16, bool > {
+    cow_hashset for Cow< HashSet< u16 > > {
+        in = Cow::Owned( vec![ 10 ].into_iter().collect() ),
+        le = [1, 0, 0, 0, 10, 0],
+        be = [0, 0, 0, 1, 0, 10],
+        minimum_bytes = 4
+    }
+    btreemap_u16_bool for BTreeMap< u16, bool > {
         in = vec![ (10, true), (20, false) ].into_iter().collect(),
+        le = [2, 0, 0, 0, 10, 0, 1, 20, 0, 0],
+        be = [0, 0, 0, 2, 0, 10, 1, 0, 20, 0],
+        minimum_bytes = 4
+    }
+    btreemap_u16_u8 for BTreeMap< u16, u8 > {
+        in = vec![ (10, 1), (20, 0) ].into_iter().collect(),
+        le = [2, 0, 0, 0, 10, 0, 1, 20, 0, 0],
+        be = [0, 0, 0, 2, 0, 10, 1, 0, 20, 0],
+        minimum_bytes = 4
+    }
+    cow_btreemap_u16_u8 for Cow< BTreeMap< u16, u8 > > {
+        in = Cow::Owned( vec![ (10, 1), (20, 0) ].into_iter().collect() ),
         le = [2, 0, 0, 0, 10, 0, 1, 20, 0, 0],
         be = [0, 0, 0, 2, 0, 10, 1, 0, 20, 0],
         minimum_bytes = 4
     }
     btreeset for BTreeSet< u16 > {
         in = vec![ 10, 20 ].into_iter().collect(),
+        le = [2, 0, 0, 0, 10, 0, 20, 0],
+        be = [0, 0, 0, 2, 0, 10, 0, 20],
+        minimum_bytes = 4
+    }
+    cow_btreeset for Cow< BTreeSet< u16 > > {
+        in = Cow::Owned( vec![ 10, 20 ].into_iter().collect() ),
         le = [2, 0, 0, 0, 10, 0, 20, 0],
         be = [0, 0, 0, 2, 0, 10, 0, 20],
         minimum_bytes = 4
@@ -1813,6 +1897,24 @@ symmetric_tests! {
         be = [0, 33],
         minimum_bytes = 2
     }
+    derived_struct_with_varint_0 for DerivedStructWithVarInt {
+        in = DerivedStructWithVarInt { value: 0 },
+        le = [0],
+        be = [0],
+        minimum_bytes = 1
+    }
+    derived_struct_with_varint_127 for DerivedStructWithVarInt {
+        in = DerivedStructWithVarInt { value: 127 },
+        le = [127],
+        be = [127],
+        minimum_bytes = 1
+    }
+    derived_struct_with_varint_128 for DerivedStructWithVarInt {
+        in = DerivedStructWithVarInt { value: 128 },
+        le = [0b10000000, 0b10000000],
+        be = [0b10000000, 0b10000000],
+        minimum_bytes = 1
+    }
 }
 
 symmetric_tests_unsized! {
@@ -1881,13 +1983,13 @@ symmetric_tests_unsized! {
         minimum_bytes = 0
     }
     derived_vec_until_eof_empty for DerivedVecUntilEof {
-        in = DerivedVecUntilEof( b"".into() ),
+        in = DerivedVecUntilEof( vec![] ),
         le = [],
         be = [],
         minimum_bytes = 0
     }
     derived_vec_until_eof_non_empty for DerivedVecUntilEof {
-        in = DerivedVecUntilEof( b"Hello".into() ),
+        in = DerivedVecUntilEof( b"Hello".to_vec() ),
         le = [72, 101, 108, 108, 111],
         be = [72, 101, 108, 108, 111],
         minimum_bytes = 0
@@ -2278,11 +2380,13 @@ fn test_minimum_bytes_needed() {
 fn test_derive_transparent() {
     assert!( <TransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
     assert!( <TransparentU16 as Readable< Endianness >>::speedy_is_primitive() );
-    assert!( !<NonTransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <NonTransparentU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( !<ManualU8 as Readable< Endianness >>::speedy_is_primitive() );
 
     assert!( <TransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
     assert!( <TransparentU16 as Writable< Endianness >>::speedy_is_primitive() );
-    assert!( !<NonTransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <NonTransparentU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( !<ManualU8 as Writable< Endianness >>::speedy_is_primitive() );
 }
 
 #[test]
@@ -2311,6 +2415,43 @@ fn test_derive_c() {
     assert!( !<DeriveCWithU16U8 as Writable< Endianness >>::speedy_is_primitive() );
 }
 
+#[test]
+fn test_derive_primitive() {
+    assert!( <ThreeF32 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <ThreeF32 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <FourU8 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <FourU8 as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( <SimpleComposite as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <SimpleComposite as Writable< Endianness >>::speedy_is_primitive() );
+}
+
+#[derive(PartialEq, Eq, Debug)]
+struct ManualU8( u8 );
+
+impl< 'a, C: speedy::Context > Readable< 'a, C > for ManualU8 {
+    #[inline]
+    fn read_from< R: speedy::Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( ManualU8( reader.read_u8()? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        1
+    }
+}
+
+impl< C: speedy::Context > speedy::Writable< C > for ManualU8 {
+    #[inline]
+    fn write_to< T: ?Sized + speedy::Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
+        writer.write_u8( self.0 )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 1 )
+    }
+}
+
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 struct NonTransparentU8( u8 );
 
@@ -2324,6 +2465,29 @@ struct NonZeroCopyable( u8 );
 #[derive(Readable, Writable, PartialEq, Eq, Debug)]
 #[repr(packed)]
 struct PackedNonZeroCopyable( NonZeroCopyable );
+
+#[derive(Readable, Writable, PartialEq, Debug)]
+struct ThreeF32 {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+#[derive(Readable, Writable, PartialEq, Eq, Debug)]
+struct FourU8 {
+    x0: u8,
+    x1: u8,
+    x2: u8,
+    x3: u8,
+}
+
+#[derive(Readable, Writable, PartialEq, Debug)]
+struct SimpleComposite {
+    v0: ThreeF32,
+    v1: ThreeF32,
+    v2: ThreeF32,
+    normal: ThreeF32,
+}
 
 // Source: https://users.rust-lang.org/t/a-macro-to-assert-that-a-type-does-not-implement-trait-bounds/31179
 macro_rules! assert_not_impl {
@@ -2380,7 +2544,28 @@ assert_impl!( DerivedPackedRecursiveTuple, speedy::private::ZeroCopyable< () > )
 assert_impl!( &'static [PackedU16], speedy::Readable< 'static, speedy::LittleEndian > );
 
 #[test]
-fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {
+fn test_incomplete_read_into_vec_triggers_drop_for_already_read_items() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new( 0 );
+
+    #[derive(Readable, Writable, PartialEq, Eq, Debug)]
+    struct WithDrop( ManualU8 );
+    impl Drop for WithDrop {
+        fn drop( &mut self ) {
+            COUNTER.fetch_add( 1, Ordering::SeqCst );
+        }
+    }
+
+    #[derive(Readable, Writable, PartialEq, Eq, Debug)]
+    struct Struct( Vec< WithDrop > );
+
+    Struct::read_from_stream_unbuffered( &mut &[0, 0, 0, 10, 1, 2][..] ).unwrap_err();
+    assert_eq!( COUNTER.load( Ordering::SeqCst ), 2 );
+}
+
+#[test]
+fn test_incomplete_read_into_vec_does_not_trigger_drop_for_already_read_items_if_they_are_primitive() {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static COUNTER: AtomicU64 = AtomicU64::new( 0 );
@@ -2397,7 +2582,31 @@ fn test_incomplete_read_into_vec_triggers_drop_for_alread_read_items() {
     struct Struct( Vec< WithDrop > );
 
     Struct::read_from_stream_unbuffered( &mut &[0, 0, 0, 10, 1, 2][..] ).unwrap_err();
-    assert_eq!( COUNTER.load( Ordering::SeqCst ), 2 );
+    assert_eq!( COUNTER.load( Ordering::SeqCst ), 0 );
+}
+
+#[test]
+fn test_zero_copy_cow_deserialization() {
+    let input: Vec< u8 > = vec![
+        2, 0, 0, 0,
+        33, 0,
+        100, 0,
+    ];
+
+    let value_borrowed: Cow< [u16] > = Readable::read_from_buffer_with_ctx( Endianness::LittleEndian, &input ).unwrap();
+    let value_owned: Cow< [u16] > = Readable::read_from_buffer_copying_data_with_ctx( Endianness::LittleEndian, &input ).unwrap();
+
+    match value_borrowed {
+        Cow::Owned( _ ) => panic!(),
+        Cow::Borrowed( value ) => assert_eq!( value, &[33, 100] )
+    }
+
+    std::mem::drop( input );
+
+    match value_owned {
+        Cow::Owned( value ) => assert_eq!( value, &[33, 100] ),
+        Cow::Borrowed( _ ) => panic!()
+    }
 }
 
 #[derive(Writable, Readable, Eq, PartialEq, Debug)]

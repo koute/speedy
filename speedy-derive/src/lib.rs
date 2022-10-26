@@ -47,7 +47,10 @@ mod kw {
     syn::custom_keyword!( skip );
     syn::custom_keyword!( constant_prefix );
     syn::custom_keyword!( peek_tag );
+
     syn::custom_keyword!( non_exhaustive );
+    syn::custom_keyword!( varint );
+
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -62,6 +65,12 @@ enum Trait {
     Readable,
     Writable,
     ZeroCopyable { is_packed: bool }
+}
+
+fn uses_generics( input: &syn::DeriveInput ) -> bool {
+    input.generics.type_params().next().is_some() ||
+    input.generics.lifetimes().next().is_some() ||
+    input.generics.const_params().next().is_some()
 }
 
 fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> bool {
@@ -224,21 +233,48 @@ fn test_is_guaranteed_non_recursive() {
     assert_test!( false, Vec< T > );
 }
 
-fn is_primitive_ty( ty: &syn::Type ) -> bool {
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum PrimitiveTy {
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    F32,
+    F64
+}
+
+fn parse_primitive_ty( ty: &syn::Type ) -> Option< PrimitiveTy > {
     match ty {
         syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
             if segments.len() != 1 {
-                return false;
+                return None;
             }
 
             let segment = &segments[ 0 ];
             let ident = segment.ident.to_string();
             match ident.as_str() {
-                "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64" | "i128" => true,
-                _ => false
+                "u8" => Some( PrimitiveTy::U8 ),
+                "u16" => Some( PrimitiveTy::U16 ),
+                "u32" => Some( PrimitiveTy::U32 ),
+                "u64" => Some( PrimitiveTy::U64 ),
+                "u128" => Some( PrimitiveTy::U128 ),
+                "i8" => Some( PrimitiveTy::I8 ),
+                "i16" => Some( PrimitiveTy::I16 ),
+                "i32" => Some( PrimitiveTy::I32 ),
+                "i64" => Some( PrimitiveTy::I64 ),
+                "i128" => Some( PrimitiveTy::I128 ),
+                "f32" => Some( PrimitiveTy::F32 ),
+                "f64" => Some( PrimitiveTy::F64 ),
+                _ => None
             }
         },
-        _ => false
+        _ => None
     }
 }
 
@@ -273,7 +309,7 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Tr
                 (Trait::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
                 (Trait::Writable, false) => None,
                 (Trait::ZeroCopyable { is_packed }, _) => {
-                    if is_packed && is_primitive_ty( ty ) {
+                    if is_packed && parse_primitive_ty( ty ).is_some() {
                         None
                     } else {
                         Some( quote! { #ty: speedy::private::ZeroCopyable< T_ > } )
@@ -664,10 +700,21 @@ struct Field< 'a > {
     length_type: Option< BasicType >,
     ty: Opt< Ty >,
     skip: bool,
+    varint: bool,
     constant_prefix: Option< syn::LitByteStr >
 }
 
 impl< 'a > Field< 'a > {
+    fn is_simple( &self ) -> bool {
+        parse_primitive_ty( self.raw_ty ).is_some() &&
+        self.default_on_eof == false &&
+        self.length.is_none() &&
+        self.length_type.is_none() &&
+        self.skip == false &&
+        self.varint == false &&
+        self.constant_prefix.is_none()
+    }
+
     fn var_name( &self ) -> syn::Ident {
         if let Some( name ) = self.name {
             name.clone()
@@ -703,7 +750,9 @@ impl< 'a > Field< 'a > {
             | Ty::RefSliceU8( _ )
             | Ty::RefStr( _ )
             | Ty::String
-            | Ty::CowStr( .. ) => vec![],
+            | Ty::CowStr( .. )
+            | Ty::Primitive( .. )
+                => vec![],
             | Ty::Ty( _ ) => vec![ self.raw_ty.clone() ]
         }
     }
@@ -748,6 +797,9 @@ enum FieldAttribute {
     ConstantPrefix {
         key_span: Span,
         prefix: syn::LitByteStr
+    },
+    VarInt {
+        key_span: Span
     }
 }
 
@@ -835,6 +887,11 @@ impl syn::parse::Parse for FieldAttribute {
                 key_span: key_token.span(),
                 prefix: syn::LitByteStr::new( &prefix, value_span )
             }
+        } else if lookahead.peek( kw::varint ) {
+            let key_token = input.parse::< kw::varint >()?;
+            FieldAttribute::VarInt {
+                key_span: key_token.span()
+            }
         } else {
             return Err( lookahead.error() )
         };
@@ -878,6 +935,7 @@ enum Ty {
 
     Array( syn::Type, u32 ),
 
+    Primitive( PrimitiveTy ),
     Ty( syn::Type )
 }
 
@@ -970,6 +1028,10 @@ fn parse_ty( ty: &syn::Type ) -> Ty {
 }
 
 fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
+    if let Some( ty ) = parse_primitive_ty( ty ) {
+        return Some( Ty::Primitive( ty ) );
+    }
+
     match *ty {
         syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
             let name = &segments[ 0 ].ident;
@@ -1083,6 +1145,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             let mut length = None;
             let mut length_type = None;
             let mut skip = false;
+            let mut varint = false;
             let mut constant_prefix = None;
             for attr in parse_attributes::< FieldAttribute >( &field.attrs )? {
                 match attr {
@@ -1123,6 +1186,14 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                             return Err( syn::Error::new( key_span, message ) );
                         }
                         constant_prefix = Some( prefix );
+                    },
+                    FieldAttribute::VarInt { key_span } => {
+                        if parse_primitive_ty( &field.ty ) != Some( PrimitiveTy::U64 ) {
+                            let message = "The 'varint' attribute can only be used on fields of type 'u64'";
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+
+                        varint = true;
                     }
                 }
             }
@@ -1181,6 +1252,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                     | Opt::Option( Ty::RefStr( .. ) )
                     | Opt::Plain( Ty::Array( .. ) )
                     | Opt::Option( Ty::Array( .. ) )
+                    | Opt::Plain( Ty::Primitive( .. ) )
+                    | Opt::Option( Ty::Primitive( .. ) )
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
@@ -1230,6 +1303,8 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
 
                     | Opt::Plain( Ty::Array( .. ) )
                     | Opt::Option( Ty::Array( .. ) )
+                    | Opt::Plain( Ty::Primitive( .. ) )
+                    | Opt::Option( Ty::Primitive( .. ) )
                     | Opt::Plain( Ty::Ty( .. ) )
                     | Opt::Option( Ty::Ty( .. ) )
                     => {
@@ -1256,6 +1331,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 length_type: length_type.map( snd ),
                 ty,
                 skip,
+                varint,
                 constant_prefix
             })
         });
@@ -1380,11 +1456,37 @@ fn read_field_body( field: &Field, is_parent_non_exhaustive: bool, num_field: us
         }
     };
 
+    let read_key_value_collection = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_key_value_collection( _length_ )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_collection_until_eof()
+            }}
+        }
+    };
+
     let read_cow_collection = || {
         if let Some( ref read_length_body ) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_collection( _length_ ).map( std::borrow::Cow::Owned )
+            }}
+        } else {
+            quote! {{
+                _reader_.read_collection_until_eof().map( std::borrow::Cow::Owned )
+            }}
+        }
+    };
+
+    let read_cow_key_value_collection = || {
+        if let Some( ref read_length_body ) = read_length_body {
+            quote! {{
+                let _length_ = #read_length_body;
+                _reader_.read_key_value_collection( _length_ ).map( std::borrow::Cow::Owned )
             }}
         } else {
             quote! {{
@@ -1473,6 +1575,12 @@ fn read_field_body( field: &Field, is_parent_non_exhaustive: bool, num_field: us
         ])})() }
     };
 
+    let read_u64_varint = || {
+        quote! {{
+            _reader_.read_u64_varint()
+        }}
+    };
+
     let read_option = |tokens: TokenStream|
         quote! {{
             _reader_.read_u8().and_then( |_flag_| {
@@ -1490,17 +1598,19 @@ fn read_field_body( field: &Field, is_parent_non_exhaustive: bool, num_field: us
         Ty::CowSlice( .. ) => read_cow_slice(),
         Ty::CowStr( .. ) => read_cow_str(),
         Ty::HashMap( .. ) |
+        Ty::BTreeMap( .. )  => read_key_value_collection(),
         Ty::HashSet( .. ) |
-        Ty::BTreeMap( .. ) |
         Ty::BTreeSet( .. ) => read_collection(),
         Ty::CowHashMap( .. ) |
+        Ty::CowBTreeMap( .. ) => read_cow_key_value_collection(),
         Ty::CowHashSet( .. ) |
-        Ty::CowBTreeMap( .. ) |
         Ty::CowBTreeSet( .. ) => read_cow_collection(),
         Ty::RefSliceU8( .. ) => read_ref_slice_u8(),
         Ty::RefSlice( _, inner_ty ) => read_ref_slice( inner_ty ),
         Ty::RefStr( .. ) => read_ref_str(),
         Ty::Array( _, length ) => read_array( *length ),
+        Ty::Primitive( .. ) if field.varint => read_u64_varint(),
+        Ty::Primitive( .. ) |
         Ty::Ty( .. ) => {
             assert!( field.length.is_none() );
             quote! { _reader_.read_value() }
@@ -1636,6 +1746,11 @@ fn write_field_body( field: &Field ) -> TokenStream {
             _writer_.write_slice( &#name[..] )?;
         }};
 
+    let write_u64_varint = ||
+        quote! {{
+            _writer_.write_u64_varint( *#name )?;
+        }};
+
     let write_option = |tokens: TokenStream|
         quote! {{
             if let Some( ref #name ) = #name {
@@ -1665,6 +1780,8 @@ fn write_field_body( field: &Field ) -> TokenStream {
         Ty::CowBTreeMap( .. ) |
         Ty::CowBTreeSet( .. ) => write_collection(),
         Ty::Array( .. ) => write_array(),
+        Ty::Primitive( .. ) if field.varint => write_u64_varint(),
+        Ty::Primitive( .. ) |
         Ty::Ty( .. ) => {
             assert!( field.length.is_none() );
             quote! { _writer_.write_value( #name )?; }
@@ -1901,6 +2018,8 @@ fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
                         let length = *length as usize;
                         quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() * #length }
                     },
+                    | Ty::Primitive( .. ) if field.varint => quote! { 1 },
+                    | Ty::Primitive( .. )
                     | Ty::Ty( .. ) => {
                         let raw_ty = &field.raw_ty;
                         quote! { <#raw_ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() }
@@ -1944,13 +2063,14 @@ fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     }
 }
 
-fn generate_is_primitive( fields: &[Field] ) -> TokenStream {
+fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool ) -> TokenStream {
     if fields.is_empty() {
         return quote! { true };
     }
 
     let mut is_primitive = Vec::new();
     let mut fields_size = Vec::new();
+    let mut fields_offsets = Vec::new();
     for field in fields {
         if !is_primitive.is_empty() {
             is_primitive.push( quote! { && });
@@ -1958,17 +2078,39 @@ fn generate_is_primitive( fields: &[Field] ) -> TokenStream {
         }
 
         let ty = &field.raw_ty;
-        is_primitive.push( quote! {
-            <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
-        });
+        if is_writable {
+            is_primitive.push( quote! {
+                <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
+            });
+        } else {
+            is_primitive.push( quote! {
+                <#ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
+            });
+        }
+
         fields_size.push( quote! {
             std::mem::size_of::< #ty >()
+        });
+
+        let name = field.name();
+        fields_offsets.push( quote! {
+            speedy::private::offset_of!( Self, #name )
         });
     }
 
     is_primitive.push( quote! {
         && (#(#fields_size)*) == std::mem::size_of::< Self >()
     });
+
+    if check_order {
+        for window in fields_offsets.windows( 2 ) {
+            let a = &window[0];
+            let b = &window[1];
+            is_primitive.push( quote! {
+                && #a <= #b
+            });
+        }
+    }
 
     quote! {
         #(#is_primitive)*
@@ -1986,6 +2128,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let is_ty_packed = is_packed( &input.attrs );
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
             let is_ty_c = is_c( &input.attrs );
+            let is_ty_simple = structure.fields.iter().all( |field| field.is_simple() );
             let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
                 #body
@@ -2019,8 +2162,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         }
                     }
                 }
-            } else if is_ty_packed || is_ty_c {
-                let is_primitive = generate_is_primitive( &structure.fields );
+            } else if is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && structure.fields.len() <= 4) {
+                let is_primitive = generate_is_primitive( &structure.fields, false, !is_ty_packed && !is_ty_c );
                 let mut body_flip_endianness = Vec::new();
                 for field in &structure.fields {
                     let ty = &field.raw_ty;
@@ -2202,12 +2345,13 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let is_ty_packed = is_packed( &input.attrs );
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
             let is_ty_c = is_c( &input.attrs );
+            let is_ty_simple = st.fields.iter().all( |field| field.is_simple() );
             let assignments = assign_to_variables( &st.fields, is_ty_packed );
             let (body, _) = writable_body( &mut types, &st );
 
             let impl_primitive =
-                if is_ty_transparent || is_ty_packed || is_ty_c {
-                    let is_primitive = generate_is_primitive( &st.fields );
+                if is_ty_transparent || is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && st.fields.len() <= 4) {
+                    let is_primitive = generate_is_primitive( &st.fields, true, !is_ty_transparent && !is_ty_packed && !is_ty_c );
                     quote! {
                         #[inline(always)]
                         fn speedy_is_primitive() -> bool {

@@ -11,6 +11,42 @@ use crate::error::error_end_of_input;
 use crate::error::IsEof;
 use crate::utils::SwapBytes;
 
+struct RawCopyIter< T > {
+    pointer: std::ptr::NonNull< T >,
+    end: *const T
+}
+
+impl< T > Iterator for RawCopyIter< T > {
+    type Item = T;
+    #[inline(always)]
+    fn next( &mut self ) -> Option< Self::Item > {
+        if self.pointer.as_ptr() as *const T == self.end {
+            return None;
+        } else {
+            unsafe {
+                let old = self.pointer.as_ptr();
+                self.pointer = std::ptr::NonNull::new_unchecked( old.add( 1 ) );
+                Some( std::ptr::read_unaligned( old ) )
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn size_hint( &self ) -> (usize, Option< usize >) {
+        let length = self.len();
+        (length, Some( length ))
+    }
+}
+
+impl< T > ExactSizeIterator for RawCopyIter< T > {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        let bytesize = self.end as usize - self.pointer.as_ptr() as usize;
+        bytesize / std::mem::size_of::< T >()
+    }
+}
+impl< T > std::iter::FusedIterator for RawCopyIter< T > {}
+
 pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
     fn peek_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
@@ -51,6 +87,11 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     fn read_bytes_borrowed( &mut self, _length: usize ) -> Option< Result< &'a [u8], C::Error > > {
+        None
+    }
+
+    #[inline(always)]
+    fn read_bytes_borrowed_from_reader< 'r >( &'r mut self, _length: usize ) -> Option< Result< &'r [u8], C::Error > > {
         None
     }
 
@@ -586,7 +627,47 @@ pub trait Reader< 'a, C: Context >: Sized {
         where U: FromIterator< T >,
               T: Readable< 'a, C >
     {
+        if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !self.endianness().conversion_necessary()) {
+            let bytesize = length.checked_mul( std::mem::size_of::< T >() ).ok_or_else( || {
+                crate::error::error_too_big_usize_for_this_architecture() // TODO: Use different error maybe?
+            })?;
+
+            if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
+                let bytes = bytes?;
+                unsafe {
+                    let pointer = bytes.as_ptr().cast::< T >();
+                    return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut T ), end: pointer.add( length ) }.collect() );
+                }
+            }
+        }
+
         (0..length).into_iter().map( |_| self.read_value::< T >() ).collect()
+    }
+
+    #[inline]
+    fn read_key_value_collection< K, V, U >( &mut self, length: usize ) -> Result< U, C::Error >
+        where U: FromIterator< (K, V) >,
+              K: Readable< 'a, C >,
+              V: Readable< 'a, C >
+    {
+        #[repr(packed)]
+        struct Pair< K, V >( K, V );
+
+        if K::speedy_is_primitive() && V::speedy_is_primitive() && ((mem::size_of::< K >() == 1 && mem::size_of::< V >() == 1) || !self.endianness().conversion_necessary()) {
+            let bytesize = length.checked_mul( std::mem::size_of::< Pair< K, V > >() ).ok_or_else( || {
+                crate::error::error_too_big_usize_for_this_architecture()
+            })?;
+
+            if let Some( bytes ) = self.read_bytes_borrowed_from_reader( bytesize ) {
+                let bytes = bytes?;
+                unsafe {
+                    let pointer = bytes.as_ptr().cast::< Pair< K, V > >();
+                    return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut Pair< K, V > ), end: pointer.add( length ) }.map( |pair| (pair.0, pair.1) ).collect() );
+                }
+            }
+        }
+
+        self.read_collection( length )
     }
 
     #[inline]
