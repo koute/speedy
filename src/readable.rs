@@ -263,12 +263,12 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
 
     #[inline(always)]
     fn context( &self ) -> &C {
-        &self.context
+        self.context
     }
 
     #[inline(always)]
     fn context_mut( &mut self ) -> &mut C {
-        &mut self.context
+        self.context
     }
 }
 
@@ -279,7 +279,7 @@ struct StreamReader< C: Context, S: Read > {
     is_buffering: bool
 }
 
-impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
+impl< C, S > StreamReader< C, S > where C: Context, S: Read {
     #[inline(never)]
     fn read_bytes_slow( &mut self, mut output: &mut [u8] ) -> Result< (), C::Error > {
         if self.is_buffering && output.len() < self.buffer.capacity() {

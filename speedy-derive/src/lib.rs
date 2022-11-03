@@ -96,22 +96,19 @@ fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> 
                 }
             })
         },
-        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
         syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().any( |elem| possibly_uses_generic_ty( generic_types, elem ) ),
-        syn::Type::Reference( syn::TypeReference { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Paren( syn::TypeParen { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Group( syn::TypeGroup { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Reference( syn::TypeReference { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
+        syn::Type::Paren( syn::TypeParen { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
+        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
+        syn::Type::Group( syn::TypeGroup { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
         syn::Type::Array( syn::TypeArray { elem, len, .. } ) => {
-            if possibly_uses_generic_ty( generic_types, &elem ) {
+            if possibly_uses_generic_ty( generic_types, elem ) {
                 return true;
             }
 
             // This is probably too conservative.
-            match len {
-                syn::Expr::Lit( .. ) => false,
-                _ => true
-            }
+            !matches!(len, syn::Expr::Lit( .. ))
         },
         syn::Type::Never( .. ) => false,
         _ => true
@@ -185,22 +182,19 @@ fn is_guaranteed_non_recursive( ty: &syn::Type ) -> bool {
                 _ => false
             }
         },
-        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().all( |elem| is_guaranteed_non_recursive( elem ) ),
-        syn::Type::Reference( syn::TypeReference { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Paren( syn::TypeParen { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Group( syn::TypeGroup { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
+        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => is_guaranteed_non_recursive( elem ),
+        syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().all( is_guaranteed_non_recursive ),
+        syn::Type::Reference( syn::TypeReference { elem, .. } ) => is_guaranteed_non_recursive( elem ),
+        syn::Type::Paren( syn::TypeParen { elem, .. } ) => is_guaranteed_non_recursive( elem ),
+        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => is_guaranteed_non_recursive( elem ),
+        syn::Type::Group( syn::TypeGroup { elem, .. } ) => is_guaranteed_non_recursive( elem ),
         syn::Type::Array( syn::TypeArray { elem, len, .. } ) => {
-            if !is_guaranteed_non_recursive( &elem ) {
+            if !is_guaranteed_non_recursive( elem ) {
                 return false;
             }
 
             // This is probably too conservative.
-            match len {
-                syn::Expr::Lit( .. ) => true,
-                _ => false
-            }
+            !matches!(len, syn::Expr::Lit( .. ))
         },
         syn::Type::Never( .. ) => true,
         _ => false
@@ -672,11 +666,11 @@ struct Field< 'a > {
 impl< 'a > Field< 'a > {
     fn is_simple( &self ) -> bool {
         parse_primitive_ty( self.raw_ty ).is_some() &&
-        self.default_on_eof == false &&
+        !self.default_on_eof &&
         self.length.is_none() &&
         self.length_type.is_none() &&
-        self.skip == false &&
-        self.varint == false &&
+        !self.skip &&
+        !self.varint &&
         self.constant_prefix.is_none()
     }
 
@@ -723,7 +717,7 @@ impl< 'a > Field< 'a > {
     }
 
     fn is_guaranteed_non_recursive( &self ) -> bool {
-        is_guaranteed_non_recursive( &self.raw_ty )
+        is_guaranteed_non_recursive( self.raw_ty )
     }
 }
 
@@ -814,7 +808,7 @@ impl syn::parse::Parse for FieldAttribute {
                         syn::Lit::ByteStr( literal ) => literal.value(),
                         syn::Lit::Byte( literal ) => vec![ literal.value() ],
                         syn::Lit::Char( literal ) => format!( "{}", literal.value() ).into_bytes(),
-                        syn::Lit::Bool( literal ) => vec![ if literal.value { 1 } else { 0 } ],
+                        syn::Lit::Bool( literal ) => vec![ u8::from(literal.value) ],
                         syn::Lit::Int( literal ) => {
                             if literal.suffix() == "u8" {
                                 vec![ literal.base10_parse::< u8 >().unwrap() ]
@@ -832,7 +826,7 @@ impl syn::parse::Parse for FieldAttribute {
                             match literal {
                                 syn::Lit::Int( literal ) => {
                                     if literal.suffix() == "i8" {
-                                        vec![ (literal.base10_parse::< i8 >().unwrap() * -1) as u8 ]
+                                        vec![ -literal.base10_parse::< i8 >().unwrap() as u8 ]
                                     } else if literal.suffix() == "u8" {
                                         return generic_error()
                                     } else {
@@ -1604,7 +1598,7 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
         field_names.push( name );
         types.extend( field.bound_types() );
 
-        if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
+        if let Some( minimum_bytes ) = get_minimum_bytes( field ) {
             minimum_bytes_needed.push( minimum_bytes );
         }
     }
@@ -1717,16 +1711,14 @@ fn write_field_body( field: &Field ) -> TokenStream {
         Opt::Option( _ ) => write_option( body )
     };
 
-    let body = if let Some( ref constant_prefix ) = field.constant_prefix {
+    if let Some( ref constant_prefix ) = field.constant_prefix {
         quote! {{
             _writer_.write_slice( #constant_prefix )?;
             #body
         }}
     } else {
         body
-    };
-
-    body
+    }
 }
 
 fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream) {
@@ -1737,7 +1729,7 @@ fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
             continue;
         }
 
-        let write_value = write_field_body( &field );
+        let write_value = write_field_body( field );
         types.extend( field.bound_types() );
 
         field_names.push( field.var_name().clone() );
@@ -1777,7 +1769,7 @@ impl< 'a > Enum< 'a > {
         let attrs = collect_enum_attributes( attrs )?;
         let tag_type = attrs.tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE );
         let max = match tag_type {
-            BasicType::U7 => 0b01111111 as u64,
+            BasicType::U7 => 0b01111111_u64,
             BasicType::U8 => std::u8::MAX as u64,
             BasicType::U16 => std::u16::MAX as u64,
             BasicType::U32 => std::u32::MAX as u64,
@@ -1862,7 +1854,6 @@ impl< 'a > Enum< 'a > {
                     quote! { #tag }
                 },
                 BasicType::U64 | BasicType::VarInt64 => {
-                    let tag = tag as u64;
                     quote! { #tag }
                 }
             };
@@ -2125,7 +2116,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             (reader_body, minimum_bytes, impl_primitive, impl_zerocopyable)
         },
         syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
-            let enumeration = Enum::new( &name, &input.attrs, &variants )?;
+            let enumeration = Enum::new( name, &input.attrs, variants )?;
             let mut variant_matches = Vec::with_capacity( variants.len() );
             let mut variant_minimum_sizes = Vec::with_capacity( variants.len() );
             for variant in enumeration.variants {
@@ -2140,10 +2131,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     }
                 });
 
-                if variant.structure.kind != StructKind::Unit {
-                    if variant.structure.is_guaranteed_non_recursive() {
-                        variant_minimum_sizes.push( minimum_bytes );
-                    }
+                if variant.structure.kind != StructKind::Unit && variant.structure.is_guaranteed_non_recursive() {
+                    variant_minimum_sizes.push( minimum_bytes );
                 }
             }
 
@@ -2281,7 +2270,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             (impl_body, impl_primitive)
         },
         syn::Data::Enum( syn::DataEnum { ref variants, .. } ) => {
-            let enumeration = Enum::new( &name, &input.attrs, &variants )?;
+            let enumeration = Enum::new( name, &input.attrs, variants )?;
             let tag_writer = match enumeration.tag_type {
                 BasicType::U64 => quote! { write_u64 },
                 BasicType::U32 => quote! { write_u32 },

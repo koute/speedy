@@ -21,7 +21,7 @@ impl< T > Iterator for RawCopyIter< T > {
     #[inline(always)]
     fn next( &mut self ) -> Option< Self::Item > {
         if self.pointer.as_ptr() as *const T == self.end {
-            return None;
+            None
         } else {
             unsafe {
                 let old = self.pointer.as_ptr();
