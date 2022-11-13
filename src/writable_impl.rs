@@ -162,7 +162,7 @@ impl< C: Context > Writable< C > for usize {
 impl< C: Context > Writable< C > for bool {
     #[inline]
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
-        writer.write_u8( if *self { 1 } else { 0 } )
+        writer.write_u8( u8::from(*self) )
     }
 
     #[inline]
@@ -275,14 +275,14 @@ impl< 'a, C: Context, T: Writable< C > > Writable< C > for &'a [T] where [T]: To
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
-        <[T] as Writable::< C >>::bytes_needed( self.as_ref() )
+        <[T] as Writable::< C >>::bytes_needed( self )
     }
 }
 
 impl< 'r, C, T > Writable< C > for Cow< 'r, HashSet< T > > where C: Context, T: Writable< C > + Clone + Hash + Eq {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-        (&**self).write_to( writer )
+        (**self).write_to( writer )
     }
 
     #[inline]
@@ -294,7 +294,7 @@ impl< 'r, C, T > Writable< C > for Cow< 'r, HashSet< T > > where C: Context, T: 
 impl< 'r, C, T > Writable< C > for Cow< 'r, BTreeSet< T > > where C: Context, T: Writable< C > + Clone + Ord {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-        (&**self).write_to( writer )
+        (**self).write_to( writer )
     }
 
     #[inline]
@@ -306,7 +306,7 @@ impl< 'r, C, T > Writable< C > for Cow< 'r, BTreeSet< T > > where C: Context, T:
 impl< 'r, C, K, V > Writable< C > for Cow< 'r, HashMap< K, V > > where C: Context, K: Writable< C > + Clone + Hash + Eq, V: Writable< C > + Clone {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-        (&**self).write_to( writer )
+        (**self).write_to( writer )
     }
 
     #[inline]
@@ -318,7 +318,7 @@ impl< 'r, C, K, V > Writable< C > for Cow< 'r, HashMap< K, V > > where C: Contex
 impl< 'r, C, K, V > Writable< C > for Cow< 'r, BTreeMap< K, V > > where C: Context, K: Writable< C > + Clone + Ord, V: Writable< C > + Clone {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-        (&**self).write_to( writer )
+        (**self).write_to( writer )
     }
 
     #[inline]
@@ -671,13 +671,13 @@ impl< C > Writable< C > for Box< str >
 {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
-        let value: &str = &**self;
+        let value: &str = self;
         value.write_to( writer )
     }
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
-        let value: &str = &**self;
+        let value: &str = self;
         Writable::< C >::bytes_needed( value )
     }
 }
