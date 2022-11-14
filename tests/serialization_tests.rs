@@ -2423,6 +2423,11 @@ fn test_derive_primitive() {
     assert!( <FourU8 as Writable< Endianness >>::speedy_is_primitive() );
     assert!( <SimpleComposite as Readable< Endianness >>::speedy_is_primitive() );
     assert!( <SimpleComposite as Writable< Endianness >>::speedy_is_primitive() );
+
+    assert!( !<DerivedStructWithVarInt as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( !<DerivedStructWithVarInt as Writable< Endianness >>::speedy_is_primitive() );
+    assert!( !<DerivedStructWithOptionU16 as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( !<DerivedStructWithOptionU16 as Writable< Endianness >>::speedy_is_primitive() );
 }
 
 #[derive(PartialEq, Eq, Debug)]

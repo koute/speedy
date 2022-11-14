@@ -670,14 +670,17 @@ struct Field< 'a > {
 }
 
 impl< 'a > Field< 'a > {
-    fn is_simple( &self ) -> bool {
-        parse_primitive_ty( self.raw_ty ).is_some() &&
+    fn can_be_primitive( &self ) -> bool {
         self.default_on_eof == false &&
         self.length.is_none() &&
         self.length_type.is_none() &&
         self.skip == false &&
         self.varint == false &&
         self.constant_prefix.is_none()
+    }
+
+    fn is_simple( &self ) -> bool {
+        parse_primitive_ty( self.raw_ty ).is_some()
     }
 
     fn var_name( &self ) -> syn::Ident {
@@ -2033,6 +2036,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
             let is_ty_c = is_c( &input.attrs );
             let is_ty_simple = structure.fields.iter().all( |field| field.is_simple() );
+            let can_be_primitive = structure.fields.iter().all( |field| field.can_be_primitive() );
             let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
                 #body
@@ -2066,7 +2070,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         }
                     }
                 }
-            } else if is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && structure.fields.len() <= 4) {
+            } else if can_be_primitive && (is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && structure.fields.len() <= 4)) {
                 let is_primitive = generate_is_primitive( &structure.fields, false, !is_ty_packed && !is_ty_c );
                 let mut body_flip_endianness = Vec::new();
                 for field in &structure.fields {
@@ -2250,11 +2254,28 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
             let is_ty_c = is_c( &input.attrs );
             let is_ty_simple = st.fields.iter().all( |field| field.is_simple() );
+            let can_be_primitive = st.fields.iter().all( |field| field.can_be_primitive() );
             let assignments = assign_to_variables( &st.fields, is_ty_packed );
             let (body, _) = writable_body( &mut types, &st );
 
             let impl_primitive =
-                if is_ty_transparent || is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && st.fields.len() <= 4) {
+                if is_ty_transparent {
+                    let field_ty = &st.fields[ 0 ].raw_ty;
+                    quote! {
+                        #[inline(always)]
+                        fn speedy_is_primitive() -> bool {
+                            <#field_ty as speedy::Writable< C_ >>::speedy_is_primitive()
+                        }
+
+                        #[inline(always)]
+                        unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
+                            unsafe {
+                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
+                            }
+                        }
+                    }
+
+                } else if can_be_primitive && (is_ty_transparent || is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && st.fields.len() <= 4)) {
                     let is_primitive = generate_is_primitive( &st.fields, true, !is_ty_transparent && !is_ty_packed && !is_ty_c );
                     quote! {
                         #[inline(always)]
