@@ -45,7 +45,9 @@ impl< 'a, C: Context, T > Readable< 'a, C > for &'a [T] where T: crate::utils::Z
 
 #[inline(always)]
 unsafe fn cast_slice< T, const N: usize >( slice: &[u8] ) -> &[T; N] {
-    &*(slice.as_ptr() as *const [T; N])
+    unsafe {
+        &*(slice.as_ptr() as *const [T; N])
+    }
 }
 
 impl< 'a, C: Context, T, const N: usize > Readable< 'a, C > for &'a [T; N] where T: crate::utils::ZeroCopyable< T > {

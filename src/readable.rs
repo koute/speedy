@@ -58,8 +58,10 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
             return Err( error_end_of_input() );
         }
 
-        std::ptr::copy_nonoverlapping( self.ptr, output, length );
-        self.ptr = self.ptr.add( length );
+        unsafe { 
+            std::ptr::copy_nonoverlapping( self.ptr, output, length );
+            self.ptr = self.ptr.add( length );
+        }
 
         Ok(())
     }
@@ -84,7 +86,9 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
             return Err( error_end_of_input() );
         }
 
-        std::ptr::copy_nonoverlapping( self.ptr, output, length );
+        unsafe {
+            std::ptr::copy_nonoverlapping( self.ptr, output, length );
+        }
         Ok(())
     }
 
@@ -199,8 +203,10 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
             return Err( error_end_of_input() );
         }
 
-        std::ptr::copy_nonoverlapping( self.ptr, output, length );
-        self.ptr = self.ptr.add( length );
+        unsafe {
+            std::ptr::copy_nonoverlapping( self.ptr, output, length );
+            self.ptr = self.ptr.add( length );
+        }
 
         Ok(())
     }
@@ -225,7 +231,9 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
             return Err( error_end_of_input() );
         }
 
-        std::ptr::copy_nonoverlapping( self.ptr, output, length );
+        unsafe {
+            std::ptr::copy_nonoverlapping( self.ptr, output, length );
+        }
         Ok(())
     }
 
@@ -645,7 +653,7 @@ pub trait Readable< 'a, C: Context >: Sized {
 
     #[doc(hidden)]
     #[inline]
-    fn speedy_flip_endianness( _: *mut Self ) {
+    unsafe fn speedy_flip_endianness( _: *mut Self ) {
         panic!();
     }
 

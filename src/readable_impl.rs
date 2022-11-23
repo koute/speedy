@@ -131,12 +131,14 @@ macro_rules! impl_for_primitive {
             #[doc(hidden)]
             #[inline]
             unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
-                std::slice::from_raw_parts( slice.as_ptr() as *const $type, slice.len() / mem::size_of::< Self >() )
+                unsafe {
+                    std::slice::from_raw_parts( slice.as_ptr() as *const $type, slice.len() / mem::size_of::< Self >() )
+                }
             }
 
             #[doc(hidden)]
             #[inline(always)]
-            fn speedy_flip_endianness( itself: *mut Self ) {
+            unsafe fn speedy_flip_endianness( itself: *mut Self ) {
                 unsafe {
                     std::ptr::write_unaligned( itself, std::ptr::read_unaligned( itself ).swap_bytes() );
                 }
