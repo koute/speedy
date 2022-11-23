@@ -2078,9 +2078,11 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     let name = field.name();
 
                     body_flip_endianness.push( quote! {
-                        <#ty as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness(
-                            std::ptr::addr_of_mut!( (*itself).#name )
-                        );
+                        unsafe {
+                            <#ty as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness(
+                                std::ptr::addr_of_mut!( (*itself).#name )
+                            );
+                        }
                     });
                 }
 
@@ -2098,7 +2100,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     }
 
                     #[inline(always)]
-                    fn speedy_flip_endianness( itself: *mut Self ) {
+                    unsafe fn speedy_flip_endianness( itself: *mut Self ) {
                         unsafe {
                             #(#body_flip_endianness)*
                         }
@@ -2108,7 +2110,9 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     fn speedy_convert_slice_endianness( endianness: speedy::Endianness, slice: &mut [Self] ) {
                         if endianness.conversion_necessary() {
                             for value in slice {
-                                <Self as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness( value );
+                                unsafe {
+                                    <Self as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness( value );
+                                }
                             }
                         }
                     }

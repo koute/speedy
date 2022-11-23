@@ -77,14 +77,12 @@ pub trait Writer< C: Context > {
 
     #[inline(always)]
     fn write_f32( &mut self, value: f32 ) -> Result< (), C::Error > {
-        let value: u32 = unsafe { mem::transmute( value ) };
-        self.write_u32( value )
+        self.write_u32( value.to_bits() )
     }
 
     #[inline(always)]
-    fn write_f64( &mut self, value: f64 ) -> Result< (), C::Error > {
-        let value: u64 = unsafe { mem::transmute( value ) };
-        self.write_u64( value )
+    fn write_f64( &mut self, value: f64 ) -> Result< (), C::Error > {        
+        self.write_u64( value.to_bits() )
     }
 
     #[inline(always)]

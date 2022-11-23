@@ -55,12 +55,16 @@ pub trait Reader< 'a, C: Context >: Sized {
 
     #[inline(always)]
     unsafe fn read_bytes_into_ptr( &mut self, output: *mut u8, length: usize ) -> Result< (), C::Error > {
-        self.read_bytes( std::slice::from_raw_parts_mut( output, length ) )
+        unsafe {
+            self.read_bytes( std::slice::from_raw_parts_mut( output, length ) )
+        }
     }
 
     #[inline(always)]
     unsafe fn peek_bytes_into_ptr( &mut self, output: *mut u8, length: usize ) -> Result< (), C::Error > {
-        self.peek_bytes( std::slice::from_raw_parts_mut( output, length ) )
+        unsafe {
+            self.peek_bytes( std::slice::from_raw_parts_mut( output, length ) )
+        }
     }
 
     #[inline(always)]

@@ -87,7 +87,7 @@ pub fn get_error_kind( error: &Error ) -> &ErrorKind {
 }
 
 impl fmt::Display for Error {
-    fn fmt( &self, fmt: &mut fmt::Formatter ) -> fmt::Result {
+    fn fmt( &self, fmt: &mut fmt::Formatter<'_> ) -> fmt::Result {
         match self.kind {
             ErrorKind::InvalidChar => write!( fmt, "out of range char" ),
             ErrorKind::InvalidEnumVariant => write!( fmt, "invalid enum variant" ),
