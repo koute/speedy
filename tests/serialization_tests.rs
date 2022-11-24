@@ -2613,3 +2613,117 @@ fn test_zero_copy_cow_deserialization() {
         Cow::Borrowed( _ ) => panic!()
     }
 }
+
+#[derive(Writable, Readable, Eq, PartialEq, Debug)]
+#[speedy(non_exhaustive)]
+struct NonExhaustiveStructBefore {
+    pub field1: bool,
+    pub field2: Vec<NonExhaustiveStructChildBefore>,
+    pub field3: u32,
+}
+
+#[derive(Writable, Readable, Eq, PartialEq, Debug)]
+#[speedy(non_exhaustive)]
+struct NonExhaustiveStructChildBefore {
+    pub field1: u32,
+    pub field2: bool,
+}
+
+#[derive(Writable, Readable, Eq, PartialEq, Debug)]
+#[speedy(non_exhaustive)]
+struct NonExhaustiveStructAfter {
+    pub field1: bool,
+    pub field2: Vec<NonExhaustiveStructChildAfter>,
+    pub field3: u32,
+}
+
+#[derive(Writable, Readable, Eq, PartialEq, Debug)]
+#[speedy(non_exhaustive)]
+struct NonExhaustiveStructChildAfter {
+    pub field1: u32,
+    pub field2: bool,
+    pub field_added: u8, // should always be 0
+    pub field_added_2: Vec<u64>
+}
+
+#[test]
+fn test_non_exhaustive_field_appended() {
+    use speedy::{
+        Readable,
+        Writable
+    };
+
+    let before = NonExhaustiveStructBefore{ 
+        field1: true, 
+        field2: vec![
+            NonExhaustiveStructChildBefore { field1: 1, field2: false}, 
+            NonExhaustiveStructChildBefore { field1: 2, field2: true},  
+        ],
+        field3: 9
+    };
+
+    let buffer = before.write_to_vec().unwrap();
+    assert_eq!( buffer, &[
+        3, 
+            1, 
+            2, 0, 0, 0, 
+                        2, 
+                            1, 0, 0, 0, 
+                            0, 
+                        2, 
+                            2, 0, 0, 0, 
+                            1, 
+            9, 0, 0, 0
+    ]);
+
+    let deserialized = NonExhaustiveStructAfter::read_from_buffer( &buffer ).unwrap();
+
+    let expectation = NonExhaustiveStructAfter{
+        field1: true, 
+        field2: vec![
+            NonExhaustiveStructChildAfter { field1: 1, field2: false, field_added: 0, field_added_2: vec![]}, 
+            NonExhaustiveStructChildAfter { field1: 2, field2: true, field_added: 0, field_added_2: vec![]},  
+        ],
+        field3: 9
+    };
+    assert_eq!( deserialized, expectation );
+
+}
+
+symmetric_tests! {
+    non_exhaustive_struct_1 for NonExhaustiveStructBefore {
+        in = NonExhaustiveStructBefore{ 
+            field1: true, 
+            field2: vec![
+                NonExhaustiveStructChildBefore { field1: 1, field2: false}, 
+                NonExhaustiveStructChildBefore { field1: 2, field2: true},  
+            ],
+            field3: 9
+        },
+        le = [
+            3, 
+                1, 
+                2, 0, 0, 0, 
+                            2, 
+                                1, 0, 0, 0, 
+                                0, 
+                            2, 
+                                2, 0, 0, 0, 
+                                1, 
+                9, 0, 0, 0
+        ],
+        be = [
+            3, 
+                1, 
+                0, 0, 0, 2, 
+                            2, 
+                                0, 0, 0, 1, 
+                                0, 
+                            2, 
+                                0, 0, 0, 2, 
+                                1, 
+                0, 0, 0, 9
+        ],
+        minimum_bytes = 1
+    }
+}

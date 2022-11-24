@@ -47,7 +47,10 @@ mod kw {
     syn::custom_keyword!( skip );
     syn::custom_keyword!( constant_prefix );
     syn::custom_keyword!( peek_tag );
+
+    syn::custom_keyword!( non_exhaustive );
     syn::custom_keyword!( varint );
+
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -388,6 +391,9 @@ enum VariantAttribute {
 }
 
 enum StructAttribute {
+    NonExhaustive {
+        key_token: kw::non_exhaustive
+    }
 }
 
 enum EnumAttribute {
@@ -430,11 +436,16 @@ fn parse_variant_attribute(
 }
 
 fn parse_struct_attribute(
-    _input: &syn::parse::ParseStream,
-    _lookahead: &syn::parse::Lookahead1
+    input: &syn::parse::ParseStream,
+    lookahead: &syn::parse::Lookahead1
 ) -> syn::parse::Result< Option< StructAttribute > >
 {
-    Ok( None )
+    if lookahead.peek( kw::non_exhaustive ) {
+        let key_token = input.parse::< kw::non_exhaustive >()?;
+        Ok( Some( StructAttribute::NonExhaustive { key_token } ) )
+    } else {
+        Ok( None )
+    }
 }
 
 fn parse_enum_attribute(
@@ -497,6 +508,7 @@ struct VariantAttributes {
 }
 
 struct StructAttributes {
+    non_exhaustive: bool
 }
 
 struct EnumAttributes {
@@ -577,10 +589,21 @@ fn collect_variant_attributes( attrs: Vec< VariantAttribute > ) -> Result< Varia
 }
 
 fn collect_struct_attributes( attrs: Vec< StructAttribute > ) -> Result< StructAttributes, syn::Error > {
-    for _attr in attrs {
+    let mut non_exhaustive = false;
+    for attr in attrs {
+        match attr {
+            StructAttribute::NonExhaustive { key_token } => {
+                if non_exhaustive {
+                    let message = "Duplicate 'non_exhaustive'";
+                    return Err( syn::Error::new( key_token.span(), message ) );
+                }
+                non_exhaustive = true;
+            }
+        }
     }
 
     Ok( StructAttributes {
+        non_exhaustive
     })
 }
 
@@ -621,32 +644,44 @@ enum StructKind {
 
 struct Struct< 'a > {
     fields: Vec< Field< 'a > >,
-    kind: StructKind
+    kind: StructKind,
+    non_exhaustive: bool
 }
 
 impl< 'a > Struct< 'a > {
     fn new( fields: &'a syn::Fields, attrs: Vec< StructAttribute > ) -> Result< Self, syn::Error > {
-        collect_struct_attributes( attrs )?;
+        let attrs = collect_struct_attributes( attrs )?;
         let structure = match fields {
             syn::Fields::Unit => {
                 Struct {
                     fields: Vec::new(),
-                    kind: StructKind::Unit
+                    kind: StructKind::Unit,
+                    non_exhaustive: attrs.non_exhaustive
                 }
             },
             syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
                 Struct {
                     fields: get_fields( named.into_iter() )?,
-                    kind: StructKind::Named
+                    kind: StructKind::Named,
+                    non_exhaustive: attrs.non_exhaustive
                 }
             },
             syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
                 Struct {
                     fields: get_fields( unnamed.into_iter() )?,
-                    kind: StructKind::Unnamed
+                    kind: StructKind::Unnamed,
+                    non_exhaustive: attrs.non_exhaustive
                 }
             }
         };
+
+
+        if structure.non_exhaustive && structure.fields.len() > 127 {
+            // we forbid structs with more than 127 fields because the MSB could be used to support structs w/ more 
+            // than 127 fields (by reading the next byte if the MSB is 1)
+            let message = "speedy(non_exhaustive) is not available on structs with more than 127 fields at the moment.";
+            return Err( syn::Error::new( fields.span(), message ) );
+        }
 
         Ok( structure )
     }
@@ -1317,7 +1352,17 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
     }
 }
 
-fn read_field_body( field: &Field ) -> TokenStream {
+fn non_exhaustive_field_body( body: TokenStream , num_field: usize) -> TokenStream {
+    quote! {
+        if _struct_size_ > #num_field {
+            #body?
+        } else {
+            std::default::Default::default()
+        }
+    }
+}
+
+fn read_field_body( field: &Field, is_parent_non_exhaustive: bool, num_field: usize ) -> TokenStream {
     if field.skip {
         return quote! {
             std::default::Default::default()
@@ -1588,10 +1633,15 @@ fn read_field_body( field: &Field ) -> TokenStream {
         body
     };
 
-    if field.default_on_eof {
-        default_on_eof_body( body )
+    if is_parent_non_exhaustive {
+        non_exhaustive_field_body( body, num_field )
     } else {
-        quote! { #body? }
+        // we do not need to handle default_on_eof when parent is non_exhaustive (because default_on_eof is applied on all fields)
+        if field.default_on_eof {
+            default_on_eof_body( body )
+        } else {
+            quote! { #body? }
+        }
     }
 }
 
@@ -1599,8 +1649,16 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
     let mut field_names = Vec::new();
     let mut field_readers = Vec::new();
     let mut minimum_bytes_needed = Vec::new();
+
+    if st.non_exhaustive {
+        field_readers.push( quote! { 
+            let _struct_size_: usize = speedy::private::read_length_u64_varint( _reader_ )?; 
+        } );
+    }
+
+    let mut num_field = 0;
     for field in &st.fields {
-        let read_value = read_field_body( field );
+        let read_value = read_field_body( field, st.non_exhaustive, num_field );
         let name = field.var_name();
         let raw_ty = field.raw_ty;
         field_readers.push( quote! { let #name: #raw_ty = #read_value; } );
@@ -1610,6 +1668,16 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
         if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
             minimum_bytes_needed.push( minimum_bytes );
         }
+
+        if !field.skip {
+            num_field += 1;
+        }
+    }
+
+    if st.non_exhaustive && num_field <= 127 {
+        field_readers[0] =  quote! { 
+            let _struct_size_: usize = speedy::private::read_length_u8( _reader_ )?; 
+        };
     }
 
     let body = quote! { #(#field_readers)* };
@@ -1620,7 +1688,15 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
         StructKind::Named => quote! { { #initializer } }
     };
 
-    let minimum_bytes_needed = sum( minimum_bytes_needed );
+    
+    
+    let minimum_bytes_needed = if st.non_exhaustive {
+        // varint64 is at least 1 byte, everything else is optional
+        quote! { 1 }
+    } else {
+        sum( minimum_bytes_needed )
+    };
+
     (body, initializer, minimum_bytes_needed)
 }
 
@@ -1735,16 +1811,36 @@ fn write_field_body( field: &Field ) -> TokenStream {
 fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
+    let mut field_count: usize = 0;
+
+    if st.non_exhaustive {
+        field_writers.push(quote! { });
+    }
     for field in &st.fields {
         if field.skip {
             continue;
         }
+
+        field_count += 1;
 
         let write_value = write_field_body( &field );
         types.extend( field.bound_types() );
 
         field_names.push( field.var_name().clone() );
         field_writers.push( write_value );
+    }
+
+    if st.non_exhaustive {
+        // we use u7 if less than 128 elements to optimize serialization & deserialization
+        let writer = if field_count > 127 {
+            quote! { write_length_u64_varint }
+        } else {
+            quote! { write_length_u7 }
+        };
+
+        field_writers[0] = quote! {
+            speedy::private::#writer(#field_count, _writer_ )?;
+        };
     }
 
     let body = quote! { #(#field_writers)* };
