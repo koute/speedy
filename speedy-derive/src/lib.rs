@@ -831,18 +831,13 @@ impl syn::parse::Parse for FieldAttribute {
                 },
                 syn::Expr::Unary( syn::ExprUnary { op: syn::UnOp::Neg(_), expr, .. } ) => {
                     match *expr {
-                        syn::Expr::Lit( syn::ExprLit { lit: literal, .. } ) => {
-                            match literal {
-                                syn::Lit::Int( literal ) => {
-                                    if literal.suffix() == "i8" {
-                                        vec![ -literal.base10_parse::< i8 >().unwrap() as u8 ]
-                                    } else if literal.suffix() == "u8" {
-                                        return generic_error()
-                                    } else {
-                                        return Err( syn::Error::new( value_span, "integers are not supported; if you want to use a single byte constant then append either 'u8' or 'i8' to it" ) );
-                                    }
-                                },
-                                _ => return generic_error()
+                        syn::Expr::Lit( syn::ExprLit { lit: syn::Lit::Int( literal ), .. } ) => {
+                            if literal.suffix() == "i8" {
+                                vec![ -literal.base10_parse::< i8 >().unwrap() as u8 ]
+                            } else if literal.suffix() == "u8" {
+                                return generic_error()
+                            } else {
+                                return Err( syn::Error::new( value_span, "integers are not supported; if you want to use a single byte constant then append either 'u8' or 'i8' to it" ) );
                             }
                         },
                         _ => return generic_error()
