@@ -334,7 +334,7 @@ impl CircularBuffer {
 
         self.buffer[ range_1.clone() ].copy_from_slice( &slice[ ..range_1.len() ] );
         if let Some( range_2 ) = range_2 {
-            self.buffer[ range_2.clone() ].copy_from_slice( &slice[ range_1.len().. ] );
+            self.buffer[ range_2 ].copy_from_slice( &slice[ range_1.len().. ] );
         }
 
         self.length += slice.len();
