@@ -271,12 +271,12 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
 
     #[inline(always)]
     fn context( &self ) -> &C {
-        &self.context
+        self.context
     }
 
     #[inline(always)]
     fn context_mut( &mut self ) -> &mut C {
-        &mut self.context
+        self.context
     }
 }
 

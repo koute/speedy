@@ -96,14 +96,14 @@ fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> 
                 }
             })
         },
-        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
         syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().any( |elem| possibly_uses_generic_ty( generic_types, elem ) ),
-        syn::Type::Reference( syn::TypeReference { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Paren( syn::TypeParen { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Group( syn::TypeGroup { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
+        syn::Type::Reference( syn::TypeReference { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
+        syn::Type::Paren( syn::TypeParen { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
+        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
+        syn::Type::Group( syn::TypeGroup { elem, .. } ) => possibly_uses_generic_ty( generic_types, elem ),
         syn::Type::Array( syn::TypeArray { elem, len, .. } ) => {
-            if possibly_uses_generic_ty( generic_types, &elem ) {
+            if possibly_uses_generic_ty( generic_types, elem ) {
                 return true;
             }
 
@@ -185,14 +185,14 @@ fn is_guaranteed_non_recursive( ty: &syn::Type ) -> bool {
                 _ => false
             }
         },
-        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
+        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => is_guaranteed_non_recursive( elem ),
         syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().all( |elem| is_guaranteed_non_recursive( elem ) ),
-        syn::Type::Reference( syn::TypeReference { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Paren( syn::TypeParen { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Group( syn::TypeGroup { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
+        syn::Type::Reference( syn::TypeReference { elem, .. } ) => is_guaranteed_non_recursive( elem ),
+        syn::Type::Paren( syn::TypeParen { elem, .. } ) => is_guaranteed_non_recursive( elem ),
+        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => is_guaranteed_non_recursive( elem ),
+        syn::Type::Group( syn::TypeGroup { elem, .. } ) => is_guaranteed_non_recursive( elem ),
         syn::Type::Array( syn::TypeArray { elem, len, .. } ) => {
-            if !is_guaranteed_non_recursive( &elem ) {
+            if !is_guaranteed_non_recursive( elem ) {
                 return false;
             }
 
@@ -726,7 +726,7 @@ impl< 'a > Field< 'a > {
     }
 
     fn is_guaranteed_non_recursive( &self ) -> bool {
-        is_guaranteed_non_recursive( &self.raw_ty )
+        is_guaranteed_non_recursive( self.raw_ty )
     }
 }
 
@@ -1607,7 +1607,7 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
         field_names.push( name );
         types.extend( field.bound_types() );
 
-        if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
+        if let Some( minimum_bytes ) = get_minimum_bytes( field ) {
             minimum_bytes_needed.push( minimum_bytes );
         }
     }
@@ -1740,7 +1740,7 @@ fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
             continue;
         }
 
-        let write_value = write_field_body( &field );
+        let write_value = write_field_body( field );
         types.extend( field.bound_types() );
 
         field_names.push( field.var_name().clone() );
@@ -2133,7 +2133,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             (reader_body, minimum_bytes, impl_primitive, impl_zerocopyable)
         },
         syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
-            let enumeration = Enum::new( &name, &input.attrs, &variants )?;
+            let enumeration = Enum::new( name, &input.attrs, variants )?;
             let mut variant_matches = Vec::with_capacity( variants.len() );
             let mut variant_minimum_sizes = Vec::with_capacity( variants.len() );
             for variant in enumeration.variants {
@@ -2306,7 +2306,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             (impl_body, impl_primitive)
         },
         syn::Data::Enum( syn::DataEnum { ref variants, .. } ) => {
-            let enumeration = Enum::new( &name, &input.attrs, &variants )?;
+            let enumeration = Enum::new( name, &input.attrs, variants )?;
             let tag_writer = match enumeration.tag_type {
                 BasicType::U64 => quote! { write_u64 },
                 BasicType::U32 => quote! { write_u32 },
