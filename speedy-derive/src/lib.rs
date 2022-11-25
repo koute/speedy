@@ -1595,7 +1595,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     }
 }
 
-fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream, TokenStream) {
+fn readable_body( types: &mut Vec< syn::Type >, st: &Struct ) -> (TokenStream, TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_readers = Vec::new();
     let mut minimum_bytes_needed = Vec::new();
@@ -1732,7 +1732,7 @@ fn write_field_body( field: &Field ) -> TokenStream {
     body
 }
 
-fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream) {
+fn writable_body( types: &mut Vec< syn::Type >, st: &Struct ) -> (TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
     for field in &st.fields {

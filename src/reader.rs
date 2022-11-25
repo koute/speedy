@@ -95,7 +95,7 @@ pub trait Reader< 'a, C: Context >: Sized {
     }
 
     #[inline(always)]
-    fn read_bytes_borrowed_from_reader< 'r >( &'r mut self, _length: usize ) -> Option< Result< &'r [u8], C::Error > > {
+    fn read_bytes_borrowed_from_reader( &mut self, _length: usize ) -> Option< Result< &[u8], C::Error > > {
         None
     }
 
