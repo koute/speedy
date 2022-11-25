@@ -673,13 +673,13 @@ impl< C > Writable< C > for Box< str >
 {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
-        let value: &str = &**self;
+        let value: &str = self;
         value.write_to( writer )
     }
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
-        let value: &str = &**self;
+        let value: &str = self;
         Writable::< C >::bytes_needed( value )
     }
 }
