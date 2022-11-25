@@ -1167,8 +1167,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 }
             }
 
-            if length_type.is_some() && length.is_some() {
-                let (key_span, _) = length_type.unwrap();
+            if let (Some((key_span, _)), Some(_)) = (length_type, &length) {
                 let message = "You cannot have both 'length_type' and 'length' on the same field";
                 return Err( syn::Error::new( key_span, message ) );
             }
