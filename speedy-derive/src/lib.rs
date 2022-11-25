@@ -1780,7 +1780,7 @@ impl< 'a > Enum< 'a > {
         let attrs = collect_enum_attributes( attrs )?;
         let tag_type = attrs.tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE );
         let max = match tag_type {
-            BasicType::U7 => 0b01111111 as u64,
+            BasicType::U7 => 0b01111111_u64,
             BasicType::U8 => std::u8::MAX as u64,
             BasicType::U16 => std::u16::MAX as u64,
             BasicType::U32 => std::u32::MAX as u64,
@@ -1865,7 +1865,6 @@ impl< 'a > Enum< 'a > {
                     quote! { #tag }
                 },
                 BasicType::U64 | BasicType::VarInt64 => {
-                    let tag = tag as u64;
                     quote! { #tag }
                 }
             };
