@@ -186,7 +186,7 @@ fn is_guaranteed_non_recursive( ty: &syn::Type ) -> bool {
             }
         },
         syn::Type::Slice( syn::TypeSlice { elem, .. } ) => is_guaranteed_non_recursive( elem ),
-        syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().all( |elem| is_guaranteed_non_recursive( elem ) ),
+        syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().all(is_guaranteed_non_recursive),
         syn::Type::Reference( syn::TypeReference { elem, .. } ) => is_guaranteed_non_recursive( elem ),
         syn::Type::Paren( syn::TypeParen { elem, .. } ) => is_guaranteed_non_recursive( elem ),
         syn::Type::Ptr( syn::TypePtr { elem, .. } ) => is_guaranteed_non_recursive( elem ),
