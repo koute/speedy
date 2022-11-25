@@ -2148,10 +2148,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     }
                 });
 
-                if variant.structure.kind != StructKind::Unit {
-                    if variant.structure.is_guaranteed_non_recursive() {
-                        variant_minimum_sizes.push( minimum_bytes );
-                    }
+                if variant.structure.kind != StructKind::Unit && variant.structure.is_guaranteed_non_recursive() {
+                    variant_minimum_sizes.push( minimum_bytes );
                 }
             }
 
