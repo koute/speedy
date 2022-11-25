@@ -835,7 +835,7 @@ impl syn::parse::Parse for FieldAttribute {
                             match literal {
                                 syn::Lit::Int( literal ) => {
                                     if literal.suffix() == "i8" {
-                                        vec![ (literal.base10_parse::< i8 >().unwrap() * -1) as u8 ]
+                                        vec![ -literal.base10_parse::< i8 >().unwrap() as u8 ]
                                     } else if literal.suffix() == "u8" {
                                         return generic_error()
                                     } else {
