@@ -1,4 +1,4 @@
-#![recursion_limit="128"]
+#![recursion_limit = "128"]
 
 use std::collections::HashMap;
 use std::u32;
@@ -17,104 +17,126 @@ use quote::ToTokens;
 use syn::spanned::Spanned;
 
 trait IterExt: Iterator + Sized {
-    fn collect_vec( self ) -> Vec< Self::Item > {
+    fn collect_vec(self) -> Vec<Self::Item> {
         self.collect()
     }
 }
 
-impl< T > IterExt for T where T: Iterator + Sized {}
+impl<T> IterExt for T where T: Iterator + Sized {}
 
 #[proc_macro_derive(Readable, attributes(speedy))]
-pub fn readable( input: proc_macro::TokenStream ) -> proc_macro::TokenStream {
-    let input = parse_macro_input!( input as syn::DeriveInput );
-    let tokens = impl_readable( input ).unwrap_or_else( |err| err.to_compile_error() );
-    proc_macro::TokenStream::from( tokens )
+pub fn readable(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as syn::DeriveInput);
+    let tokens = impl_readable(input).unwrap_or_else(|err| err.to_compile_error());
+    proc_macro::TokenStream::from(tokens)
 }
 
 #[proc_macro_derive(Writable, attributes(speedy))]
-pub fn writable( input: proc_macro::TokenStream ) -> proc_macro::TokenStream {
-    let input = parse_macro_input!( input as syn::DeriveInput );
-    let tokens = impl_writable( input ).unwrap_or_else( |err| err.to_compile_error() );
-    proc_macro::TokenStream::from( tokens )
+pub fn writable(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as syn::DeriveInput);
+    let tokens = impl_writable(input).unwrap_or_else(|err| err.to_compile_error());
+    proc_macro::TokenStream::from(tokens)
 }
 
 mod kw {
-    syn::custom_keyword!( length );
-    syn::custom_keyword!( default_on_eof );
-    syn::custom_keyword!( tag_type );
-    syn::custom_keyword!( length_type );
-    syn::custom_keyword!( tag );
-    syn::custom_keyword!( skip );
-    syn::custom_keyword!( constant_prefix );
-    syn::custom_keyword!( peek_tag );
-    syn::custom_keyword!( varint );
+    syn::custom_keyword!(length);
+    syn::custom_keyword!(default_on_eof);
+    syn::custom_keyword!(tag_type);
+    syn::custom_keyword!(length_type);
+    syn::custom_keyword!(tag);
+    syn::custom_keyword!(skip);
+    syn::custom_keyword!(constant_prefix);
+    syn::custom_keyword!(peek_tag);
+    syn::custom_keyword!(varint);
 
-    syn::custom_keyword!( u7 );
-    syn::custom_keyword!( u8 );
-    syn::custom_keyword!( u16 );
-    syn::custom_keyword!( u32 );
-    syn::custom_keyword!( u64 );
-    syn::custom_keyword!( u64_varint );
+    syn::custom_keyword!(u7);
+    syn::custom_keyword!(u8);
+    syn::custom_keyword!(u16);
+    syn::custom_keyword!(u32);
+    syn::custom_keyword!(u64);
+    syn::custom_keyword!(u64_varint);
 }
 
 #[derive(Copy, Clone, PartialEq)]
 enum Trait {
     Readable,
     Writable,
-    ZeroCopyable { is_packed: bool }
+    ZeroCopyable { is_packed: bool },
 }
 
-fn uses_generics( input: &syn::DeriveInput ) -> bool {
-    input.generics.type_params().next().is_some() ||
-    input.generics.lifetimes().next().is_some() ||
-    input.generics.const_params().next().is_some()
+fn uses_generics(input: &syn::DeriveInput) -> bool {
+    input.generics.type_params().next().is_some()
+        || input.generics.lifetimes().next().is_some()
+        || input.generics.const_params().next().is_some()
 }
 
-fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> bool {
+fn possibly_uses_generic_ty(generic_types: &[&syn::Ident], ty: &syn::Type) -> bool {
     match ty {
-        syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
-            segments.iter().any( |segment| {
-                if generic_types.iter().any( |&ident| *ident == segment.ident ) {
+        syn::Type::Path(syn::TypePath {
+            qself: None,
+            path:
+                syn::Path {
+                    leading_colon: None,
+                    segments,
+                },
+        }) => {
+            segments.iter().any(|segment| {
+                if generic_types.iter().any(|&ident| *ident == segment.ident) {
                     return true;
                 }
 
                 match segment.arguments {
                     syn::PathArguments::None => false,
-                    syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { ref args, .. } ) => {
-                        args.iter().any( |arg| {
+                    syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                        ref args,
+                        ..
+                    }) => {
+                        args.iter().any(|arg| {
                             match arg {
-                                syn::GenericArgument::Lifetime( .. ) => false,
-                                syn::GenericArgument::Type( inner_ty ) => possibly_uses_generic_ty( generic_types, inner_ty ),
+                                syn::GenericArgument::Lifetime(..) => false,
+                                syn::GenericArgument::Type(inner_ty) => {
+                                    possibly_uses_generic_ty(generic_types, inner_ty)
+                                }
                                 // TODO: How to handle these?
-                                syn::GenericArgument::Binding( .. ) => true,
-                                syn::GenericArgument::Constraint( .. ) => true,
-                                syn::GenericArgument::Const( .. ) => true
+                                syn::GenericArgument::Binding(..) => true,
+                                syn::GenericArgument::Constraint(..) => true,
+                                syn::GenericArgument::Const(..) => true,
                             }
                         })
-                    },
-                    _ => true
+                    }
+                    _ => true,
                 }
             })
-        },
-        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().any( |elem| possibly_uses_generic_ty( generic_types, elem ) ),
-        syn::Type::Reference( syn::TypeReference { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Paren( syn::TypeParen { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Group( syn::TypeGroup { elem, .. } ) => possibly_uses_generic_ty( generic_types, &elem ),
-        syn::Type::Array( syn::TypeArray { elem, len, .. } ) => {
-            if possibly_uses_generic_ty( generic_types, &elem ) {
+        }
+        syn::Type::Slice(syn::TypeSlice { elem, .. }) => {
+            possibly_uses_generic_ty(generic_types, &elem)
+        }
+        syn::Type::Tuple(syn::TypeTuple { elems, .. }) => elems
+            .iter()
+            .any(|elem| possibly_uses_generic_ty(generic_types, elem)),
+        syn::Type::Reference(syn::TypeReference { elem, .. }) => {
+            possibly_uses_generic_ty(generic_types, &elem)
+        }
+        syn::Type::Paren(syn::TypeParen { elem, .. }) => {
+            possibly_uses_generic_ty(generic_types, &elem)
+        }
+        syn::Type::Ptr(syn::TypePtr { elem, .. }) => possibly_uses_generic_ty(generic_types, &elem),
+        syn::Type::Group(syn::TypeGroup { elem, .. }) => {
+            possibly_uses_generic_ty(generic_types, &elem)
+        }
+        syn::Type::Array(syn::TypeArray { elem, len, .. }) => {
+            if possibly_uses_generic_ty(generic_types, &elem) {
                 return true;
             }
 
             // This is probably too conservative.
             match len {
-                syn::Expr::Lit( .. ) => false,
-                _ => true
+                syn::Expr::Lit(..) => false,
+                _ => true,
             }
-        },
-        syn::Type::Never( .. ) => false,
-        _ => true
+        }
+        syn::Type::Never(..) => false,
+        _ => true,
     }
 }
 
@@ -129,81 +151,95 @@ fn test_possibly_uses_generic_ty() {
         }
     }
 
-    assert_test!( false, String );
-    assert_test!( false, Cow<'a, BTreeMap<u8, u8>> );
-    assert_test!( false, Cow<'a, [u8]> );
-    assert_test!( false, () );
-    assert_test!( false, (u8) );
-    assert_test!( false, (u8, u8) );
-    assert_test!( false, &u8 );
-    assert_test!( false, *const u8 );
-    assert_test!( false, ! );
-    assert_test!( false, [u8; 2] );
-    assert_test!( true, T );
-    assert_test!( true, Dummy::T );
-    assert_test!( true, Cow<'a, BTreeMap<T, u8>> );
-    assert_test!( true, Cow<'a, BTreeMap<u8, T>> );
-    assert_test!( true, Cow<'a, [T]> );
-    assert_test!( true, (T) );
-    assert_test!( true, (u8, T) );
-    assert_test!( true, &T );
-    assert_test!( true, *const T );
-    assert_test!( true, [T; 2] );
-    assert_test!( true, Vec<T> );
+    assert_test!(false, String);
+    assert_test!(false, Cow<'a, BTreeMap<u8, u8>>);
+    assert_test!(false, Cow<'a, [u8]>);
+    assert_test!(false, ());
+    assert_test!(false, (u8));
+    assert_test!(false, (u8, u8));
+    assert_test!(false, &u8);
+    assert_test!(false, *const u8);
+    assert_test!(false, !);
+    assert_test!(false, [u8; 2]);
+    assert_test!(true, T);
+    assert_test!(true, Dummy::T);
+    assert_test!(true, Cow<'a, BTreeMap<T, u8>>);
+    assert_test!(true, Cow<'a, BTreeMap<u8, T>>);
+    assert_test!(true, Cow<'a, [T]>);
+    assert_test!(true, (T));
+    assert_test!(true, (u8, T));
+    assert_test!(true, &T);
+    assert_test!(true, *const T);
+    assert_test!(true, [T; 2]);
+    assert_test!(true, Vec<T>);
 }
 
-fn is_guaranteed_non_recursive( ty: &syn::Type ) -> bool {
+fn is_guaranteed_non_recursive(ty: &syn::Type) -> bool {
     match ty {
-        syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
+        syn::Type::Path(syn::TypePath {
+            qself: None,
+            path:
+                syn::Path {
+                    leading_colon: None,
+                    segments,
+                },
+        }) => {
             if segments.len() != 1 {
                 return false;
             }
 
-            let segment = &segments[ 0 ];
+            let segment = &segments[0];
             let ident = segment.ident.to_string();
             match ident.as_str() {
-                "String" | "Vec" | "BTreeSet" | "BTreeMap" | "HashSet" | "HashMap" |
-                "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" | "usize" | "isize" |
-                "str" => {},
-                _ => return false
+                "String" | "Vec" | "BTreeSet" | "BTreeMap" | "HashSet" | "HashMap" | "u8"
+                | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" | "usize" | "isize"
+                | "str" => {}
+                _ => return false,
             }
 
             match segment.arguments {
                 syn::PathArguments::None => true,
-                syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { ref args, .. } ) => {
-                    args.iter().all( |arg| {
-                            match arg {
-                                syn::GenericArgument::Lifetime( .. ) => true,
-                                syn::GenericArgument::Type( inner_ty ) => is_guaranteed_non_recursive( inner_ty ),
-                                // TODO: How to handle these?
-                                syn::GenericArgument::Binding( .. ) => false,
-                                syn::GenericArgument::Constraint( .. ) => false,
-                                syn::GenericArgument::Const( .. ) => false
+                syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                    ref args,
+                    ..
+                }) => {
+                    args.iter().all(|arg| {
+                        match arg {
+                            syn::GenericArgument::Lifetime(..) => true,
+                            syn::GenericArgument::Type(inner_ty) => {
+                                is_guaranteed_non_recursive(inner_ty)
                             }
-                        })
-                },
-                _ => false
+                            // TODO: How to handle these?
+                            syn::GenericArgument::Binding(..) => false,
+                            syn::GenericArgument::Constraint(..) => false,
+                            syn::GenericArgument::Const(..) => false,
+                        }
+                    })
+                }
+                _ => false,
             }
-        },
-        syn::Type::Slice( syn::TypeSlice { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Tuple( syn::TypeTuple { elems, .. } ) => elems.iter().all( |elem| is_guaranteed_non_recursive( elem ) ),
-        syn::Type::Reference( syn::TypeReference { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Paren( syn::TypeParen { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Ptr( syn::TypePtr { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Group( syn::TypeGroup { elem, .. } ) => is_guaranteed_non_recursive( &elem ),
-        syn::Type::Array( syn::TypeArray { elem, len, .. } ) => {
-            if !is_guaranteed_non_recursive( &elem ) {
+        }
+        syn::Type::Slice(syn::TypeSlice { elem, .. }) => is_guaranteed_non_recursive(&elem),
+        syn::Type::Tuple(syn::TypeTuple { elems, .. }) => {
+            elems.iter().all(|elem| is_guaranteed_non_recursive(elem))
+        }
+        syn::Type::Reference(syn::TypeReference { elem, .. }) => is_guaranteed_non_recursive(&elem),
+        syn::Type::Paren(syn::TypeParen { elem, .. }) => is_guaranteed_non_recursive(&elem),
+        syn::Type::Ptr(syn::TypePtr { elem, .. }) => is_guaranteed_non_recursive(&elem),
+        syn::Type::Group(syn::TypeGroup { elem, .. }) => is_guaranteed_non_recursive(&elem),
+        syn::Type::Array(syn::TypeArray { elem, len, .. }) => {
+            if !is_guaranteed_non_recursive(&elem) {
                 return false;
             }
 
             // This is probably too conservative.
             match len {
-                syn::Expr::Lit( .. ) => true,
-                _ => false
+                syn::Expr::Lit(..) => true,
+                _ => false,
             }
-        },
-        syn::Type::Never( .. ) => true,
-        _ => false
+        }
+        syn::Type::Never(..) => true,
+        _ => false,
     }
 }
 
@@ -218,16 +254,16 @@ fn test_is_guaranteed_non_recursive() {
         }
     }
 
-    assert_test!( true, String );
-    assert_test!( true, u8 );
-    assert_test!( true, () );
-    assert_test!( true, *const u8 );
-    assert_test!( true, [u8; 2] );
-    assert_test!( true, (u8, u16) );
-    assert_test!( true, ! );
-    assert_test!( true, Vec< u8 > );
-    assert_test!( false, T );
-    assert_test!( false, Vec< T > );
+    assert_test!(true, String);
+    assert_test!(true, u8);
+    assert_test!(true, ());
+    assert_test!(true, *const u8);
+    assert_test!(true, [u8; 2]);
+    assert_test!(true, (u8, u16));
+    assert_test!(true, !);
+    assert_test!(true, Vec<u8>);
+    assert_test!(false, T);
+    assert_test!(false, Vec<T>);
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -243,52 +279,66 @@ enum PrimitiveTy {
     I64,
     I128,
     F32,
-    F64
+    F64,
 }
 
-fn parse_primitive_ty( ty: &syn::Type ) -> Option< PrimitiveTy > {
+fn parse_primitive_ty(ty: &syn::Type) -> Option<PrimitiveTy> {
     match ty {
-        syn::Type::Path( syn::TypePath { qself: None, path: syn::Path { leading_colon: None, segments } } ) => {
+        syn::Type::Path(syn::TypePath {
+            qself: None,
+            path:
+                syn::Path {
+                    leading_colon: None,
+                    segments,
+                },
+        }) => {
             if segments.len() != 1 {
                 return None;
             }
 
-            let segment = &segments[ 0 ];
+            let segment = &segments[0];
             let ident = segment.ident.to_string();
             match ident.as_str() {
-                "u8" => Some( PrimitiveTy::U8 ),
-                "u16" => Some( PrimitiveTy::U16 ),
-                "u32" => Some( PrimitiveTy::U32 ),
-                "u64" => Some( PrimitiveTy::U64 ),
-                "u128" => Some( PrimitiveTy::U128 ),
-                "i8" => Some( PrimitiveTy::I8 ),
-                "i16" => Some( PrimitiveTy::I16 ),
-                "i32" => Some( PrimitiveTy::I32 ),
-                "i64" => Some( PrimitiveTy::I64 ),
-                "i128" => Some( PrimitiveTy::I128 ),
-                "f32" => Some( PrimitiveTy::F32 ),
-                "f64" => Some( PrimitiveTy::F64 ),
-                _ => None
+                "u8" => Some(PrimitiveTy::U8),
+                "u16" => Some(PrimitiveTy::U16),
+                "u32" => Some(PrimitiveTy::U32),
+                "u64" => Some(PrimitiveTy::U64),
+                "u128" => Some(PrimitiveTy::U128),
+                "i8" => Some(PrimitiveTy::I8),
+                "i16" => Some(PrimitiveTy::I16),
+                "i32" => Some(PrimitiveTy::I32),
+                "i64" => Some(PrimitiveTy::I64),
+                "i128" => Some(PrimitiveTy::I128),
+                "f32" => Some(PrimitiveTy::F32),
+                "f64" => Some(PrimitiveTy::F64),
+                _ => None,
             }
-        },
-        _ => None
+        }
+        _ => None,
     }
 }
 
-fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Trait ) -> (TokenStream, TokenStream, TokenStream) {
+fn common_tokens(
+    ast: &syn::DeriveInput,
+    types: &[syn::Type],
+    trait_variant: Trait,
+) -> (TokenStream, TokenStream, TokenStream) {
     let impl_params = {
-        let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
-        let type_params = ast.generics.type_params().map( |ty| quote! { #ty } );
-        let params = lifetime_params.chain( type_params ).collect_vec();
+        let lifetime_params = ast.generics.lifetimes().map(|alpha| quote! { #alpha });
+        let type_params = ast.generics.type_params().map(|ty| quote! { #ty });
+        let params = lifetime_params.chain(type_params).collect_vec();
         quote! {
             #(#params,)*
         }
     };
 
     let ty_params = {
-        let lifetime_params = ast.generics.lifetimes().map( |alpha| quote! { #alpha } );
-        let type_params = ast.generics.type_params().map( |ty| { let ident = &ty.ident; quote! { #ident } } );
-        let params = lifetime_params.chain( type_params ).collect_vec();
+        let lifetime_params = ast.generics.lifetimes().map(|alpha| quote! { #alpha });
+        let type_params = ast.generics.type_params().map(|ty| {
+            let ident = &ty.ident;
+            quote! { #ident }
+        });
+        let params = lifetime_params.chain(type_params).collect_vec();
         if params.is_empty() {
             quote! {}
         } else {
@@ -296,38 +346,42 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Tr
         }
     };
 
-    let generics: Vec< _ > = ast.generics.type_params().map( |ty| &ty.ident ).collect();
+    let generics: Vec<_> = ast.generics.type_params().map(|ty| &ty.ident).collect();
     let where_clause = {
-        let constraints = types.iter().filter_map( |ty| {
-            let possibly_generic = possibly_uses_generic_ty( &generics, ty );
+        let constraints = types.iter().filter_map(|ty| {
+            let possibly_generic = possibly_uses_generic_ty(&generics, ty);
             match (trait_variant, possibly_generic) {
-                (Trait::Readable, true) => Some( quote! { #ty: speedy::Readable< 'a_, C_ > } ),
+                (Trait::Readable, true) => Some(quote! { #ty: speedy::Readable< 'a_, C_ > }),
                 (Trait::Readable, false) => None,
-                (Trait::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
+                (Trait::Writable, true) => Some(quote! { #ty: speedy::Writable< C_ > }),
                 (Trait::Writable, false) => None,
                 (Trait::ZeroCopyable { is_packed }, _) => {
-                    if is_packed && parse_primitive_ty( ty ).is_some() {
+                    if is_packed && parse_primitive_ty(ty).is_some() {
                         None
                     } else {
-                        Some( quote! { #ty: speedy::private::ZeroCopyable< T_ > } )
+                        Some(quote! { #ty: speedy::private::ZeroCopyable< T_ > })
                     }
-                },
+                }
             }
         });
 
         let mut predicates = Vec::new();
-        if let Some( where_clause ) = ast.generics.where_clause.as_ref() {
-            predicates = where_clause.predicates.iter().map( |pred| quote! { #pred } ).collect();
+        if let Some(where_clause) = ast.generics.where_clause.as_ref() {
+            predicates = where_clause
+                .predicates
+                .iter()
+                .map(|pred| quote! { #pred })
+                .collect();
         }
 
         if trait_variant == Trait::Readable {
             for lifetime in ast.generics.lifetimes() {
-                predicates.push( quote! { 'a_: #lifetime } );
-                predicates.push( quote! { #lifetime: 'a_ } );
+                predicates.push(quote! { 'a_: #lifetime });
+                predicates.push(quote! { #lifetime: 'a_ });
             }
         }
 
-        let items = constraints.chain( predicates.into_iter() ).collect_vec();
+        let items = constraints.chain(predicates.into_iter()).collect_vec();
         if items.is_empty() {
             quote! {}
         } else {
@@ -345,166 +399,150 @@ enum BasicType {
     U16,
     U32,
     U64,
-    VarInt64
+    VarInt64,
 }
 
 const DEFAULT_LENGTH_TYPE: BasicType = BasicType::U32;
 const DEFAULT_ENUM_TAG_TYPE: BasicType = BasicType::U32;
 
 impl syn::parse::Parse for BasicType {
-    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+    fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
         let lookahead = input.lookahead1();
-        let ty = if lookahead.peek( kw::u7 ) {
-            input.parse::< kw::u7 >()?;
+        let ty = if lookahead.peek(kw::u7) {
+            input.parse::<kw::u7>()?;
             BasicType::U7
-        } else if lookahead.peek( kw::u8 ) {
-            input.parse::< kw::u8 >()?;
+        } else if lookahead.peek(kw::u8) {
+            input.parse::<kw::u8>()?;
             BasicType::U8
-        } else if lookahead.peek( kw::u16 ) {
-            input.parse::< kw::u16 >()?;
+        } else if lookahead.peek(kw::u16) {
+            input.parse::<kw::u16>()?;
             BasicType::U16
-        } else if lookahead.peek( kw::u32 ) {
-            input.parse::< kw::u32 >()?;
+        } else if lookahead.peek(kw::u32) {
+            input.parse::<kw::u32>()?;
             BasicType::U32
-        } else if lookahead.peek( kw::u64 ) {
-            input.parse::< kw::u64 >()?;
+        } else if lookahead.peek(kw::u64) {
+            input.parse::<kw::u64>()?;
             BasicType::U64
-        } else if lookahead.peek( kw::u64_varint ) {
-            input.parse::< kw::u64_varint >()?;
+        } else if lookahead.peek(kw::u64_varint) {
+            input.parse::<kw::u64_varint>()?;
             BasicType::VarInt64
         } else {
-            return Err( lookahead.error() );
+            return Err(lookahead.error());
         };
 
-        Ok( ty )
+        Ok(ty)
     }
 }
 
 enum VariantAttribute {
-    Tag {
-        key_token: kw::tag,
-        tag: u64
-    }
+    Tag { key_token: kw::tag, tag: u64 },
 }
 
-enum StructAttribute {
-}
+enum StructAttribute {}
 
 enum EnumAttribute {
     TagType {
         key_token: kw::tag_type,
-        ty: BasicType
+        ty: BasicType,
     },
     PeekTag {
-        key_token: kw::peek_tag
-    }
+        key_token: kw::peek_tag,
+    },
 }
 
 enum VariantOrStructAttribute {
-    Variant( VariantAttribute ),
-    Struct( StructAttribute )
+    Variant(VariantAttribute),
+    Struct(StructAttribute),
 }
 
 fn parse_variant_attribute(
     input: &syn::parse::ParseStream,
-    lookahead: &syn::parse::Lookahead1
-) -> syn::parse::Result< Option< VariantAttribute > >
-{
-    let attribute = if lookahead.peek( kw::tag ) {
-        let key_token = input.parse::< kw::tag >()?;
+    lookahead: &syn::parse::Lookahead1,
+) -> syn::parse::Result<Option<VariantAttribute>> {
+    let attribute = if lookahead.peek(kw::tag) {
+        let key_token = input.parse::<kw::tag>()?;
         let _: Token![=] = input.parse()?;
         let raw_tag: syn::LitInt = input.parse()?;
-        let tag = raw_tag.base10_parse::< u64 >().map_err( |err| {
-            syn::Error::new( raw_tag.span(), err )
-        })?;
+        let tag = raw_tag
+            .base10_parse::<u64>()
+            .map_err(|err| syn::Error::new(raw_tag.span(), err))?;
 
-        VariantAttribute::Tag {
-            key_token,
-            tag
-        }
+        VariantAttribute::Tag { key_token, tag }
     } else {
-        return Ok( None )
+        return Ok(None);
     };
 
-    Ok( Some( attribute ) )
+    Ok(Some(attribute))
 }
 
 fn parse_struct_attribute(
     _input: &syn::parse::ParseStream,
-    _lookahead: &syn::parse::Lookahead1
-) -> syn::parse::Result< Option< StructAttribute > >
-{
-    Ok( None )
+    _lookahead: &syn::parse::Lookahead1,
+) -> syn::parse::Result<Option<StructAttribute>> {
+    Ok(None)
 }
 
 fn parse_enum_attribute(
     input: &syn::parse::ParseStream,
-    lookahead: &syn::parse::Lookahead1
-) -> syn::parse::Result< Option< EnumAttribute > >
-{
-    let attribute = if lookahead.peek( kw::tag_type ) {
-        let key_token = input.parse::< kw::tag_type >()?;
+    lookahead: &syn::parse::Lookahead1,
+) -> syn::parse::Result<Option<EnumAttribute>> {
+    let attribute = if lookahead.peek(kw::tag_type) {
+        let key_token = input.parse::<kw::tag_type>()?;
         let _: Token![=] = input.parse()?;
         let ty: BasicType = input.parse()?;
 
-        EnumAttribute::TagType {
-            key_token,
-            ty
-        }
-    } else if lookahead.peek( kw::peek_tag ) {
-        let key_token = input.parse::< kw::peek_tag >()?;
-        EnumAttribute::PeekTag {
-            key_token
-        }
+        EnumAttribute::TagType { key_token, ty }
+    } else if lookahead.peek(kw::peek_tag) {
+        let key_token = input.parse::<kw::peek_tag>()?;
+        EnumAttribute::PeekTag { key_token }
     } else {
-        return Ok( None )
+        return Ok(None);
     };
 
-    Ok( Some( attribute ) )
+    Ok(Some(attribute))
 }
 
 impl syn::parse::Parse for StructAttribute {
-    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+    fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
         let lookahead = input.lookahead1();
-        parse_struct_attribute( &input, &lookahead )?.ok_or_else( || lookahead.error() )
+        parse_struct_attribute(&input, &lookahead)?.ok_or_else(|| lookahead.error())
     }
 }
 
 impl syn::parse::Parse for EnumAttribute {
-    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+    fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
         let lookahead = input.lookahead1();
-        parse_enum_attribute( &input, &lookahead )?.ok_or_else( || lookahead.error() )
+        parse_enum_attribute(&input, &lookahead)?.ok_or_else(|| lookahead.error())
     }
 }
 
 impl syn::parse::Parse for VariantOrStructAttribute {
-    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+    fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
         let lookahead = input.lookahead1();
-        if let Some( attr ) = parse_variant_attribute( &input, &lookahead )? {
-            return Ok( VariantOrStructAttribute::Variant( attr ) );
+        if let Some(attr) = parse_variant_attribute(&input, &lookahead)? {
+            return Ok(VariantOrStructAttribute::Variant(attr));
         }
 
-        if let Some( attr ) = parse_struct_attribute( &input, &lookahead )? {
-            return Ok( VariantOrStructAttribute::Struct( attr ) );
+        if let Some(attr) = parse_struct_attribute(&input, &lookahead)? {
+            return Ok(VariantOrStructAttribute::Struct(attr));
         }
 
-        Err( lookahead.error() )
+        Err(lookahead.error())
     }
 }
 
 struct VariantAttributes {
-    tag: Option< u64 >
+    tag: Option<u64>,
 }
 
-struct StructAttributes {
-}
+struct StructAttributes {}
 
 struct EnumAttributes {
-    tag_type: Option< BasicType >,
-    peek_tag: bool
+    tag_type: Option<BasicType>,
+    peek_tag: bool,
 }
 
-fn check_repr( attrs: &[syn::Attribute], value: &str ) -> bool {
+fn check_repr(attrs: &[syn::Attribute], value: &str) -> bool {
     let mut result = false;
     for raw_attr in attrs {
         let path = raw_attr.path.clone().into_token_stream().to_string();
@@ -518,26 +556,32 @@ fn check_repr( attrs: &[syn::Attribute], value: &str ) -> bool {
     result
 }
 
-fn is_transparent( attrs: &[syn::Attribute] ) -> bool {
-    check_repr( attrs, "(transparent)" )
+fn is_transparent(attrs: &[syn::Attribute]) -> bool {
+    check_repr(attrs, "(transparent)")
 }
 
-fn is_packed( attrs: &[syn::Attribute] ) -> bool {
-    check_repr( attrs, "(packed)" )
+fn is_packed(attrs: &[syn::Attribute]) -> bool {
+    check_repr(attrs, "(packed)")
 }
 
-fn is_c( attrs: &[syn::Attribute] ) -> bool {
-    check_repr( attrs, "(C)" )
+fn is_c(attrs: &[syn::Attribute]) -> bool {
+    check_repr(attrs, "(C)")
 }
 
-fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::Error > where T: syn::parse::Parse {
-    struct RawAttributes< T >( syn::punctuated::Punctuated< T, Token![,] > );
+fn parse_attributes<T>(attrs: &[syn::Attribute]) -> Result<Vec<T>, syn::Error>
+where
+    T: syn::parse::Parse,
+{
+    struct RawAttributes<T>(syn::punctuated::Punctuated<T, Token![,]>);
 
-    impl< T > syn::parse::Parse for RawAttributes< T > where T: syn::parse::Parse {
-        fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+    impl<T> syn::parse::Parse for RawAttributes<T>
+    where
+        T: syn::parse::Parse,
+    {
+        fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
             let content;
             parenthesized!( content in input );
-            Ok( RawAttributes( content.parse_terminated( T::parse )? ) )
+            Ok(RawAttributes(content.parse_terminated(T::parse)?))
         }
     }
 
@@ -548,43 +592,41 @@ fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::E
             continue;
         }
 
-        let parsed_attrs: RawAttributes< T > = syn::parse2( raw_attr.tokens.clone() )?;
+        let parsed_attrs: RawAttributes<T> = syn::parse2(raw_attr.tokens.clone())?;
         for attr in parsed_attrs.0 {
-            output.push( attr );
+            output.push(attr);
         }
     }
 
-    Ok( output )
+    Ok(output)
 }
 
-fn collect_variant_attributes( attrs: Vec< VariantAttribute > ) -> Result< VariantAttributes, syn::Error > {
+fn collect_variant_attributes(
+    attrs: Vec<VariantAttribute>,
+) -> Result<VariantAttributes, syn::Error> {
     let mut variant_tag = None;
     for attr in attrs {
         match attr {
             VariantAttribute::Tag { key_token, tag } => {
                 if variant_tag.is_some() {
                     let message = "Duplicate 'tag'";
-                    return Err( syn::Error::new( key_token.span(), message ) );
+                    return Err(syn::Error::new(key_token.span(), message));
                 }
-                variant_tag = Some( tag );
+                variant_tag = Some(tag);
             }
         }
     }
 
-    Ok( VariantAttributes {
-        tag: variant_tag
-    })
+    Ok(VariantAttributes { tag: variant_tag })
 }
 
-fn collect_struct_attributes( attrs: Vec< StructAttribute > ) -> Result< StructAttributes, syn::Error > {
-    for _attr in attrs {
-    }
+fn collect_struct_attributes(attrs: Vec<StructAttribute>) -> Result<StructAttributes, syn::Error> {
+    for _attr in attrs {}
 
-    Ok( StructAttributes {
-    })
+    Ok(StructAttributes {})
 }
 
-fn collect_enum_attributes( attrs: Vec< EnumAttribute > ) -> Result< EnumAttributes, syn::Error > {
+fn collect_enum_attributes(attrs: Vec<EnumAttribute>) -> Result<EnumAttributes, syn::Error> {
     let mut tag_type = None;
     let mut peek_tag = false;
     for attr in attrs {
@@ -592,514 +634,570 @@ fn collect_enum_attributes( attrs: Vec< EnumAttribute > ) -> Result< EnumAttribu
             EnumAttribute::TagType { key_token, ty } => {
                 if tag_type.is_some() {
                     let message = "Duplicate 'tag_type'";
-                    return Err( syn::Error::new( key_token.span(), message ) );
+                    return Err(syn::Error::new(key_token.span(), message));
                 }
-                tag_type = Some( ty );
-            },
+                tag_type = Some(ty);
+            }
             EnumAttribute::PeekTag { key_token } => {
                 if peek_tag {
                     let message = "Duplicate 'peek_tag'";
-                    return Err( syn::Error::new( key_token.span(), message ) );
+                    return Err(syn::Error::new(key_token.span(), message));
                 }
                 peek_tag = true;
             }
         }
     }
 
-    Ok( EnumAttributes {
-        tag_type,
-        peek_tag
-    })
+    Ok(EnumAttributes { tag_type, peek_tag })
 }
 
 #[derive(PartialEq)]
 enum StructKind {
     Unit,
     Named,
-    Unnamed
+    Unnamed,
 }
 
-struct Struct< 'a > {
-    fields: Vec< Field< 'a > >,
-    kind: StructKind
+struct Struct<'a> {
+    fields: Vec<Field<'a>>,
+    kind: StructKind,
 }
 
-impl< 'a > Struct< 'a > {
-    fn new( fields: &'a syn::Fields, attrs: Vec< StructAttribute > ) -> Result< Self, syn::Error > {
-        collect_struct_attributes( attrs )?;
+impl<'a> Struct<'a> {
+    fn new(fields: &'a syn::Fields, attrs: Vec<StructAttribute>) -> Result<Self, syn::Error> {
+        collect_struct_attributes(attrs)?;
         let structure = match fields {
-            syn::Fields::Unit => {
-                Struct {
-                    fields: Vec::new(),
-                    kind: StructKind::Unit
-                }
+            syn::Fields::Unit => Struct {
+                fields: Vec::new(),
+                kind: StructKind::Unit,
             },
-            syn::Fields::Named( syn::FieldsNamed { ref named, .. } ) => {
-                Struct {
-                    fields: get_fields( named.into_iter() )?,
-                    kind: StructKind::Named
-                }
+            syn::Fields::Named(syn::FieldsNamed { ref named, .. }) => Struct {
+                fields: get_fields(named.into_iter())?,
+                kind: StructKind::Named,
             },
-            syn::Fields::Unnamed( syn::FieldsUnnamed { ref unnamed, .. } ) => {
-                Struct {
-                    fields: get_fields( unnamed.into_iter() )?,
-                    kind: StructKind::Unnamed
-                }
-            }
+            syn::Fields::Unnamed(syn::FieldsUnnamed { ref unnamed, .. }) => Struct {
+                fields: get_fields(unnamed.into_iter())?,
+                kind: StructKind::Unnamed,
+            },
         };
 
-        Ok( structure )
+        Ok(structure)
     }
 
-    fn is_guaranteed_non_recursive( &self ) -> bool {
-        self.fields.iter().all( |field| field.is_guaranteed_non_recursive() )
+    fn is_guaranteed_non_recursive(&self) -> bool {
+        self.fields
+            .iter()
+            .all(|field| field.is_guaranteed_non_recursive())
     }
 }
 
-struct Field< 'a > {
+struct Field<'a> {
     index: usize,
-    name: Option< &'a syn::Ident >,
+    name: Option<&'a syn::Ident>,
     raw_ty: &'a syn::Type,
     default_on_eof: bool,
-    length: Option< LengthKind >,
-    length_type: Option< BasicType >,
-    ty: Opt< Ty >,
+    length: Option<LengthKind>,
+    length_type: Option<BasicType>,
+    ty: Opt<Ty>,
     skip: bool,
     varint: bool,
-    constant_prefix: Option< syn::LitByteStr >
+    constant_prefix: Option<syn::LitByteStr>,
 }
 
-impl< 'a > Field< 'a > {
-    fn can_be_primitive( &self ) -> bool {
-        self.default_on_eof == false &&
-        self.length.is_none() &&
-        self.length_type.is_none() &&
-        self.skip == false &&
-        self.varint == false &&
-        self.constant_prefix.is_none()
+impl<'a> Field<'a> {
+    fn can_be_primitive(&self) -> bool {
+        self.default_on_eof == false
+            && self.length.is_none()
+            && self.length_type.is_none()
+            && self.skip == false
+            && self.varint == false
+            && self.constant_prefix.is_none()
     }
 
-    fn is_simple( &self ) -> bool {
-        parse_primitive_ty( self.raw_ty ).is_some()
+    fn is_simple(&self) -> bool {
+        parse_primitive_ty(self.raw_ty).is_some()
     }
 
-    fn var_name( &self ) -> syn::Ident {
-        if let Some( name ) = self.name {
+    fn var_name(&self) -> syn::Ident {
+        if let Some(name) = self.name {
             name.clone()
         } else {
-            syn::Ident::new( &format!( "t{}", self.index ), Span::call_site() )
+            syn::Ident::new(&format!("t{}", self.index), Span::call_site())
         }
     }
 
-    fn name( &self ) -> syn::Member {
-        if let Some( name ) = self.name {
-            syn::Member::Named( name.clone() )
+    fn name(&self) -> syn::Member {
+        if let Some(name) = self.name {
+            syn::Member::Named(name.clone())
         } else {
-            syn::Member::Unnamed( syn::Index { index: self.index as u32, span: Span::call_site() } )
+            syn::Member::Unnamed(syn::Index {
+                index: self.index as u32,
+                span: Span::call_site(),
+            })
         }
     }
 
-    fn bound_types( &self ) -> Vec< syn::Type > {
+    fn bound_types(&self) -> Vec<syn::Type> {
         match self.ty.inner() {
-            | Ty::Array( inner_ty, .. )
-            | Ty::Vec( inner_ty )
-            | Ty::HashSet( inner_ty )
-            | Ty::BTreeSet( inner_ty )
-            | Ty::CowHashSet( _, inner_ty )
-            | Ty::CowBTreeSet( _, inner_ty )
-            | Ty::CowSlice( _, inner_ty )
-            | Ty::RefSlice( _, inner_ty )
-                => vec![ inner_ty.clone() ],
-            | Ty::HashMap( key_ty, value_ty )
-            | Ty::BTreeMap( key_ty, value_ty )
-            | Ty::CowHashMap( _, key_ty, value_ty )
-            | Ty::CowBTreeMap( _, key_ty, value_ty )
-                => vec![ key_ty.clone(), value_ty.clone() ],
-            | Ty::RefSliceU8( _ )
-            | Ty::RefStr( _ )
-            | Ty::String
-            | Ty::CowStr( .. )
-            | Ty::Primitive( .. )
-                => vec![],
-            | Ty::Ty( _ ) => vec![ self.raw_ty.clone() ]
+            Ty::Array(inner_ty, ..)
+            | Ty::Vec(inner_ty)
+            | Ty::HashSet(inner_ty)
+            | Ty::BTreeSet(inner_ty)
+            | Ty::CowHashSet(_, inner_ty)
+            | Ty::CowBTreeSet(_, inner_ty)
+            | Ty::CowSlice(_, inner_ty)
+            | Ty::RefSlice(_, inner_ty) => vec![inner_ty.clone()],
+            Ty::HashMap(key_ty, value_ty)
+            | Ty::BTreeMap(key_ty, value_ty)
+            | Ty::CowHashMap(_, key_ty, value_ty)
+            | Ty::CowBTreeMap(_, key_ty, value_ty) => vec![key_ty.clone(), value_ty.clone()],
+            Ty::RefSliceU8(_) | Ty::RefStr(_) | Ty::String | Ty::CowStr(..) | Ty::Primitive(..) => {
+                vec![]
+            }
+            Ty::Ty(_) => vec![self.raw_ty.clone()],
         }
     }
 
-    fn is_guaranteed_non_recursive( &self ) -> bool {
-        is_guaranteed_non_recursive( &self.raw_ty )
+    fn is_guaranteed_non_recursive(&self) -> bool {
+        is_guaranteed_non_recursive(&self.raw_ty)
     }
 }
 
 enum LengthKind {
-    Expr( syn::Expr ),
-    UntilEndOfFile
+    Expr(syn::Expr),
+    UntilEndOfFile,
 }
 
 impl syn::parse::Parse for LengthKind {
-    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
-        if input.peek( Token![..] ) {
+    fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
+        if input.peek(Token![..]) {
             let _: Token![..] = input.parse()?;
-            Ok( LengthKind::UntilEndOfFile )
+            Ok(LengthKind::UntilEndOfFile)
         } else {
             let expr: syn::Expr = input.parse()?;
-            Ok( LengthKind::Expr( expr ) )
+            Ok(LengthKind::Expr(expr))
         }
     }
 }
 
 enum FieldAttribute {
     DefaultOnEof {
-        key_span: Span
+        key_span: Span,
     },
     Length {
         key_span: Span,
-        length_kind: LengthKind
+        length_kind: LengthKind,
     },
     LengthType {
         key_span: Span,
-        ty: BasicType
+        ty: BasicType,
     },
     Skip {
-        key_span: Span
+        key_span: Span,
     },
     ConstantPrefix {
         key_span: Span,
-        prefix: syn::LitByteStr
+        prefix: syn::LitByteStr,
     },
     VarInt {
-        key_span: Span
-    }
+        key_span: Span,
+    },
 }
 
 impl syn::parse::Parse for FieldAttribute {
-    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+    fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
         let lookahead = input.lookahead1();
-        let value = if lookahead.peek( kw::default_on_eof ) {
-            let key_token = input.parse::< kw::default_on_eof >()?;
+        let value = if lookahead.peek(kw::default_on_eof) {
+            let key_token = input.parse::<kw::default_on_eof>()?;
             FieldAttribute::DefaultOnEof {
-                key_span: key_token.span()
+                key_span: key_token.span(),
             }
-        } else if lookahead.peek( kw::length ) {
-            let key_token = input.parse::< kw::length >()?;
+        } else if lookahead.peek(kw::length) {
+            let key_token = input.parse::<kw::length>()?;
             let _: Token![=] = input.parse()?;
             let length_kind: LengthKind = input.parse()?;
             FieldAttribute::Length {
                 key_span: key_token.span(),
-                length_kind
+                length_kind,
             }
-        } else if lookahead.peek( kw::length_type ) {
-            let key_token = input.parse::< kw::length_type>()?;
+        } else if lookahead.peek(kw::length_type) {
+            let key_token = input.parse::<kw::length_type>()?;
             let _: Token![=] = input.parse()?;
             let ty: BasicType = input.parse()?;
             FieldAttribute::LengthType {
                 key_span: key_token.span(),
-                ty
+                ty,
             }
-        } else if lookahead.peek( kw::skip ) {
-            let key_token = input.parse::< kw::skip >()?;
+        } else if lookahead.peek(kw::skip) {
+            let key_token = input.parse::<kw::skip>()?;
             FieldAttribute::Skip {
-                key_span: key_token.span()
+                key_span: key_token.span(),
             }
-        } else if lookahead.peek( kw::constant_prefix ) {
-            let key_token = input.parse::< kw::constant_prefix >()?;
+        } else if lookahead.peek(kw::constant_prefix) {
+            let key_token = input.parse::<kw::constant_prefix>()?;
             let _: Token![=] = input.parse()?;
             let expr: syn::Expr = input.parse()?;
             let value_span = expr.span();
             let generic_error = || {
-                Err( syn::Error::new( value_span, "unsupported expression; only basic literals are supported" ) )
+                Err(syn::Error::new(
+                    value_span,
+                    "unsupported expression; only basic literals are supported",
+                ))
             };
 
             let prefix = match expr {
-                syn::Expr::Lit( literal ) => {
+                syn::Expr::Lit(literal) => {
                     let literal = literal.lit;
                     match literal {
-                        syn::Lit::Str( literal ) => literal.value().into_bytes(),
-                        syn::Lit::ByteStr( literal ) => literal.value(),
-                        syn::Lit::Byte( literal ) => vec![ literal.value() ],
-                        syn::Lit::Char( literal ) => format!( "{}", literal.value() ).into_bytes(),
-                        syn::Lit::Bool( literal ) => vec![ if literal.value { 1 } else { 0 } ],
-                        syn::Lit::Int( literal ) => {
+                        syn::Lit::Str(literal) => literal.value().into_bytes(),
+                        syn::Lit::ByteStr(literal) => literal.value(),
+                        syn::Lit::Byte(literal) => vec![literal.value()],
+                        syn::Lit::Char(literal) => format!("{}", literal.value()).into_bytes(),
+                        syn::Lit::Bool(literal) => vec![if literal.value { 1 } else { 0 }],
+                        syn::Lit::Int(literal) => {
                             if literal.suffix() == "u8" {
-                                vec![ literal.base10_parse::< u8 >().unwrap() ]
+                                vec![literal.base10_parse::<u8>().unwrap()]
                             } else {
                                 return Err( syn::Error::new( value_span, "integers are not supported; if you want to use a single byte constant then append either 'u8' or 'i8' to it" ) );
                             }
-                        },
-                        syn::Lit::Float( _ ) => return Err( syn::Error::new( value_span, "floats are not supported" ) ),
-                        syn::Lit::Verbatim( _ ) => return Err( syn::Error::new( value_span, "verbatim literals are not supported" ) )
+                        }
+                        syn::Lit::Float(_) => {
+                            return Err(syn::Error::new(value_span, "floats are not supported"))
+                        }
+                        syn::Lit::Verbatim(_) => {
+                            return Err(syn::Error::new(
+                                value_span,
+                                "verbatim literals are not supported",
+                            ))
+                        }
                     }
-                },
-                syn::Expr::Unary( syn::ExprUnary { op: syn::UnOp::Neg(_), expr, .. } ) => {
-                    match *expr {
-                        syn::Expr::Lit( syn::ExprLit { lit: literal, .. } ) => {
-                            match literal {
-                                syn::Lit::Int( literal ) => {
-                                    if literal.suffix() == "i8" {
-                                        vec![ (literal.base10_parse::< i8 >().unwrap() * -1) as u8 ]
-                                    } else if literal.suffix() == "u8" {
-                                        return generic_error()
-                                    } else {
-                                        return Err( syn::Error::new( value_span, "integers are not supported; if you want to use a single byte constant then append either 'u8' or 'i8' to it" ) );
-                                    }
-                                },
-                                _ => return generic_error()
+                }
+                syn::Expr::Unary(syn::ExprUnary {
+                    op: syn::UnOp::Neg(_),
+                    expr,
+                    ..
+                }) => match *expr {
+                    syn::Expr::Lit(syn::ExprLit { lit: literal, .. }) => match literal {
+                        syn::Lit::Int(literal) => {
+                            if literal.suffix() == "i8" {
+                                vec![(literal.base10_parse::<i8>().unwrap() * -1) as u8]
+                            } else if literal.suffix() == "u8" {
+                                return generic_error();
+                            } else {
+                                return Err( syn::Error::new( value_span, "integers are not supported; if you want to use a single byte constant then append either 'u8' or 'i8' to it" ) );
                             }
-                        },
-                        _ => return generic_error()
-                    }
+                        }
+                        _ => return generic_error(),
+                    },
+                    _ => return generic_error(),
                 },
-                _ => return generic_error()
+                _ => return generic_error(),
             };
 
             FieldAttribute::ConstantPrefix {
                 key_span: key_token.span(),
-                prefix: syn::LitByteStr::new( &prefix, value_span )
+                prefix: syn::LitByteStr::new(&prefix, value_span),
             }
-        } else if lookahead.peek( kw::varint ) {
-            let key_token = input.parse::< kw::varint >()?;
+        } else if lookahead.peek(kw::varint) {
+            let key_token = input.parse::<kw::varint>()?;
             FieldAttribute::VarInt {
-                key_span: key_token.span()
+                key_span: key_token.span(),
             }
         } else {
-            return Err( lookahead.error() )
+            return Err(lookahead.error());
         };
 
-        Ok( value )
+        Ok(value)
     }
 }
 
-enum Opt< T > {
-    Plain( T ),
-    Option( T )
+enum Opt<T> {
+    Plain(T),
+    Option(T),
 }
 
-impl< T > Opt< T > {
-    fn inner( &self ) -> &T {
+impl<T> Opt<T> {
+    fn inner(&self) -> &T {
         match *self {
-            Opt::Option( ref inner ) => inner,
-            Opt::Plain( ref inner ) => inner
+            Opt::Option(ref inner) => inner,
+            Opt::Plain(ref inner) => inner,
         }
     }
 }
 
 enum Ty {
     String,
-    Vec( syn::Type ),
-    CowSlice( syn::Lifetime, syn::Type ),
-    CowStr( syn::Lifetime ),
-    HashMap( syn::Type, syn::Type ),
-    HashSet( syn::Type ),
-    BTreeMap( syn::Type, syn::Type ),
-    BTreeSet( syn::Type ),
+    Vec(syn::Type),
+    CowSlice(syn::Lifetime, syn::Type),
+    CowStr(syn::Lifetime),
+    HashMap(syn::Type, syn::Type),
+    HashSet(syn::Type),
+    BTreeMap(syn::Type, syn::Type),
+    BTreeSet(syn::Type),
 
-    CowHashMap( syn::Lifetime, syn::Type, syn::Type ),
-    CowHashSet( syn::Lifetime, syn::Type ),
-    CowBTreeMap( syn::Lifetime, syn::Type, syn::Type ),
-    CowBTreeSet( syn::Lifetime, syn::Type ),
+    CowHashMap(syn::Lifetime, syn::Type, syn::Type),
+    CowHashSet(syn::Lifetime, syn::Type),
+    CowBTreeMap(syn::Lifetime, syn::Type, syn::Type),
+    CowBTreeSet(syn::Lifetime, syn::Type),
 
-    RefSliceU8( syn::Lifetime ),
-    RefSlice( syn::Lifetime, syn::Type ),
-    RefStr( syn::Lifetime ),
+    RefSliceU8(syn::Lifetime),
+    RefSlice(syn::Lifetime, syn::Type),
+    RefStr(syn::Lifetime),
 
-    Array( syn::Type, u32 ),
+    Array(syn::Type, u32),
 
-    Primitive( PrimitiveTy ),
-    Ty( syn::Type )
+    Primitive(PrimitiveTy),
+    Ty(syn::Type),
 }
 
-fn extract_inner_ty( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< &syn::Type > {
+fn extract_inner_ty(
+    args: &syn::punctuated::Punctuated<syn::GenericArgument, syn::token::Comma>,
+) -> Option<&syn::Type> {
     if args.len() != 1 {
         return None;
     }
 
-    match args[ 0 ] {
-        syn::GenericArgument::Type( ref ty ) => Some( ty ),
-         _ => None
+    match args[0] {
+        syn::GenericArgument::Type(ref ty) => Some(ty),
+        _ => None,
     }
 }
 
-fn extract_inner_ty_2( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< (&syn::Type, &syn::Type) > {
+fn extract_inner_ty_2(
+    args: &syn::punctuated::Punctuated<syn::GenericArgument, syn::token::Comma>,
+) -> Option<(&syn::Type, &syn::Type)> {
     if args.len() != 2 {
         return None;
     }
 
-    let ty_1 = match args[ 0 ] {
-        syn::GenericArgument::Type( ref ty ) => ty,
-         _ => return None
+    let ty_1 = match args[0] {
+        syn::GenericArgument::Type(ref ty) => ty,
+        _ => return None,
     };
 
-    let ty_2 = match args[ 1 ] {
-        syn::GenericArgument::Type( ref ty ) => ty,
-         _ => return None
+    let ty_2 = match args[1] {
+        syn::GenericArgument::Type(ref ty) => ty,
+        _ => return None,
     };
 
-    Some( (ty_1, ty_2) )
+    Some((ty_1, ty_2))
 }
 
-fn extract_lifetime_and_inner_ty( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< (&syn::Lifetime, &syn::Type) > {
+fn extract_lifetime_and_inner_ty(
+    args: &syn::punctuated::Punctuated<syn::GenericArgument, syn::token::Comma>,
+) -> Option<(&syn::Lifetime, &syn::Type)> {
     if args.len() != 2 {
         return None;
     }
 
-    let lifetime = match args[ 0 ] {
-        syn::GenericArgument::Lifetime( ref lifetime ) => lifetime,
-        _ => return None
+    let lifetime = match args[0] {
+        syn::GenericArgument::Lifetime(ref lifetime) => lifetime,
+        _ => return None,
     };
 
-    let ty = match args[ 1 ] {
-        syn::GenericArgument::Type( ref ty ) => ty,
-         _ => return None
+    let ty = match args[1] {
+        syn::GenericArgument::Type(ref ty) => ty,
+        _ => return None,
     };
 
-    Some( (lifetime, ty) )
+    Some((lifetime, ty))
 }
 
-fn extract_slice_inner_ty( ty: &syn::Type ) -> Option< &syn::Type > {
+fn extract_slice_inner_ty(ty: &syn::Type) -> Option<&syn::Type> {
     match *ty {
-        syn::Type::Slice( syn::TypeSlice { ref elem, .. } ) => {
-            Some( &*elem )
-        },
-        _ => None
+        syn::Type::Slice(syn::TypeSlice { ref elem, .. }) => Some(&*elem),
+        _ => None,
     }
 }
 
-fn is_bare_ty( ty: &syn::Type, name: &str ) -> bool {
+fn is_bare_ty(ty: &syn::Type, name: &str) -> bool {
     match *ty {
-        syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
-            segments[ 0 ].ident == name && segments[ 0 ].arguments.is_empty()
-        },
-        _ => false
-    }
-}
-
-fn extract_option_inner_ty( ty: &syn::Type ) -> Option< &syn::Type > {
-    match *ty {
-        syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } )
-            if segments.len() == 1 && segments[ 0 ].ident == "Option" =>
-        {
-            match segments[ 0 ].arguments {
-                syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { colon2_token: None, ref args, .. } ) if args.len() == 1 => {
-                    match args[ 0 ] {
-                        syn::GenericArgument::Type( ref ty ) => Some( ty ),
-                        _ => None
-                    }
+        syn::Type::Path(syn::TypePath {
+            path:
+                syn::Path {
+                    leading_colon: None,
+                    ref segments,
                 },
-                _ => None
-            }
-        },
-        _ => None
+            qself: None,
+        }) if segments.len() == 1 => segments[0].ident == name && segments[0].arguments.is_empty(),
+        _ => false,
     }
 }
 
-fn parse_ty( ty: &syn::Type ) -> Ty {
-    parse_special_ty( ty ).unwrap_or_else( || Ty::Ty( ty.clone() ) )
+fn extract_option_inner_ty(ty: &syn::Type) -> Option<&syn::Type> {
+    match *ty {
+        syn::Type::Path(syn::TypePath {
+            path:
+                syn::Path {
+                    leading_colon: None,
+                    ref segments,
+                },
+            qself: None,
+        }) if segments.len() == 1 && segments[0].ident == "Option" => match segments[0].arguments {
+            syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                colon2_token: None,
+                ref args,
+                ..
+            }) if args.len() == 1 => match args[0] {
+                syn::GenericArgument::Type(ref ty) => Some(ty),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
-fn parse_special_ty( ty: &syn::Type ) -> Option< Ty > {
-    if let Some( ty ) = parse_primitive_ty( ty ) {
-        return Some( Ty::Primitive( ty ) );
+fn parse_ty(ty: &syn::Type) -> Ty {
+    parse_special_ty(ty).unwrap_or_else(|| Ty::Ty(ty.clone()))
+}
+
+fn parse_special_ty(ty: &syn::Type) -> Option<Ty> {
+    if let Some(ty) = parse_primitive_ty(ty) {
+        return Some(Ty::Primitive(ty));
     }
 
     match *ty {
-        syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
-            let name = &segments[ 0 ].ident;
-            match segments[ 0 ].arguments {
+        syn::Type::Path(syn::TypePath {
+            path:
+                syn::Path {
+                    leading_colon: None,
+                    ref segments,
+                },
+            qself: None,
+        }) if segments.len() == 1 => {
+            let name = &segments[0].ident;
+            match segments[0].arguments {
                 syn::PathArguments::None => {
                     if name == "String" {
-                        Some( Ty::String )
+                        Some(Ty::String)
                     } else {
                         None
                     }
-                },
-                syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { colon2_token: None, ref args, .. } ) => {
+                }
+                syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                    colon2_token: None,
+                    ref args,
+                    ..
+                }) => {
                     if name == "Vec" {
-                        Some( Ty::Vec( extract_inner_ty( args )?.clone() ) )
+                        Some(Ty::Vec(extract_inner_ty(args)?.clone()))
                     } else if name == "HashSet" {
-                        Some( Ty::HashSet( extract_inner_ty( args )?.clone() ) )
+                        Some(Ty::HashSet(extract_inner_ty(args)?.clone()))
                     } else if name == "BTreeSet" {
-                        Some( Ty::BTreeSet( extract_inner_ty( args )?.clone() ) )
+                        Some(Ty::BTreeSet(extract_inner_ty(args)?.clone()))
                     } else if name == "Cow" {
-                        let (lifetime, ty) = extract_lifetime_and_inner_ty( args )?;
-                        if let Some( inner_ty ) = extract_slice_inner_ty( ty ) {
-                            Some( Ty::CowSlice( lifetime.clone(), inner_ty.clone() ) )
-                        } else if is_bare_ty( ty, "str" ) {
-                            Some( Ty::CowStr( lifetime.clone() ) )
+                        let (lifetime, ty) = extract_lifetime_and_inner_ty(args)?;
+                        if let Some(inner_ty) = extract_slice_inner_ty(ty) {
+                            Some(Ty::CowSlice(lifetime.clone(), inner_ty.clone()))
+                        } else if is_bare_ty(ty, "str") {
+                            Some(Ty::CowStr(lifetime.clone()))
                         } else {
                             match *ty {
-                                syn::Type::Path( syn::TypePath { path: syn::Path { leading_colon: None, ref segments }, qself: None } ) if segments.len() == 1 => {
-                                    let inner_name = &segments[ 0 ].ident;
-                                    match segments[ 0 ].arguments {
-                                        syn::PathArguments::AngleBracketed( syn::AngleBracketedGenericArguments { colon2_token: None, ref args, .. } ) => {
+                                syn::Type::Path(syn::TypePath {
+                                    path:
+                                        syn::Path {
+                                            leading_colon: None,
+                                            ref segments,
+                                        },
+                                    qself: None,
+                                }) if segments.len() == 1 => {
+                                    let inner_name = &segments[0].ident;
+                                    match segments[0].arguments {
+                                        syn::PathArguments::AngleBracketed(
+                                            syn::AngleBracketedGenericArguments {
+                                                colon2_token: None,
+                                                ref args,
+                                                ..
+                                            },
+                                        ) => {
                                             if inner_name == "HashSet" {
-                                                Some( Ty::CowHashSet( lifetime.clone(), extract_inner_ty( args )?.clone() ) )
+                                                Some(Ty::CowHashSet(
+                                                    lifetime.clone(),
+                                                    extract_inner_ty(args)?.clone(),
+                                                ))
                                             } else if inner_name == "BTreeSet" {
-                                                Some( Ty::CowBTreeSet( lifetime.clone(), extract_inner_ty( args )?.clone() ) )
+                                                Some(Ty::CowBTreeSet(
+                                                    lifetime.clone(),
+                                                    extract_inner_ty(args)?.clone(),
+                                                ))
                                             } else if inner_name == "HashMap" {
-                                                let (key_ty, value_ty) = extract_inner_ty_2( args )?;
-                                                Some( Ty::CowHashMap( lifetime.clone(), key_ty.clone(), value_ty.clone() ) )
+                                                let (key_ty, value_ty) = extract_inner_ty_2(args)?;
+                                                Some(Ty::CowHashMap(
+                                                    lifetime.clone(),
+                                                    key_ty.clone(),
+                                                    value_ty.clone(),
+                                                ))
                                             } else if inner_name == "BTreeMap" {
-                                                let (key_ty, value_ty) = extract_inner_ty_2( args )?;
-                                                Some( Ty::CowBTreeMap( lifetime.clone(), key_ty.clone(), value_ty.clone() ) )
+                                                let (key_ty, value_ty) = extract_inner_ty_2(args)?;
+                                                Some(Ty::CowBTreeMap(
+                                                    lifetime.clone(),
+                                                    key_ty.clone(),
+                                                    value_ty.clone(),
+                                                ))
                                             } else {
                                                 None
                                             }
-                                        },
-                                        _ => None
+                                        }
+                                        _ => None,
                                     }
-                                },
-                                _ => None
+                                }
+                                _ => None,
                             }
                         }
                     } else if name == "HashMap" {
-                        let (key_ty, value_ty) = extract_inner_ty_2( args )?;
-                        Some( Ty::HashMap( key_ty.clone(), value_ty.clone() ) )
+                        let (key_ty, value_ty) = extract_inner_ty_2(args)?;
+                        Some(Ty::HashMap(key_ty.clone(), value_ty.clone()))
                     } else if name == "BTreeMap" {
-                        let (key_ty, value_ty) = extract_inner_ty_2( args )?;
-                        Some( Ty::BTreeMap( key_ty.clone(), value_ty.clone() ) )
+                        let (key_ty, value_ty) = extract_inner_ty_2(args)?;
+                        Some(Ty::BTreeMap(key_ty.clone(), value_ty.clone()))
                     } else {
                         None
                     }
-                },
-                _ => None
+                }
+                _ => None,
             }
-        },
-        syn::Type::Array( syn::TypeArray {
+        }
+        syn::Type::Array(syn::TypeArray {
             ref elem,
-            len: syn::Expr::Lit( syn::ExprLit {
-                ref attrs,
-                lit: syn::Lit::Int( ref literal )
-            }),
+            len:
+                syn::Expr::Lit(syn::ExprLit {
+                    ref attrs,
+                    lit: syn::Lit::Int(ref literal),
+                }),
             ..
         }) if attrs.is_empty() => {
-            if let Ok( length ) = literal.base10_parse::< u32 >() {
-                Some( Ty::Array( (**elem).clone(), length ) )
+            if let Ok(length) = literal.base10_parse::<u32>() {
+                Some(Ty::Array((**elem).clone(), length))
             } else {
                 None
             }
-        },
-        syn::Type::Reference( syn::TypeReference {
-            lifetime: Some( ref lifetime ),
+        }
+        syn::Type::Reference(syn::TypeReference {
+            lifetime: Some(ref lifetime),
             mutability: None,
             ref elem,
             ..
         }) => {
-            if is_bare_ty( &*elem, "str" ) {
-                Some( Ty::RefStr( lifetime.clone() ) )
-            } else if let Some( inner_ty ) = extract_slice_inner_ty( &*elem ) {
-                if is_bare_ty( inner_ty, "u8" ) {
-                    Some( Ty::RefSliceU8( lifetime.clone() ) )
+            if is_bare_ty(&*elem, "str") {
+                Some(Ty::RefStr(lifetime.clone()))
+            } else if let Some(inner_ty) = extract_slice_inner_ty(&*elem) {
+                if is_bare_ty(inner_ty, "u8") {
+                    Some(Ty::RefSliceU8(lifetime.clone()))
                 } else {
-                    Some( Ty::RefSlice( lifetime.clone(), inner_ty.clone() ) )
+                    Some(Ty::RefSlice(lifetime.clone(), inner_ty.clone()))
                 }
             } else {
                 None
             }
-        },
-        _ => None
+        }
+        _ => None,
     }
 }
 
-fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) -> Result< Vec< Field< 'a > >, syn::Error > {
+fn get_fields<'a, I: IntoIterator<Item = &'a syn::Field> + 'a>(
+    fields: I,
+) -> Result<Vec<Field<'a>>, syn::Error> {
     let mut length_until_eof_seen = false;
     let iter = fields.into_iter()
         .enumerate()
@@ -1307,7 +1405,7 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
     iter.collect()
 }
 
-fn default_on_eof_body( body: TokenStream ) -> TokenStream {
+fn default_on_eof_body(body: TokenStream) -> TokenStream {
     quote! {
         match #body {
             Ok( value ) => value,
@@ -1317,7 +1415,7 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
     }
 }
 
-fn read_field_body( field: &Field ) -> TokenStream {
+fn read_field_body(field: &Field) -> TokenStream {
     if field.skip {
         return quote! {
             std::default::Default::default()
@@ -1325,10 +1423,10 @@ fn read_field_body( field: &Field ) -> TokenStream {
     }
 
     let read_length_body = match field.length {
-        Some( LengthKind::Expr( ref length ) ) => Some( quote! { ((#length) as usize) } ),
-        Some( LengthKind::UntilEndOfFile ) => None,
+        Some(LengthKind::Expr(ref length)) => Some(quote! { ((#length) as usize) }),
+        Some(LengthKind::UntilEndOfFile) => None,
         None => {
-            let read_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
+            let read_length_fn = match field.length_type.unwrap_or(DEFAULT_LENGTH_TYPE) {
                 BasicType::U7 => quote! { read_length_u7 },
                 BasicType::U8 => quote! { read_length_u8 },
                 BasicType::U16 => quote! { read_length_u16 },
@@ -1342,15 +1440,15 @@ fn read_field_body( field: &Field ) -> TokenStream {
             };
 
             if field.default_on_eof {
-                Some( default_on_eof_body( body ) )
+                Some(default_on_eof_body(body))
             } else {
-                Some( quote! { #body? } )
+                Some(quote! { #body? })
             }
         }
     };
 
     let read_string = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_vec( _length_ ).and_then( speedy::private::vec_to_string )
@@ -1363,7 +1461,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_vec = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_vec( _length_ )
@@ -1376,7 +1474,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_cow_slice = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_cow( _length_ )
@@ -1389,7 +1487,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_cow_str = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_cow( _length_ ).and_then( speedy::private::cow_bytes_to_cow_str )
@@ -1402,7 +1500,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_collection = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_collection( _length_ )
@@ -1415,7 +1513,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_key_value_collection = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_key_value_collection( _length_ )
@@ -1428,7 +1526,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_cow_collection = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_collection( _length_ ).map( std::borrow::Cow::Owned )
@@ -1441,7 +1539,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_cow_key_value_collection = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_key_value_collection( _length_ ).map( std::borrow::Cow::Owned )
@@ -1454,7 +1552,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_ref_slice_u8 = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 _reader_.read_bytes_borrowed( _length_ ).ok_or_else( speedy::private::error_unsized ).and_then( |error| error )
@@ -1467,7 +1565,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     let read_ref_str = || {
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
                 match _reader_.read_bytes_borrowed( _length_ ) {
@@ -1488,7 +1586,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
 
     let read_ref_slice = |inner_ty: &syn::Type| {
         let inner;
-        if let Some( ref read_length_body ) = read_length_body {
+        if let Some(ref read_length_body) = read_length_body {
             inner = quote! {{
                 let _length_ = #read_length_body;
                 _length_.checked_mul( std::mem::size_of::< #inner_ty >() )
@@ -1521,10 +1619,12 @@ fn read_field_body( field: &Field ) -> TokenStream {
 
     let read_array = |length: u32| {
         // TODO: This is quite inefficient; for primitive types we can do better.
-        let readers = (0..length).map( |_| quote! {
-            match _reader_.read_value() {
-                Ok( value ) => value,
-                Err( error ) => return Err( error )
+        let readers = (0..length).map(|_| {
+            quote! {
+                match _reader_.read_value() {
+                    Ok( value ) => value,
+                    Err( error ) => return Err( error )
+                }
             }
         });
 
@@ -1539,7 +1639,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
         }}
     };
 
-    let read_option = |tokens: TokenStream|
+    let read_option = |tokens: TokenStream| {
         quote! {{
             _reader_.read_u8().and_then( |_flag_| {
                 if _flag_ != 0 {
@@ -1548,39 +1648,35 @@ fn read_field_body( field: &Field ) -> TokenStream {
                     Ok( None )
                 }
             })
-        }};
+        }}
+    };
 
     let body = match field.ty.inner() {
         Ty::String => read_string(),
-        Ty::Vec( .. ) => read_vec(),
-        Ty::CowSlice( .. ) => read_cow_slice(),
-        Ty::CowStr( .. ) => read_cow_str(),
-        Ty::HashMap( .. ) |
-        Ty::BTreeMap( .. )  => read_key_value_collection(),
-        Ty::HashSet( .. ) |
-        Ty::BTreeSet( .. ) => read_collection(),
-        Ty::CowHashMap( .. ) |
-        Ty::CowBTreeMap( .. ) => read_cow_key_value_collection(),
-        Ty::CowHashSet( .. ) |
-        Ty::CowBTreeSet( .. ) => read_cow_collection(),
-        Ty::RefSliceU8( .. ) => read_ref_slice_u8(),
-        Ty::RefSlice( _, inner_ty ) => read_ref_slice( inner_ty ),
-        Ty::RefStr( .. ) => read_ref_str(),
-        Ty::Array( _, length ) => read_array( *length ),
-        Ty::Primitive( .. ) if field.varint => read_u64_varint(),
-        Ty::Primitive( .. ) |
-        Ty::Ty( .. ) => {
-            assert!( field.length.is_none() );
+        Ty::Vec(..) => read_vec(),
+        Ty::CowSlice(..) => read_cow_slice(),
+        Ty::CowStr(..) => read_cow_str(),
+        Ty::HashMap(..) | Ty::BTreeMap(..) => read_key_value_collection(),
+        Ty::HashSet(..) | Ty::BTreeSet(..) => read_collection(),
+        Ty::CowHashMap(..) | Ty::CowBTreeMap(..) => read_cow_key_value_collection(),
+        Ty::CowHashSet(..) | Ty::CowBTreeSet(..) => read_cow_collection(),
+        Ty::RefSliceU8(..) => read_ref_slice_u8(),
+        Ty::RefSlice(_, inner_ty) => read_ref_slice(inner_ty),
+        Ty::RefStr(..) => read_ref_str(),
+        Ty::Array(_, length) => read_array(*length),
+        Ty::Primitive(..) if field.varint => read_u64_varint(),
+        Ty::Primitive(..) | Ty::Ty(..) => {
+            assert!(field.length.is_none());
             quote! { _reader_.read_value() }
         }
     };
 
     let body = match field.ty {
-        Opt::Plain( _ ) => body,
-        Opt::Option( _ ) => read_option( body )
+        Opt::Plain(_) => body,
+        Opt::Option(_) => read_option(body),
     };
 
-    let body = if let Some( ref constant_prefix ) = field.constant_prefix {
+    let body = if let Some(ref constant_prefix) = field.constant_prefix {
         quote! {{
             speedy::private::read_constant( _reader_, #constant_prefix ).and_then( |_| #body )
         }}
@@ -1589,26 +1685,29 @@ fn read_field_body( field: &Field ) -> TokenStream {
     };
 
     if field.default_on_eof {
-        default_on_eof_body( body )
+        default_on_eof_body(body)
     } else {
         quote! { #body? }
     }
 }
 
-fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream, TokenStream) {
+fn readable_body<'a>(
+    types: &mut Vec<syn::Type>,
+    st: &Struct<'a>,
+) -> (TokenStream, TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_readers = Vec::new();
     let mut minimum_bytes_needed = Vec::new();
     for field in &st.fields {
-        let read_value = read_field_body( field );
+        let read_value = read_field_body(field);
         let name = field.var_name();
         let raw_ty = field.raw_ty;
-        field_readers.push( quote! { let #name: #raw_ty = #read_value; } );
-        field_names.push( name );
-        types.extend( field.bound_types() );
+        field_readers.push(quote! { let #name: #raw_ty = #read_value; });
+        field_names.push(name);
+        types.extend(field.bound_types());
 
-        if let Some( minimum_bytes ) = get_minimum_bytes( &field ) {
-            minimum_bytes_needed.push( minimum_bytes );
+        if let Some(minimum_bytes) = get_minimum_bytes(&field) {
+            minimum_bytes_needed.push(minimum_bytes);
         }
     }
 
@@ -1617,68 +1716,73 @@ fn readable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
     let initializer = match st.kind {
         StructKind::Unit => initializer,
         StructKind::Unnamed => quote! { ( #initializer ) },
-        StructKind::Named => quote! { { #initializer } }
+        StructKind::Named => quote! { { #initializer } },
     };
 
-    let minimum_bytes_needed = sum( minimum_bytes_needed );
+    let minimum_bytes_needed = sum(minimum_bytes_needed);
     (body, initializer, minimum_bytes_needed)
 }
 
-fn write_field_body( field: &Field ) -> TokenStream {
+fn write_field_body(field: &Field) -> TokenStream {
     let name = field.var_name();
     let write_length_body = match field.length {
-        Some( LengthKind::Expr( ref length ) ) => {
-            let field_name = format!( "{}", name );
+        Some(LengthKind::Expr(ref length)) => {
+            let field_name = format!("{}", name);
             quote! {
                 if !speedy::private::are_lengths_the_same( #name.len(), #length ) {
                     return Err( speedy::private::error_length_is_not_the_same_as_length_attribute( #field_name ) );
                 }
             }
-        },
-        Some( LengthKind::UntilEndOfFile ) => quote! {},
+        }
+        Some(LengthKind::UntilEndOfFile) => quote! {},
         None => {
-            let write_length_fn = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
+            let write_length_fn = match field.length_type.unwrap_or(DEFAULT_LENGTH_TYPE) {
                 BasicType::U7 => quote! { write_length_u7 },
                 BasicType::U8 => quote! { write_length_u8 },
                 BasicType::U16 => quote! { write_length_u16 },
                 BasicType::U32 => quote! { write_length_u32 },
                 BasicType::U64 => quote! { write_length_u64 },
-                BasicType::VarInt64 => quote! { write_length_u64_varint }
+                BasicType::VarInt64 => quote! { write_length_u64_varint },
             };
 
             quote! { speedy::private::#write_length_fn( #name.len(), _writer_ )?; }
         }
     };
 
-    let write_str = ||
+    let write_str = || {
         quote! {{
             #write_length_body
             _writer_.write_slice( #name.as_bytes() )?;
-        }};
+        }}
+    };
 
-    let write_slice = ||
+    let write_slice = || {
         quote! {{
             #write_length_body
             _writer_.write_slice( &#name )?;
-        }};
+        }}
+    };
 
-    let write_collection = ||
+    let write_collection = || {
         quote! {{
             #write_length_body
             _writer_.write_collection( #name.iter() )?;
-        }};
+        }}
+    };
 
-    let write_array = ||
+    let write_array = || {
         quote! {{
             _writer_.write_slice( &#name[..] )?;
-        }};
+        }}
+    };
 
-    let write_u64_varint = ||
+    let write_u64_varint = || {
         quote! {{
             _writer_.write_u64_varint( *#name )?;
-        }};
+        }}
+    };
 
-    let write_option = |tokens: TokenStream|
+    let write_option = |tokens: TokenStream| {
         quote! {{
             if let Some( ref #name ) = #name {
                 _writer_.write_u8( 1 )?;
@@ -1686,41 +1790,34 @@ fn write_field_body( field: &Field ) -> TokenStream {
             } else {
                 _writer_.write_u8( 0 )?;
             }
-        }};
+        }}
+    };
 
     let body = match field.ty.inner() {
-        Ty::String |
-        Ty::CowStr( .. ) |
-        Ty::RefStr( .. )
-            => write_str(),
-        Ty::Vec( .. ) |
-        Ty::CowSlice( .. ) |
-        Ty::RefSliceU8( .. ) |
-        Ty::RefSlice( .. )
-            => write_slice(),
-        Ty::HashMap( .. ) |
-        Ty::HashSet( .. ) |
-        Ty::BTreeMap( .. ) |
-        Ty::BTreeSet( .. ) |
-        Ty::CowHashMap( .. ) |
-        Ty::CowHashSet( .. ) |
-        Ty::CowBTreeMap( .. ) |
-        Ty::CowBTreeSet( .. ) => write_collection(),
-        Ty::Array( .. ) => write_array(),
-        Ty::Primitive( .. ) if field.varint => write_u64_varint(),
-        Ty::Primitive( .. ) |
-        Ty::Ty( .. ) => {
-            assert!( field.length.is_none() );
+        Ty::String | Ty::CowStr(..) | Ty::RefStr(..) => write_str(),
+        Ty::Vec(..) | Ty::CowSlice(..) | Ty::RefSliceU8(..) | Ty::RefSlice(..) => write_slice(),
+        Ty::HashMap(..)
+        | Ty::HashSet(..)
+        | Ty::BTreeMap(..)
+        | Ty::BTreeSet(..)
+        | Ty::CowHashMap(..)
+        | Ty::CowHashSet(..)
+        | Ty::CowBTreeMap(..)
+        | Ty::CowBTreeSet(..) => write_collection(),
+        Ty::Array(..) => write_array(),
+        Ty::Primitive(..) if field.varint => write_u64_varint(),
+        Ty::Primitive(..) | Ty::Ty(..) => {
+            assert!(field.length.is_none());
             quote! { _writer_.write_value( #name )?; }
         }
     };
 
     let body = match field.ty {
-        Opt::Plain( _ ) => body,
-        Opt::Option( _ ) => write_option( body )
+        Opt::Plain(_) => body,
+        Opt::Option(_) => write_option(body),
     };
 
-    let body = if let Some( ref constant_prefix ) = field.constant_prefix {
+    let body = if let Some(ref constant_prefix) = field.constant_prefix {
         quote! {{
             _writer_.write_slice( #constant_prefix )?;
             #body
@@ -1732,7 +1829,7 @@ fn write_field_body( field: &Field ) -> TokenStream {
     body
 }
 
-fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (TokenStream, TokenStream) {
+fn writable_body<'a>(types: &mut Vec<syn::Type>, st: &Struct<'a>) -> (TokenStream, TokenStream) {
     let mut field_names = Vec::new();
     let mut field_writers = Vec::new();
     for field in &st.fields {
@@ -1740,11 +1837,11 @@ fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
             continue;
         }
 
-        let write_value = write_field_body( &field );
-        types.extend( field.bound_types() );
+        let write_value = write_field_body(&field);
+        types.extend(field.bound_types());
 
-        field_names.push( field.var_name().clone() );
-        field_writers.push( write_value );
+        field_names.push(field.var_name().clone());
+        field_writers.push(write_value);
     }
 
     let body = quote! { #(#field_writers)* };
@@ -1752,40 +1849,40 @@ fn writable_body< 'a >( types: &mut Vec< syn::Type >, st: &Struct< 'a > ) -> (To
     let initializer = match st.kind {
         StructKind::Unit => initializer,
         StructKind::Unnamed => quote! { ( #initializer ) },
-        StructKind::Named => quote! { { #initializer } }
+        StructKind::Named => quote! { { #initializer } },
     };
 
     (body, initializer)
 }
 
-struct Variant< 'a > {
+struct Variant<'a> {
     tag_expr: TokenStream,
     ident: &'a syn::Ident,
-    structure: Struct< 'a >
+    structure: Struct<'a>,
 }
 
-struct Enum< 'a > {
+struct Enum<'a> {
     tag_type: BasicType,
     peek_tag: bool,
-    variants: Vec< Variant< 'a > >
+    variants: Vec<Variant<'a>>,
 }
 
-impl< 'a > Enum< 'a > {
+impl<'a> Enum<'a> {
     fn new(
         ident: &syn::Ident,
         attrs: &[syn::Attribute],
-        raw_variants: &'a syn::punctuated::Punctuated< syn::Variant, syn::token::Comma >
-    ) -> Result< Self, syn::Error > {
-        let attrs = parse_attributes::< EnumAttribute >( attrs )?;
-        let attrs = collect_enum_attributes( attrs )?;
-        let tag_type = attrs.tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE );
+        raw_variants: &'a syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>,
+    ) -> Result<Self, syn::Error> {
+        let attrs = parse_attributes::<EnumAttribute>(attrs)?;
+        let attrs = collect_enum_attributes(attrs)?;
+        let tag_type = attrs.tag_type.unwrap_or(DEFAULT_ENUM_TAG_TYPE);
         let max = match tag_type {
             BasicType::U7 => 0b01111111 as u64,
             BasicType::U8 => std::u8::MAX as u64,
             BasicType::U16 => std::u16::MAX as u64,
             BasicType::U32 => std::u32::MAX as u64,
             BasicType::U64 => std::u64::MAX,
-            BasicType::VarInt64 => std::u64::MAX
+            BasicType::VarInt64 => std::u64::MAX,
         };
 
         let mut previous_tag = None;
@@ -1794,29 +1891,30 @@ impl< 'a > Enum< 'a > {
         for variant in raw_variants {
             let mut struct_attrs = Vec::new();
             let mut variant_attrs = Vec::new();
-            for attr in parse_attributes::< VariantOrStructAttribute >( &variant.attrs )? {
+            for attr in parse_attributes::<VariantOrStructAttribute>(&variant.attrs)? {
                 match attr {
-                    VariantOrStructAttribute::Struct( attr ) => struct_attrs.push( attr ),
-                    VariantOrStructAttribute::Variant( attr ) => variant_attrs.push( attr )
+                    VariantOrStructAttribute::Struct(attr) => struct_attrs.push(attr),
+                    VariantOrStructAttribute::Variant(attr) => variant_attrs.push(attr),
                 }
             }
 
-            let variant_attrs = collect_variant_attributes( variant_attrs )?;
+            let variant_attrs = collect_variant_attributes(variant_attrs)?;
 
-            let full_name = format!( "{}::{}", ident, variant.ident );
-            let tag = if let Some( tag ) = variant_attrs.tag {
+            let full_name = format!("{}::{}", ident, variant.ident);
+            let tag = if let Some(tag) = variant_attrs.tag {
                 if tag > max {
-                    let message = format!( "Enum discriminant `{}` is too big!", full_name );
-                    return Err( syn::Error::new( variant.span(), message ) );
+                    let message = format!("Enum discriminant `{}` is too big!", full_name);
+                    return Err(syn::Error::new(variant.span(), message));
                 }
                 tag
             } else {
                 match variant.discriminant {
                     None => {
-                        let tag = if let Some( previous_tag ) = previous_tag {
+                        let tag = if let Some(previous_tag) = previous_tag {
                             if previous_tag >= max {
-                                let message = format!( "Enum discriminant `{}` is too big!", full_name );
-                                return Err( syn::Error::new( variant.span(), message ) );
+                                let message =
+                                    format!("Enum discriminant `{}` is too big!", full_name);
+                                return Err(syn::Error::new(variant.span(), message));
                             }
 
                             previous_tag + 1
@@ -1825,126 +1923,138 @@ impl< 'a > Enum< 'a > {
                         };
 
                         tag
-                    },
-                    Some( (_, syn::Expr::Lit( syn::ExprLit { lit: syn::Lit::Int( ref raw_value ), .. } )) ) => {
-                        let tag = raw_value.base10_parse::< u64 >().map_err( |err| {
-                            syn::Error::new( raw_value.span(), err )
-                        })?;
+                    }
+                    Some((
+                        _,
+                        syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Int(ref raw_value),
+                            ..
+                        }),
+                    )) => {
+                        let tag = raw_value
+                            .base10_parse::<u64>()
+                            .map_err(|err| syn::Error::new(raw_value.span(), err))?;
                         if tag > max {
-                            let message = format!( "Enum discriminant `{}` is too big!", full_name );
-                            return Err( syn::Error::new( raw_value.span(), message ) );
+                            let message = format!("Enum discriminant `{}` is too big!", full_name);
+                            return Err(syn::Error::new(raw_value.span(), message));
                         }
 
                         tag
-                    },
+                    }
                     Some((_, ref expr)) => {
-                        let message = format!( "Enum discriminant `{}` is currently unsupported!", full_name );
-                        return Err( syn::Error::new( expr.span(), message ) );
+                        let message = format!(
+                            "Enum discriminant `{}` is currently unsupported!",
+                            full_name
+                        );
+                        return Err(syn::Error::new(expr.span(), message));
                     }
                 }
             };
 
-            previous_tag = Some( tag );
-            if let Some( other_full_name ) = tag_to_full_name.get( &tag ) {
-                let message = format!( "Two discriminants with the same value of '{}': `{}`, `{}`", tag, full_name, other_full_name );
-                return Err( syn::Error::new( variant.span(), message ) );
+            previous_tag = Some(tag);
+            if let Some(other_full_name) = tag_to_full_name.get(&tag) {
+                let message = format!(
+                    "Two discriminants with the same value of '{}': `{}`, `{}`",
+                    tag, full_name, other_full_name
+                );
+                return Err(syn::Error::new(variant.span(), message));
             }
 
-            tag_to_full_name.insert( tag, full_name );
+            tag_to_full_name.insert(tag, full_name);
             let tag_expr = match tag_type {
                 BasicType::U7 | BasicType::U8 => {
                     let tag = tag as u8;
                     quote! { #tag }
-                },
+                }
                 BasicType::U16 => {
                     let tag = tag as u16;
                     quote! { #tag }
-                },
+                }
                 BasicType::U32 => {
                     let tag = tag as u32;
                     quote! { #tag }
-                },
+                }
                 BasicType::U64 | BasicType::VarInt64 => {
                     let tag = tag as u64;
                     quote! { #tag }
                 }
             };
 
-            let structure = Struct::new( &variant.fields, struct_attrs )?;
-            variants.push( Variant {
+            let structure = Struct::new(&variant.fields, struct_attrs)?;
+            variants.push(Variant {
                 tag_expr,
                 ident: &variant.ident,
-                structure
+                structure,
             });
         }
 
-        Ok( Enum {
+        Ok(Enum {
             tag_type,
             peek_tag: attrs.peek_tag,
-            variants
+            variants,
         })
     }
 }
 
-fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
+fn get_minimum_bytes(field: &Field) -> Option<TokenStream> {
     if field.default_on_eof || field.length.is_some() || field.skip {
         None
     } else {
         let mut length = match field.ty {
-            Opt::Option( .. ) => {
+            Opt::Option(..) => {
                 quote! { 1 }
-            },
-            Opt::Plain( ref ty ) => {
-                match ty {
-                    | Ty::String
-                    | Ty::Vec( .. )
-                    | Ty::CowSlice( .. )
-                    | Ty::CowStr( .. )
-                    | Ty::HashMap( .. )
-                    | Ty::HashSet( .. )
-                    | Ty::BTreeMap( .. )
-                    | Ty::BTreeSet( .. )
-                    | Ty::CowHashMap( .. )
-                    | Ty::CowHashSet( .. )
-                    | Ty::CowBTreeMap( .. )
-                    | Ty::CowBTreeSet( .. )
-                    | Ty::RefSliceU8( .. )
-                    | Ty::RefSlice( .. )
-                    | Ty::RefStr( .. )
-                    => {
-                        let size: usize = match field.length_type.unwrap_or( DEFAULT_LENGTH_TYPE ) {
-                            BasicType::U7 | BasicType::U8 | BasicType::VarInt64 => 1,
-                            BasicType::U16 => 2,
-                            BasicType::U32 => 4,
-                            BasicType::U64 => 8
-                        };
-
-                        quote! { #size }
-                    },
-                    | Ty::Array( ty, length ) => {
-                        let length = *length as usize;
-                        quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() * #length }
-                    },
-                    | Ty::Primitive( .. ) if field.varint => quote! { 1 },
-                    | Ty::Primitive( .. )
-                    | Ty::Ty( .. ) => {
-                        let raw_ty = &field.raw_ty;
-                        quote! { <#raw_ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() }
-                    }
-                }
             }
+            Opt::Plain(ref ty) => match ty {
+                Ty::String
+                | Ty::Vec(..)
+                | Ty::CowSlice(..)
+                | Ty::CowStr(..)
+                | Ty::HashMap(..)
+                | Ty::HashSet(..)
+                | Ty::BTreeMap(..)
+                | Ty::BTreeSet(..)
+                | Ty::CowHashMap(..)
+                | Ty::CowHashSet(..)
+                | Ty::CowBTreeMap(..)
+                | Ty::CowBTreeSet(..)
+                | Ty::RefSliceU8(..)
+                | Ty::RefSlice(..)
+                | Ty::RefStr(..) => {
+                    let size: usize = match field.length_type.unwrap_or(DEFAULT_LENGTH_TYPE) {
+                        BasicType::U7 | BasicType::U8 | BasicType::VarInt64 => 1,
+                        BasicType::U16 => 2,
+                        BasicType::U32 => 4,
+                        BasicType::U64 => 8,
+                    };
+
+                    quote! { #size }
+                }
+                Ty::Array(ty, length) => {
+                    let length = *length as usize;
+                    quote! { <#ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() * #length }
+                }
+                Ty::Primitive(..) if field.varint => quote! { 1 },
+                Ty::Primitive(..) | Ty::Ty(..) => {
+                    let raw_ty = &field.raw_ty;
+                    quote! { <#raw_ty as speedy::Readable< 'a_, C_ >>::minimum_bytes_needed() }
+                }
+            },
         };
 
-        if let Some( ref constant_prefix ) = field.constant_prefix {
+        if let Some(ref constant_prefix) = field.constant_prefix {
             let extra_length = constant_prefix.value().len();
             length = quote! { #length + #extra_length };
         }
 
-        Some( length )
+        Some(length)
     }
 }
 
-fn sum< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStream >, <I as IntoIterator>::IntoIter: ExactSizeIterator {
+fn sum<I>(values: I) -> TokenStream
+where
+    I: IntoIterator<Item = TokenStream>,
+    <I as IntoIterator>::IntoIter: ExactSizeIterator,
+{
     let iter = values.into_iter();
     if iter.len() == 0 {
         quote! { 0 }
@@ -1957,7 +2067,11 @@ fn sum< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     }
 }
 
-fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStream >, <I as IntoIterator>::IntoIter: ExactSizeIterator {
+fn min<I>(values: I) -> TokenStream
+where
+    I: IntoIterator<Item = TokenStream>,
+    <I as IntoIterator>::IntoIter: ExactSizeIterator,
+{
     let iter = values.into_iter();
     if iter.len() == 0 {
         quote! { 0 }
@@ -1970,7 +2084,7 @@ fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     }
 }
 
-fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool ) -> TokenStream {
+fn generate_is_primitive(fields: &[Field], is_writable: bool, check_order: bool) -> TokenStream {
     if fields.is_empty() {
         return quote! { true };
     }
@@ -1980,40 +2094,40 @@ fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool
     let mut fields_offsets = Vec::new();
     for field in fields {
         if !is_primitive.is_empty() {
-            is_primitive.push( quote! { && });
-            fields_size.push( quote! { + });
+            is_primitive.push(quote! { && });
+            fields_size.push(quote! { + });
         }
 
         let ty = &field.raw_ty;
         if is_writable {
-            is_primitive.push( quote! {
+            is_primitive.push(quote! {
                 <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
             });
         } else {
-            is_primitive.push( quote! {
+            is_primitive.push(quote! {
                 <#ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
             });
         }
 
-        fields_size.push( quote! {
+        fields_size.push(quote! {
             std::mem::size_of::< #ty >()
         });
 
         let name = field.name();
-        fields_offsets.push( quote! {
+        fields_offsets.push(quote! {
             speedy::private::offset_of!( Self, #name )
         });
     }
 
-    is_primitive.push( quote! {
+    is_primitive.push(quote! {
         && (#(#fields_size)*) == std::mem::size_of::< Self >()
     });
 
     if check_order {
-        for window in fields_offsets.windows( 2 ) {
+        for window in fields_offsets.windows(2) {
             let a = &window[0];
             let b = &window[1];
-            is_primitive.push( quote! {
+            is_primitive.push(quote! {
                 && #a <= #b
             });
         }
@@ -2024,20 +2138,25 @@ fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool
     }
 }
 
-fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error > {
+fn impl_readable(input: syn::DeriveInput) -> Result<TokenStream, syn::Error> {
     let name = &input.ident;
     let mut types = Vec::new();
 
-    let (reader_body, minimum_bytes_needed_body, impl_primitive, impl_zerocopyable) = match &input.data {
-        syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
-            let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
-            let structure = Struct::new( fields, attrs )?;
-            let is_ty_packed = is_packed( &input.attrs );
-            let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
-            let is_ty_c = is_c( &input.attrs );
-            let is_ty_simple = structure.fields.iter().all( |field| field.is_simple() );
-            let can_be_primitive = structure.fields.iter().all( |field| field.can_be_primitive() );
-            let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
+    let (reader_body, minimum_bytes_needed_body, impl_primitive, impl_zerocopyable) = match &input
+        .data
+    {
+        syn::Data::Struct(syn::DataStruct { ref fields, .. }) => {
+            let attrs = parse_attributes::<StructAttribute>(&input.attrs)?;
+            let structure = Struct::new(fields, attrs)?;
+            let is_ty_packed = is_packed(&input.attrs);
+            let is_ty_transparent = fields.len() == 1 && is_transparent(&input.attrs);
+            let is_ty_c = is_c(&input.attrs);
+            let is_ty_simple = structure.fields.iter().all(|field| field.is_simple());
+            let can_be_primitive = structure
+                .fields
+                .iter()
+                .all(|field| field.can_be_primitive());
+            let (body, initializer, minimum_bytes) = readable_body(&mut types, &structure);
             let reader_body = quote! {
                 #body
                 Ok( #name #initializer )
@@ -2045,11 +2164,11 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
 
             let mut field_types = Vec::new();
             for field in &structure.fields {
-                field_types.push( field.raw_ty.clone() );
+                field_types.push(field.raw_ty.clone());
             }
 
             let impl_primitive = if is_ty_transparent {
-                let field_ty = &structure.fields[ 0 ].raw_ty;
+                let field_ty = &structure.fields[0].raw_ty;
                 quote! {
                     #[inline(always)]
                     fn speedy_is_primitive() -> bool {
@@ -2070,14 +2189,20 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         }
                     }
                 }
-            } else if can_be_primitive && (is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && structure.fields.len() <= 4)) {
-                let is_primitive = generate_is_primitive( &structure.fields, false, !is_ty_packed && !is_ty_c );
+            } else if can_be_primitive
+                && (is_ty_packed
+                    || is_ty_c
+                    || is_ty_simple
+                    || (!uses_generics(&input) && structure.fields.len() <= 4))
+            {
+                let is_primitive =
+                    generate_is_primitive(&structure.fields, false, !is_ty_packed && !is_ty_c);
                 let mut body_flip_endianness = Vec::new();
                 for field in &structure.fields {
                     let ty = &field.raw_ty;
                     let name = field.name();
 
-                    body_flip_endianness.push( quote! {
+                    body_flip_endianness.push(quote! {
                         unsafe {
                             <#ty as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness(
                                 std::ptr::addr_of_mut!( (*itself).#name )
@@ -2122,7 +2247,13 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             };
 
             let impl_zerocopyable = if is_ty_packed || is_ty_transparent {
-                let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::ZeroCopyable { is_packed: is_ty_packed } );
+                let (impl_params, ty_params, where_clause) = common_tokens(
+                    &input,
+                    &field_types,
+                    Trait::ZeroCopyable {
+                        is_packed: is_ty_packed,
+                    },
+                );
                 quote! {
                     unsafe impl< #impl_params T_ > speedy::private::ZeroCopyable< T_ > for #name #ty_params #where_clause {}
                 }
@@ -2130,18 +2261,24 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 quote! {}
             };
 
-            (reader_body, minimum_bytes, impl_primitive, impl_zerocopyable)
-        },
-        syn::Data::Enum( syn::DataEnum { variants, .. } ) => {
-            let enumeration = Enum::new( &name, &input.attrs, &variants )?;
-            let mut variant_matches = Vec::with_capacity( variants.len() );
-            let mut variant_minimum_sizes = Vec::with_capacity( variants.len() );
+            (
+                reader_body,
+                minimum_bytes,
+                impl_primitive,
+                impl_zerocopyable,
+            )
+        }
+        syn::Data::Enum(syn::DataEnum { variants, .. }) => {
+            let enumeration = Enum::new(&name, &input.attrs, &variants)?;
+            let mut variant_matches = Vec::with_capacity(variants.len());
+            let mut variant_minimum_sizes = Vec::with_capacity(variants.len());
             for variant in enumeration.variants {
                 let tag = variant.tag_expr;
                 let unqualified_ident = &variant.ident;
                 let variant_path = quote! { #name::#unqualified_ident };
-                let (body, initializer, minimum_bytes) = readable_body( &mut types, &variant.structure );
-                variant_matches.push( quote! {
+                let (body, initializer, minimum_bytes) =
+                    readable_body(&mut types, &variant.structure);
+                variant_matches.push(quote! {
                     #tag => {
                         #body
                         Ok( #variant_path #initializer )
@@ -2150,7 +2287,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
 
                 if variant.structure.kind != StructKind::Unit {
                     if variant.structure.is_guaranteed_non_recursive() {
-                        variant_minimum_sizes.push( minimum_bytes );
+                        variant_minimum_sizes.push(minimum_bytes);
                     }
                 }
             }
@@ -2187,23 +2324,22 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     _ => Err( speedy::private::error_invalid_enum_variant() )
                 }
             };
-            let minimum_bytes_needed_body = min( variant_minimum_sizes.into_iter() );
-            let minimum_bytes_needed_body =
-                if !enumeration.peek_tag {
-                    quote! { (#minimum_bytes_needed_body) + #tag_size }
-                } else {
-                    quote! { std::cmp::max( #minimum_bytes_needed_body, #tag_size ) }
-                };
+            let minimum_bytes_needed_body = min(variant_minimum_sizes.into_iter());
+            let minimum_bytes_needed_body = if !enumeration.peek_tag {
+                quote! { (#minimum_bytes_needed_body) + #tag_size }
+            } else {
+                quote! { std::cmp::max( #minimum_bytes_needed_body, #tag_size ) }
+            };
 
             (reader_body, minimum_bytes_needed_body, quote! {}, quote! {})
-        },
-        syn::Data::Union( syn::DataUnion { union_token, .. } ) => {
+        }
+        syn::Data::Union(syn::DataUnion { union_token, .. }) => {
             let message = "Unions are not supported!";
-            return Err( syn::Error::new( union_token.span(), message ) );
+            return Err(syn::Error::new(union_token.span(), message));
         }
     };
 
-    let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Trait::Readable );
+    let (impl_params, ty_params, where_clause) = common_tokens(&input, &types, Trait::Readable);
     let output = quote! {
         impl< 'a_, #impl_params C_: speedy::Context > speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
             #[inline]
@@ -2222,81 +2358,96 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
         #impl_zerocopyable
     };
 
-    Ok( output )
+    Ok(output)
 }
 
-fn assign_to_variables< 'a >( fields: impl IntoIterator< Item = &'a Field< 'a > >, is_packed: bool ) -> TokenStream {
-    let fields: Vec< _ > = fields.into_iter().filter(|field| !field.skip).map( |field| {
-        let var_name = field.var_name();
-        let name = field.name();
+fn assign_to_variables<'a>(
+    fields: impl IntoIterator<Item = &'a Field<'a>>,
+    is_packed: bool,
+) -> TokenStream {
+    let fields: Vec<_> = fields
+        .into_iter()
+        .filter(|field| !field.skip)
+        .map(|field| {
+            let var_name = field.var_name();
+            let name = field.name();
 
-        if !is_packed {
-            quote! {
-                let #var_name = &self.#name;
+            if !is_packed {
+                quote! {
+                    let #var_name = &self.#name;
+                }
+            } else {
+                quote! {
+                    let #var_name = self.#name;
+                    let #var_name = &#var_name;
+                }
             }
-        } else {
-            quote! {
-                let #var_name = self.#name;
-                let #var_name = &#var_name;
-            }
-        }
-    }).collect();
+        })
+        .collect();
 
     quote! {
         #(#fields)*
     }
 }
 
-fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error > {
+fn impl_writable(input: syn::DeriveInput) -> Result<TokenStream, syn::Error> {
     let name = &input.ident;
     let mut types = Vec::new();
     let (writer_body, impl_primitive) = match input.data {
-        syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
-            let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
-            let st = Struct::new( fields, attrs )?;
-            let is_ty_packed = is_packed( &input.attrs );
-            let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
-            let is_ty_c = is_c( &input.attrs );
-            let is_ty_simple = st.fields.iter().all( |field| field.is_simple() );
-            let can_be_primitive = st.fields.iter().all( |field| field.can_be_primitive() );
-            let assignments = assign_to_variables( &st.fields, is_ty_packed );
-            let (body, _) = writable_body( &mut types, &st );
+        syn::Data::Struct(syn::DataStruct { ref fields, .. }) => {
+            let attrs = parse_attributes::<StructAttribute>(&input.attrs)?;
+            let st = Struct::new(fields, attrs)?;
+            let is_ty_packed = is_packed(&input.attrs);
+            let is_ty_transparent = fields.len() == 1 && is_transparent(&input.attrs);
+            let is_ty_c = is_c(&input.attrs);
+            let is_ty_simple = st.fields.iter().all(|field| field.is_simple());
+            let can_be_primitive = st.fields.iter().all(|field| field.can_be_primitive());
+            let assignments = assign_to_variables(&st.fields, is_ty_packed);
+            let (body, _) = writable_body(&mut types, &st);
 
-            let impl_primitive =
-                if is_ty_transparent {
-                    let field_ty = &st.fields[ 0 ].raw_ty;
-                    quote! {
-                        #[inline(always)]
-                        fn speedy_is_primitive() -> bool {
-                            <#field_ty as speedy::Writable< C_ >>::speedy_is_primitive()
-                        }
-
-                        #[inline(always)]
-                        unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
-                            unsafe {
-                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
-                            }
-                        }
+            let impl_primitive = if is_ty_transparent {
+                let field_ty = &st.fields[0].raw_ty;
+                quote! {
+                    #[inline(always)]
+                    fn speedy_is_primitive() -> bool {
+                        <#field_ty as speedy::Writable< C_ >>::speedy_is_primitive()
                     }
 
-                } else if can_be_primitive && (is_ty_transparent || is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && st.fields.len() <= 4)) {
-                    let is_primitive = generate_is_primitive( &st.fields, true, !is_ty_transparent && !is_ty_packed && !is_ty_c );
-                    quote! {
-                        #[inline(always)]
-                        fn speedy_is_primitive() -> bool {
-                            #is_primitive
-                        }
-
-                        #[inline(always)]
-                        unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
-                            unsafe {
-                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
-                            }
+                    #[inline(always)]
+                    unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
+                        unsafe {
+                            std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
                         }
                     }
-                } else {
-                    quote! {}
-                };
+                }
+            } else if can_be_primitive
+                && (is_ty_transparent
+                    || is_ty_packed
+                    || is_ty_c
+                    || is_ty_simple
+                    || (!uses_generics(&input) && st.fields.len() <= 4))
+            {
+                let is_primitive = generate_is_primitive(
+                    &st.fields,
+                    true,
+                    !is_ty_transparent && !is_ty_packed && !is_ty_c,
+                );
+                quote! {
+                    #[inline(always)]
+                    fn speedy_is_primitive() -> bool {
+                        #is_primitive
+                    }
+
+                    #[inline(always)]
+                    unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
+                        unsafe {
+                            std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
+                        }
+                    }
+                }
+            } else {
+                quote! {}
+            };
 
             let impl_body = quote! {
                 #assignments
@@ -2304,9 +2455,9 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             };
 
             (impl_body, impl_primitive)
-        },
-        syn::Data::Enum( syn::DataEnum { ref variants, .. } ) => {
-            let enumeration = Enum::new( &name, &input.attrs, &variants )?;
+        }
+        syn::Data::Enum(syn::DataEnum { ref variants, .. }) => {
+            let enumeration = Enum::new(&name, &input.attrs, &variants)?;
             let tag_writer = match enumeration.tag_type {
                 BasicType::U64 => quote! { write_u64 },
                 BasicType::U32 => quote! { write_u32 },
@@ -2316,18 +2467,19 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 BasicType::VarInt64 => quote! { write_u64_varint },
             };
 
-            let variants: Result< Vec< _ >, syn::Error > = enumeration.variants.iter()
-                .map( |variant| {
+            let variants: Result<Vec<_>, syn::Error> = enumeration
+                .variants
+                .iter()
+                .map(|variant| {
                     let unqualified_ident = &variant.ident;
                     let tag_expr = &variant.tag_expr;
                     let variant_path = quote! { #name::#unqualified_ident };
-                    let (body, initializer) = writable_body( &mut types, &variant.structure );
-                    let write_tag =
-                        if !enumeration.peek_tag {
-                            quote! { _writer_.#tag_writer( #tag_expr )?; }
-                        } else {
-                            quote! {}
-                        };
+                    let (body, initializer) = writable_body(&mut types, &variant.structure);
+                    let write_tag = if !enumeration.peek_tag {
+                        quote! { _writer_.#tag_writer( #tag_expr )?; }
+                    } else {
+                        quote! {}
+                    };
 
                     let snippet = quote! {
                         #variant_path #initializer => {
@@ -2336,19 +2488,19 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         }
                     };
 
-                    Ok( snippet )
+                    Ok(snippet)
                 })
                 .collect();
             let variants = variants?;
             (quote! { match *self { #(#variants),* } }, quote! {})
-        },
-        syn::Data::Union( syn::DataUnion { union_token, .. } ) => {
+        }
+        syn::Data::Union(syn::DataUnion { union_token, .. }) => {
             let message = "Unions are not supported!";
-            return Err( syn::Error::new( union_token.span(), message ) );
+            return Err(syn::Error::new(union_token.span(), message));
         }
     };
 
-    let (impl_params, ty_params, where_clause) = common_tokens( &input, &types, Trait::Writable );
+    let (impl_params, ty_params, where_clause) = common_tokens(&input, &types, Trait::Writable);
     let output = quote! {
         impl< #impl_params C_: speedy::Context > speedy::Writable< C_ > for #name #ty_params #where_clause {
             #[inline]
@@ -2361,5 +2513,5 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
         }
     };
 
-    Ok( output )
+    Ok(output)
 }
