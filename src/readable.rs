@@ -314,7 +314,7 @@ impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
             }
         }
 
-        if self.buffer.len() > 0 {
+        if !self.buffer.len() > 0 {
             let length = std::cmp::min( self.buffer.len(), output.len() );
             self.buffer.consume_into( &mut output[ ..length ] );
             output = &mut output[ length.. ];

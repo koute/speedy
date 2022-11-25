@@ -506,7 +506,7 @@ quickcheck::quickcheck! {
                 assert_eq!( buffer.len(), control_buffer.len() );
                 assert_eq!( buffer.to_vec(), control_buffer );
 
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let expected = control_buffer.remove( 0 );
                     let mut actual = [!expected];
                     buffer.consume_into( &mut actual );
