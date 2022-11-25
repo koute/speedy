@@ -2223,7 +2223,7 @@ symmetric_tests_unsized_native_endian! {
 #[cfg(feature = "chrono")]
 symmetric_tests! {
     chrono_datetime_utc for chrono::DateTime< chrono::Utc > {
-        in = chrono::offset::TimeZone::timestamp( &chrono::Utc, 123, 222 ),
+        in = chrono::offset::TimeZone::timestamp_opt( &chrono::Utc, 123, 222 ).unwrap(),
         le = [123, 0, 0, 0, 0, 0, 0, 0, 222, 0, 0, 0],
         be = [0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 222],
         minimum_bytes = 12
