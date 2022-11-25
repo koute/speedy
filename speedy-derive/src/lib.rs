@@ -671,11 +671,11 @@ struct Field< 'a > {
 
 impl< 'a > Field< 'a > {
     fn can_be_primitive( &self ) -> bool {
-        self.default_on_eof == false &&
+        !self.default_on_eof &&
         self.length.is_none() &&
         self.length_type.is_none() &&
-        self.skip == false &&
-        self.varint == false &&
+        !self.skip &&
+        !self.varint &&
         self.constant_prefix.is_none()
     }
 
