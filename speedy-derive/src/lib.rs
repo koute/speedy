@@ -314,7 +314,7 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Tr
                     if is_packed && parse_primitive_ty( ty ).is_some() {
                         None
                     } else {
-                        Some( quote! { #ty: speedy::private::ZeroCopyable< T_ > } )
+                        Some( quote! { #ty: speedy::private::ZeroCopyable< C_, T_ > } )
                     }
                 },
             }
@@ -2136,7 +2136,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
             let impl_zerocopyable = if is_ty_packed || is_ty_transparent {
                 let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::ZeroCopyable { is_packed: is_ty_packed } );
                 quote! {
-                    unsafe impl< #impl_params T_ > speedy::private::ZeroCopyable< T_ > for #name #ty_params #where_clause {}
+                    unsafe impl< #impl_params C_, T_ > speedy::private::ZeroCopyable< C_, T_ > for #name #ty_params #where_clause {}
                 }
             } else {
                 quote! {}

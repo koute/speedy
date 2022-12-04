@@ -38,6 +38,12 @@ impl Context for BigEndian {
     }
 }
 
+#[cfg(target_endian = "little")]
+pub use LittleEndian as NativeContext;
+
+#[cfg(target_endian = "big")]
+pub use BigEndian as NativeContext;
+
 pub trait DefaultContext {
     type Context;
 }

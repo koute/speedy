@@ -18,9 +18,19 @@ macro_rules! unsafe_is_length {
 }
 
 // TODO: Remove the T parameter once #![feature(trivial_bounds)] is stable.
-pub unsafe trait ZeroCopyable< T > where T: ?Sized {}
-unsafe impl< T > ZeroCopyable< T > for i8 {}
-unsafe impl< T > ZeroCopyable< T > for u8 {}
+pub unsafe trait ZeroCopyable< C, T > where T: ?Sized {}
+unsafe impl< C, T > ZeroCopyable< C, T > for i8 {}
+unsafe impl< C, T > ZeroCopyable< C, T > for u8 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for i16 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for u16 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for i32 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for u32 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for i64 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for u64 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for i128 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for u128 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for f32 {}
+unsafe impl< T > ZeroCopyable< crate::context::NativeContext, T > for f64 {}
 
 pub trait SwapBytes {
     fn swap_bytes( self ) -> Self;

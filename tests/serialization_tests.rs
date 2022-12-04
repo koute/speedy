@@ -2517,36 +2517,67 @@ macro_rules! assert_impl {
     };
 }
 
-assert_not_impl!( (u8, u8), speedy::private::ZeroCopyable< () > );
-assert_not_impl!( Vec< u8 >, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( NonTransparentU8, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( TransparentNonZeroCopyable, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( NonZeroCopyable, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( PackedNonZeroCopyable, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( DerivedRefSlicePackedTuple, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( DerivedRefSlicePackedTupleUntilEof, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( &[DerivedPackedTuple], speedy::private::ZeroCopyable< () > );
-assert_not_impl!( u16, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( u32, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( u64, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( u128, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( i16, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( i32, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( i64, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( i128, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( f32, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( f64, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( TransparentU16, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( TransparentU32, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( TransparentU128, speedy::private::ZeroCopyable< () > );
-assert_not_impl!( &'static [u16], speedy::Readable< 'static, speedy::LittleEndian > );
+#[cfg(target_endian = "little")]
+pub use speedy::LittleEndian as NativeEndian;
 
-assert_impl!( u8, speedy::private::ZeroCopyable< () > );
-assert_impl!( i8, speedy::private::ZeroCopyable< () > );
-assert_impl!( TransparentU8, speedy::private::ZeroCopyable< () > );
-assert_impl!( DerivedPackedTuple, speedy::private::ZeroCopyable< () > );
-assert_impl!( DerivedPackedRecursiveTuple, speedy::private::ZeroCopyable< () > );
-assert_impl!( &'static [PackedU16], speedy::Readable< 'static, speedy::LittleEndian > );
+#[cfg(target_endian = "little")]
+pub use speedy::BigEndian as OtherEndian;
+
+#[cfg(target_endian = "big")]
+pub use speedy::BigEndian as NativeEndian;
+
+#[cfg(target_endian = "big")]
+pub use speedy::LittleEndian as OtherEndian;
+
+assert_not_impl!( (u8, u8), speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_not_impl!( Vec< u8 >, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_not_impl!( NonTransparentU8, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_not_impl!( TransparentNonZeroCopyable, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_not_impl!( NonZeroCopyable, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_not_impl!( PackedNonZeroCopyable, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_not_impl!( DerivedRefSlicePackedTuple, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_not_impl!( DerivedRefSlicePackedTupleUntilEof, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_not_impl!( &[DerivedPackedTuple], speedy::private::ZeroCopyable< NativeEndian, () > );
+
+assert_impl!( u16, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( u32, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( u64, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( u128, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( i16, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( i32, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( i64, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( i128, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( f32, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( f64, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( TransparentU16, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( TransparentU32, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( TransparentU128, speedy::private::ZeroCopyable< NativeEndian, () > );
+
+assert_impl!( &'static [u16], speedy::Readable< 'static, NativeEndian > );
+
+assert_not_impl!( u16, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( u32, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( u64, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( u128, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( i16, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( i32, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( i64, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( i128, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( f32, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( f64, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( TransparentU16, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( TransparentU32, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_not_impl!( TransparentU128, speedy::private::ZeroCopyable< OtherEndian, () > );
+
+assert_not_impl!( &'static [u16], speedy::Readable< 'static, OtherEndian > );
+
+assert_impl!( u8, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( i8, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( TransparentU8, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( DerivedPackedTuple, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( DerivedPackedRecursiveTuple, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( &'static [PackedU16], speedy::Readable< 'static, NativeEndian > );
+assert_impl!( &'static [PackedU16], speedy::Readable< 'static, OtherEndian > );
 
 #[test]
 fn test_incomplete_read_into_vec_triggers_drop_for_already_read_items() {

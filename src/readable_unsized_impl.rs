@@ -21,7 +21,7 @@ impl< 'a, C: Context > Readable< 'a, C > for &'a str {
     }
 }
 
-impl< 'a, C: Context, T > Readable< 'a, C > for &'a [T] where T: crate::utils::ZeroCopyable< T > {
+impl< 'a, C: Context, T > Readable< 'a, C > for &'a [T] where T: crate::utils::ZeroCopyable< C, T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         if std::mem::size_of::< T >() != 1 && reader.endianness().conversion_necessary() {
@@ -50,7 +50,7 @@ unsafe fn cast_slice< T, const N: usize >( slice: &[u8] ) -> &[T; N] {
     }
 }
 
-impl< 'a, C: Context, T, const N: usize > Readable< 'a, C > for &'a [T; N] where T: crate::utils::ZeroCopyable< T > {
+impl< 'a, C: Context, T, const N: usize > Readable< 'a, C > for &'a [T; N] where T: crate::utils::ZeroCopyable< C, T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         if std::mem::size_of::< T >() != 1 && reader.endianness().conversion_necessary() {
