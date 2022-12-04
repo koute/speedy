@@ -600,7 +600,7 @@ pub trait Readable< 'a, C: Context >: Sized {
                         return Ok(());
                     }
 
-                    if madvise( self.0, self.1, advice ) < 0 {
+                    if unsafe { madvise( self.0, self.1, advice ) } < 0 {
                         Err( Error::from_io_error( std::io::Error::last_os_error() ) )
                     } else {
                         Ok(())
