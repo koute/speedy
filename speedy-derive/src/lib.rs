@@ -526,15 +526,15 @@ fn check_repr( attrs: &[syn::Attribute], value: &str ) -> bool {
 }
 
 fn is_transparent( attrs: &[syn::Attribute] ) -> bool {
-    check_repr( attrs, "(transparent)" )
+    check_repr( attrs, "transparent" )
 }
 
 fn is_packed( attrs: &[syn::Attribute] ) -> bool {
-    check_repr( attrs, "(packed)" )
+    check_repr( attrs, "packed" )
 }
 
 fn is_c( attrs: &[syn::Attribute] ) -> bool {
-    check_repr( attrs, "(C)" )
+    check_repr( attrs, "C" )
 }
 
 fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::Error > where T: syn::parse::Parse {
