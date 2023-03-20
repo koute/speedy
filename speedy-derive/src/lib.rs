@@ -49,6 +49,8 @@ mod kw {
     syn::custom_keyword!( constant_prefix );
     syn::custom_keyword!( peek_tag );
     syn::custom_keyword!( varint );
+    syn::custom_keyword!( unsafe_is_primitive );
+    syn::custom_keyword!( always );
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -62,7 +64,7 @@ mod kw {
 enum Trait {
     Readable,
     Writable,
-    ZeroCopyable { is_packed: bool }
+    ZeroCopyable { is_packed: bool, is_forced: bool }
 }
 
 fn uses_generics( input: &syn::DeriveInput ) -> bool {
@@ -310,8 +312,8 @@ fn common_tokens( ast: &syn::DeriveInput, types: &[syn::Type], trait_variant: Tr
                 (Trait::Readable, false) => None,
                 (Trait::Writable, true) => Some( quote! { #ty: speedy::Writable< C_ > } ),
                 (Trait::Writable, false) => None,
-                (Trait::ZeroCopyable { is_packed }, _) => {
-                    if is_packed && parse_primitive_ty( ty ).is_some() {
+                (Trait::ZeroCopyable { is_packed, is_forced }, _) => {
+                    if is_forced || (is_packed && parse_primitive_ty( ty ).is_some()) {
                         None
                     } else {
                         Some( quote! { #ty: speedy::private::ZeroCopyable< C_, T_ > } )
@@ -383,6 +385,29 @@ impl syn::parse::Parse for BasicType {
 
         Ok( ty )
     }
+}
+
+enum IsPrimitive {
+    Always,
+}
+
+impl syn::parse::Parse for IsPrimitive {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let lookahead = input.lookahead1();
+        let ty = if lookahead.peek( kw::always ) {
+            input.parse::< kw::always >()?;
+            IsPrimitive::Always
+        } else {
+            return Err( lookahead.error() );
+        };
+
+        Ok( ty )
+    }
+}
+
+enum ToplevelStructAttribute {
+    UnsafeIsPrimitive { key_token: kw::unsafe_is_primitive, kind: IsPrimitive },
+    StructAttribute( StructAttribute )
 }
 
 enum VariantAttribute {
@@ -468,6 +493,22 @@ fn parse_enum_attribute(
     Ok( Some( attribute ) )
 }
 
+impl syn::parse::Parse for ToplevelStructAttribute {
+    fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+        let lookahead = input.lookahead1();
+        if lookahead.peek( kw::unsafe_is_primitive ) {
+            let key_token = input.parse::< kw::unsafe_is_primitive >()?;
+            let _: Token![=] = input.parse()?;
+            let kind = input.parse::< IsPrimitive >()?;
+            Ok( ToplevelStructAttribute::UnsafeIsPrimitive { key_token, kind } )
+        } else if let Some( attr ) = parse_struct_attribute( &input, &lookahead )? {
+            Ok( ToplevelStructAttribute::StructAttribute( attr ) )
+        } else {
+            Err( lookahead.error() )
+        }
+    }
+}
+
 impl syn::parse::Parse for StructAttribute {
     fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
         let lookahead = input.lookahead1();
@@ -507,6 +548,18 @@ struct StructAttributes {
 struct EnumAttributes {
     tag_type: Option< BasicType >,
     peek_tag: bool
+}
+
+struct ToplevelStructAttributes {
+    is_primitive: Option< IsPrimitive >,
+    struct_attributes: StructAttributes
+}
+
+impl std::ops::Deref for ToplevelStructAttributes {
+    type Target = StructAttributes;
+    fn deref( &self ) -> &Self::Target {
+        &self.struct_attributes
+    }
 }
 
 fn check_repr( attrs: &[syn::Attribute], value: &str ) -> bool {
@@ -595,6 +648,32 @@ fn collect_struct_attributes( attrs: Vec< StructAttribute > ) -> Result< StructA
     })
 }
 
+fn collect_toplevel_struct_attributes( attrs: Vec< ToplevelStructAttribute > ) -> Result< ToplevelStructAttributes, syn::Error > {
+    let mut struct_attributes = Vec::new();
+    let mut is_primitive = None;
+    for attr in attrs {
+        match attr {
+            ToplevelStructAttribute::UnsafeIsPrimitive { key_token, kind } => {
+                if is_primitive.is_some() {
+                    let message = "Duplicate 'unsafe_is_primitive'";
+                    return Err( syn::Error::new( key_token.span(), message ) );
+                }
+                is_primitive = Some( kind );
+            },
+            ToplevelStructAttribute::StructAttribute( attr ) => {
+                struct_attributes.push( attr );
+            }
+        }
+    }
+
+    let struct_attributes = collect_struct_attributes( struct_attributes )?;
+    Ok( ToplevelStructAttributes {
+        is_primitive,
+        struct_attributes
+    })
+}
+
+
 fn collect_enum_attributes( attrs: Vec< EnumAttribute > ) -> Result< EnumAttributes, syn::Error > {
     let mut tag_type = None;
     let mut peek_tag = false;
@@ -636,8 +715,7 @@ struct Struct< 'a > {
 }
 
 impl< 'a > Struct< 'a > {
-    fn new( fields: &'a syn::Fields, attrs: Vec< StructAttribute > ) -> Result< Self, syn::Error > {
-        collect_struct_attributes( attrs )?;
+    fn new( fields: &'a syn::Fields, _attrs: &StructAttributes ) -> Result< Self, syn::Error > {
         let structure = match fields {
             syn::Fields::Unit => {
                 Struct {
@@ -1882,7 +1960,8 @@ impl< 'a > Enum< 'a > {
                 }
             };
 
-            let structure = Struct::new( &variant.fields, struct_attrs )?;
+            let struct_attrs = collect_struct_attributes( struct_attrs )?;
+            let structure = Struct::new( &variant.fields, &struct_attrs )?;
             variants.push( Variant {
                 tag_expr,
                 ident: &variant.ident,
@@ -1982,8 +2061,8 @@ fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     }
 }
 
-fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool ) -> TokenStream {
-    if fields.is_empty() {
+fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool, is_forced: bool ) -> TokenStream {
+    if fields.is_empty() || is_forced {
         return quote! { true };
     }
 
@@ -2036,19 +2115,51 @@ fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool
     }
 }
 
+struct IsPrimitiveResult {
+    is_ty_packed: bool,
+    is_ty_transparent: bool,
+    is_ty_potentially_primitive: bool,
+    check_order: bool,
+    impl_zerocopyable: bool,
+    is_forced: bool
+}
+
+fn check_is_primitive( input: &syn::DeriveInput, structure: &Struct, attrs: &ToplevelStructAttributes ) -> IsPrimitiveResult {
+    let is_ty_packed = is_packed( &input.attrs );
+    let is_ty_transparent = structure.fields.len() == 1 && is_transparent( &input.attrs );
+    let is_ty_c = is_c( &input.attrs );
+    let is_ty_simple = structure.fields.iter().all( |field| field.is_simple() );
+    let check_order = !is_ty_transparent && !is_ty_packed && !is_ty_c;
+
+    let mut is_forced = false;
+    match attrs.is_primitive {
+        None => {},
+        Some( IsPrimitive::Always ) => {
+            is_forced = true;
+        }
+    }
+
+    let can_be_primitive = is_forced || structure.fields.iter().all( |field| field.can_be_primitive() );
+    IsPrimitiveResult {
+        is_ty_packed,
+        is_ty_transparent,
+        is_ty_potentially_primitive: can_be_primitive && (is_forced || is_ty_transparent || is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && structure.fields.len() <= 4)),
+        check_order,
+        impl_zerocopyable: is_ty_packed || is_ty_transparent || is_forced,
+        is_forced
+    }
+}
+
 fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error > {
     let name = &input.ident;
     let mut types = Vec::new();
 
     let (reader_body, minimum_bytes_needed_body, impl_primitive, impl_zerocopyable) = match &input.data {
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
-            let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
-            let structure = Struct::new( fields, attrs )?;
-            let is_ty_packed = is_packed( &input.attrs );
-            let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
-            let is_ty_c = is_c( &input.attrs );
-            let is_ty_simple = structure.fields.iter().all( |field| field.is_simple() );
-            let can_be_primitive = structure.fields.iter().all( |field| field.can_be_primitive() );
+            let attrs = parse_attributes::< ToplevelStructAttribute >( &input.attrs )?;
+            let attrs = collect_toplevel_struct_attributes( attrs )?;
+            let structure = Struct::new( fields, &attrs )?;
+            let is_primitive = check_is_primitive( &input, &structure, &attrs );
             let (body, initializer, minimum_bytes) = readable_body( &mut types, &structure );
             let reader_body = quote! {
                 #body
@@ -2060,7 +2171,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 field_types.push( field.raw_ty.clone() );
             }
 
-            let impl_primitive = if is_ty_transparent {
+            let impl_primitive = if is_primitive.is_ty_transparent {
                 let field_ty = &structure.fields[ 0 ].raw_ty;
                 quote! {
                     #[inline(always)]
@@ -2082,8 +2193,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         }
                     }
                 }
-            } else if can_be_primitive && (is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && structure.fields.len() <= 4)) {
-                let is_primitive = generate_is_primitive( &structure.fields, false, !is_ty_packed && !is_ty_c );
+            } else if is_primitive.is_ty_potentially_primitive {
+                let is_primitive = generate_is_primitive( &structure.fields, false, is_primitive.check_order, is_primitive.is_forced );
                 let mut body_flip_endianness = Vec::new();
                 for field in &structure.fields {
                     let ty = &field.raw_ty;
@@ -2133,8 +2244,8 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 quote! {}
             };
 
-            let impl_zerocopyable = if is_ty_packed || is_ty_transparent {
-                let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::ZeroCopyable { is_packed: is_ty_packed } );
+            let impl_zerocopyable = if is_primitive.impl_zerocopyable {
+                let (impl_params, ty_params, where_clause) = common_tokens( &input, &field_types, Trait::ZeroCopyable { is_packed: is_primitive.is_ty_packed, is_forced: is_primitive.is_forced } );
                 quote! {
                     unsafe impl< #impl_params C_, T_ > speedy::private::ZeroCopyable< C_, T_ > for #name #ty_params #where_clause {}
                 }
@@ -2264,18 +2375,15 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let mut types = Vec::new();
     let (writer_body, impl_primitive) = match input.data {
         syn::Data::Struct( syn::DataStruct { ref fields, .. } ) => {
-            let attrs = parse_attributes::< StructAttribute >( &input.attrs )?;
-            let st = Struct::new( fields, attrs )?;
-            let is_ty_packed = is_packed( &input.attrs );
-            let is_ty_transparent = fields.len() == 1 && is_transparent( &input.attrs );
-            let is_ty_c = is_c( &input.attrs );
-            let is_ty_simple = st.fields.iter().all( |field| field.is_simple() );
-            let can_be_primitive = st.fields.iter().all( |field| field.can_be_primitive() );
-            let assignments = assign_to_variables( &st.fields, is_ty_packed );
+            let attrs = parse_attributes::< ToplevelStructAttribute >( &input.attrs )?;
+            let attrs = collect_toplevel_struct_attributes( attrs )?;
+            let st = Struct::new( fields, &attrs )?;
+            let is_primitive = check_is_primitive( &input, &st, &attrs );
+            let assignments = assign_to_variables( &st.fields, is_primitive.is_ty_packed );
             let (body, _) = writable_body( &mut types, &st );
 
             let impl_primitive =
-                if is_ty_transparent {
+                if is_primitive.is_ty_transparent {
                     let field_ty = &st.fields[ 0 ].raw_ty;
                     quote! {
                         #[inline(always)]
@@ -2291,8 +2399,8 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         }
                     }
 
-                } else if can_be_primitive && (is_ty_transparent || is_ty_packed || is_ty_c || is_ty_simple || (!uses_generics( &input ) && st.fields.len() <= 4)) {
-                    let is_primitive = generate_is_primitive( &st.fields, true, !is_ty_transparent && !is_ty_packed && !is_ty_c );
+                } else if is_primitive.is_ty_potentially_primitive {
+                    let is_primitive = generate_is_primitive( &st.fields, true, is_primitive.check_order, is_primitive.is_forced );
                     quote! {
                         #[inline(always)]
                         fn speedy_is_primitive() -> bool {

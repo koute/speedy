@@ -2428,6 +2428,9 @@ fn test_derive_primitive() {
     assert!( !<DerivedStructWithVarInt as Writable< Endianness >>::speedy_is_primitive() );
     assert!( !<DerivedStructWithOptionU16 as Readable< Endianness >>::speedy_is_primitive() );
     assert!( !<DerivedStructWithOptionU16 as Writable< Endianness >>::speedy_is_primitive() );
+
+    assert!( <ForcedPrimitive as Readable< Endianness >>::speedy_is_primitive() );
+    assert!( <ForcedPrimitive as Writable< Endianness >>::speedy_is_primitive() );
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -2493,6 +2496,10 @@ struct SimpleComposite {
     v2: ThreeF32,
     normal: ThreeF32,
 }
+
+#[derive(Readable, Writable, PartialEq, Debug)]
+#[speedy(unsafe_is_primitive = always)]
+struct ForcedPrimitive( char );
 
 // Source: https://users.rust-lang.org/t/a-macro-to-assert-that-a-type-does-not-implement-trait-bounds/31179
 macro_rules! assert_not_impl {
@@ -2578,6 +2585,11 @@ assert_impl!( DerivedPackedTuple, speedy::private::ZeroCopyable< NativeEndian, (
 assert_impl!( DerivedPackedRecursiveTuple, speedy::private::ZeroCopyable< NativeEndian, () > );
 assert_impl!( &'static [PackedU16], speedy::Readable< 'static, NativeEndian > );
 assert_impl!( &'static [PackedU16], speedy::Readable< 'static, OtherEndian > );
+
+assert_impl!( ForcedPrimitive, speedy::private::ZeroCopyable< NativeEndian, () > );
+assert_impl!( ForcedPrimitive, speedy::private::ZeroCopyable< OtherEndian, () > );
+assert_impl!( &'static [ForcedPrimitive], speedy::Readable< 'static, NativeEndian > );
+assert_impl!( &'static [ForcedPrimitive], speedy::Readable< 'static, OtherEndian > );
 
 #[test]
 fn test_incomplete_read_into_vec_triggers_drop_for_already_read_items() {
