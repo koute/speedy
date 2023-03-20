@@ -542,7 +542,6 @@ fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::E
 
     impl< T > syn::parse::Parse for RawAttributes< T > where T: syn::parse::Parse {
         fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
-            dbg!(&input);
             let content;
             parenthesized!( content in input );
             Ok( RawAttributes( content.parse_terminated( T::parse, Token![,] )? ) )
