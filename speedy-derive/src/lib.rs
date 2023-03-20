@@ -14,6 +14,7 @@ extern crate quote;
 
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
 trait IterExt: Iterator + Sized {
@@ -85,10 +86,12 @@ fn possibly_uses_generic_ty( generic_types: &[&syn::Ident], ty: &syn::Type ) -> 
                             match arg {
                                 syn::GenericArgument::Lifetime( .. ) => false,
                                 syn::GenericArgument::Type( inner_ty ) => possibly_uses_generic_ty( generic_types, inner_ty ),
+                                syn::GenericArgument::AssocType( assoc_type ) => possibly_uses_generic_ty( generic_types, &assoc_type.ty ),
                                 // TODO: How to handle these?
-                                syn::GenericArgument::Binding( .. ) => true,
                                 syn::GenericArgument::Constraint( .. ) => true,
-                                syn::GenericArgument::Const( .. ) => true
+                                syn::GenericArgument::Const( .. ) => true,
+                                syn::GenericArgument::AssocConst(_) => true,
+                                _ => true,
                             }
                         })
                     },
@@ -175,10 +178,12 @@ fn is_guaranteed_non_recursive( ty: &syn::Type ) -> bool {
                             match arg {
                                 syn::GenericArgument::Lifetime( .. ) => true,
                                 syn::GenericArgument::Type( inner_ty ) => is_guaranteed_non_recursive( inner_ty ),
+                                syn::GenericArgument::AssocType( assoc_type ) => is_guaranteed_non_recursive( &assoc_type.ty ),
                                 // TODO: How to handle these?
-                                syn::GenericArgument::Binding( .. ) => false,
                                 syn::GenericArgument::Constraint( .. ) => false,
-                                syn::GenericArgument::Const( .. ) => false
+                                syn::GenericArgument::Const( .. ) => false,
+                                syn::GenericArgument::AssocConst(_) => false,
+                                _ => false,
                             }
                         })
                 },
@@ -507,12 +512,14 @@ struct EnumAttributes {
 fn check_repr( attrs: &[syn::Attribute], value: &str ) -> bool {
     let mut result = false;
     for raw_attr in attrs {
-        let path = raw_attr.path.clone().into_token_stream().to_string();
+        let path = raw_attr.meta.path().clone().into_token_stream().to_string();
         if path != "repr" {
             continue;
         }
 
-        result = raw_attr.tokens.clone().into_token_stream().to_string() == value;
+        if let Ok(meta_list) = raw_attr.meta.require_list() {
+            result = meta_list.tokens.clone().into_token_stream().to_string() == value;
+        }
     }
 
     result
@@ -531,25 +538,30 @@ fn is_c( attrs: &[syn::Attribute] ) -> bool {
 }
 
 fn parse_attributes< T >( attrs: &[syn::Attribute] ) -> Result< Vec< T >, syn::Error > where T: syn::parse::Parse {
-    struct RawAttributes< T >( syn::punctuated::Punctuated< T, Token![,] > );
+    struct RawAttributes< T >( Punctuated< T, Token![,] > );
 
     impl< T > syn::parse::Parse for RawAttributes< T > where T: syn::parse::Parse {
         fn parse( input: syn::parse::ParseStream ) -> syn::parse::Result< Self > {
+            dbg!(&input);
             let content;
             parenthesized!( content in input );
-            Ok( RawAttributes( content.parse_terminated( T::parse )? ) )
+            Ok( RawAttributes( content.parse_terminated( T::parse, Token![,] )? ) )
         }
     }
 
     let mut output = Vec::new();
     for raw_attr in attrs {
-        let path = raw_attr.path.clone().into_token_stream().to_string();
+        let path = raw_attr.meta.path().clone().into_token_stream().to_string();
         if path != "speedy" {
             continue;
         }
 
-        let parsed_attrs: RawAttributes< T > = syn::parse2( raw_attr.tokens.clone() )?;
-        for attr in parsed_attrs.0 {
+        let meta_list = raw_attr.meta.require_list()?;
+        let parsed_attrs = syn::parse::Parser::parse2(
+            Punctuated::<T, Token![,]>::parse_terminated,
+            meta_list.tokens.clone(),
+        )?;
+        for attr in parsed_attrs {
             output.push( attr );
         }
     }
@@ -826,7 +838,8 @@ impl syn::parse::Parse for FieldAttribute {
                             }
                         },
                         syn::Lit::Float( _ ) => return Err( syn::Error::new( value_span, "floats are not supported" ) ),
-                        syn::Lit::Verbatim( _ ) => return Err( syn::Error::new( value_span, "verbatim literals are not supported" ) )
+                        syn::Lit::Verbatim( _ ) => return Err( syn::Error::new( value_span, "verbatim literals are not supported" ) ),
+                        _ => return Err( syn::Error::new( value_span, "unsupported literal" ) )
                     }
                 },
                 syn::Expr::Unary( syn::ExprUnary { op: syn::UnOp::Neg(_), expr, .. } ) => {
@@ -907,7 +920,7 @@ enum Ty {
     Ty( syn::Type )
 }
 
-fn extract_inner_ty( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< &syn::Type > {
+fn extract_inner_ty( args: &Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< &syn::Type > {
     if args.len() != 1 {
         return None;
     }
@@ -918,7 +931,7 @@ fn extract_inner_ty( args: &syn::punctuated::Punctuated< syn::GenericArgument, s
     }
 }
 
-fn extract_inner_ty_2( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< (&syn::Type, &syn::Type) > {
+fn extract_inner_ty_2( args: &Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< (&syn::Type, &syn::Type) > {
     if args.len() != 2 {
         return None;
     }
@@ -936,7 +949,7 @@ fn extract_inner_ty_2( args: &syn::punctuated::Punctuated< syn::GenericArgument,
     Some( (ty_1, ty_2) )
 }
 
-fn extract_lifetime_and_inner_ty( args: &syn::punctuated::Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< (&syn::Lifetime, &syn::Type) > {
+fn extract_lifetime_and_inner_ty( args: &Punctuated< syn::GenericArgument, syn::token::Comma > ) -> Option< (&syn::Lifetime, &syn::Type) > {
     if args.len() != 2 {
         return None;
     }
@@ -1774,7 +1787,7 @@ impl< 'a > Enum< 'a > {
     fn new(
         ident: &syn::Ident,
         attrs: &[syn::Attribute],
-        raw_variants: &'a syn::punctuated::Punctuated< syn::Variant, syn::token::Comma >
+        raw_variants: &'a Punctuated< syn::Variant, syn::token::Comma >
     ) -> Result< Self, syn::Error > {
         let attrs = parse_attributes::< EnumAttribute >( attrs )?;
         let attrs = collect_enum_attributes( attrs )?;
