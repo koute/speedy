@@ -1,4 +1,4 @@
-use std::mem;
+use std::mem::{self, MaybeUninit};
 use std::borrow::{Cow, ToOwned};
 use std::ops::Range;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -512,58 +512,35 @@ impl< 'a, C > Readable< 'a, C > for std::time::SystemTime where C: Context {
     }
 }
 
-macro_rules! repeat {
-    (1, $expr:expr) => { [$expr] };
-    (2, $expr:expr) => { [$expr, $expr] };
-    (3, $expr:expr) => { [$expr, $expr, $expr] };
-    (4, $expr:expr) => { [$expr, $expr, $expr, $expr] };
-    (5, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr] };
-    (6, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr] };
-    (7, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (8, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (9, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (10, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (11, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (12, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (13, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (14, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (15, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (16, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-}
-
-macro_rules! impl_for_array {
-    ($count:tt) => {
-        impl< 'a, C, T > Readable< 'a, C > for [T; $count] where C: Context, T: Readable< 'a, C > {
-            #[inline(always)]
-            fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
-                let array = repeat!( $count, reader.read_value()? );
-                Ok( array )
+impl< 'a, C, T, const N: usize > Readable< 'a, C > for [T; N] where C: Context, T: Readable< 'a, C > {
+    #[inline(always)]
+    fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
+        // This block follows
+        // https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
+        let array = {
+            // SAFETY: See example from above.
+            let mut array: [MaybeUninit< T >; N] = unsafe { MaybeUninit::uninit().assume_init() };
+            for elem in array.iter_mut() {
+                elem.write( reader.read_value()? );
             }
+            // Can't use mem::transmute here like in the example from above because
+            // it can't handle const generics, instead we copy the implementation of
+            // MaybeUninit::transpose, which is not yet stable, and then MaybeUninit::assume_init.
+            // SAFETY: See safety comment in MaybeUninit::transpose.
+            let transposed = unsafe {
+                mem::transmute_copy::< _, MaybeUninit< [T; N] > >( &mem::ManuallyDrop::new( array ) )
+            };
+            // SAFETY: All elements have been initialized, so the array itself is initialized.
+            unsafe { transposed.assume_init() }
+        };
+        Ok( array )
+    }
 
-            #[inline]
-            fn minimum_bytes_needed() -> usize {
-                T::minimum_bytes_needed() * $count
-            }
-        }
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        T::minimum_bytes_needed() * N
     }
 }
-
-impl_for_array!( 1 );
-impl_for_array!( 2 );
-impl_for_array!( 3 );
-impl_for_array!( 4 );
-impl_for_array!( 5 );
-impl_for_array!( 6 );
-impl_for_array!( 7 );
-impl_for_array!( 8 );
-impl_for_array!( 9 );
-impl_for_array!( 10 );
-impl_for_array!( 11 );
-impl_for_array!( 12 );
-impl_for_array!( 13 );
-impl_for_array!( 14 );
-impl_for_array!( 15 );
-impl_for_array!( 16 );
 
 impl< 'a, C, T > Readable< 'a, C > for Box< T >
     where C: Context,
