@@ -380,11 +380,11 @@ impl< C: Context, T: Writable< C >, E: Writable< C > > Writable< C > for Result<
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
         match *self {
             Ok( ref value ) => {
-                writer.write_u8( 0 )?;
+                writer.write_u8( 1 )?;
                 value.write_to( writer )
             },
             Err( ref value ) => {
-                writer.write_u8( 1 )?;
+                writer.write_u8( 0 )?;
                 value.write_to( writer )
             }
         }
