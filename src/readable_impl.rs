@@ -318,6 +318,25 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Option< T > {
     }
 }
 
+impl< 'a, C: Context, T: Readable< 'a, C >, E: Readable< 'a, C > > Readable< 'a, C > for Result< T, E > {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let flag = reader.read_value()?;
+        let value = if flag {
+            Err( reader.read_value()? )
+        } else {
+            Ok( reader.read_value()? )
+        };
+
+        Ok( value )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        1
+    }
+}
+
 impl< 'a, C: Context > Readable< 'a, C > for () {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( _: &mut R ) -> Result< Self, C::Error > {

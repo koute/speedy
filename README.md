@@ -78,6 +78,7 @@ Out-of-box the following types are supported:
 |           `BTreeSet<T>` |             `{length: u32, values: [T]}` |
 |              `Range<T>` |                                 `(T, T)` |
 |             `Option<T>` |                    `(1_u8, T)` or `0_u8` |
+|          `Result<T, E>` |               `(0_u8, T)` or `(1_u8, E)` |
 |                    `()` |                                  nothing |
 |                   `(T)` |                                    as-is |
 |                `(T, T)` |                                    as-is |

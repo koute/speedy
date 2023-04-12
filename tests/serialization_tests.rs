@@ -690,6 +690,11 @@ struct DerivedStructWithOptionU16 {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithResultU16 {
+    data: Result< u16, u16 >
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithSkippedField {
     a: u8,
     #[speedy(skip)]
@@ -1365,6 +1370,30 @@ symmetric_tests! {
         in = DerivedStructWithOptionU16 { data: None },
         le = [0],
         be = [0],
+        minimum_bytes = 1
+    }
+    result_u16_ok for Result< u16, u16 > {
+        in = Ok( 10 ),
+        le = [0, 10, 0],
+        be = [0, 0, 10],
+        minimum_bytes = 1
+    }
+    result_u16_err for Result< u16, u16 > {
+        in = Err( 10 ),
+        le = [1, 10, 0],
+        be = [1, 0, 10],
+        minimum_bytes = 1
+    }
+    derived_struct_with_result_u16_ok for DerivedStructWithResultU16 {
+        in = DerivedStructWithResultU16 { data: Ok( 10 ) },
+        le = [0, 10, 0],
+        be = [0, 0, 10],
+        minimum_bytes = 1
+    }
+    derived_struct_with_result_u16_err for DerivedStructWithResultU16 {
+        in = DerivedStructWithResultU16 { data: Err( 10 ) },
+        le = [1, 10, 0],
+        be = [1, 0, 10],
         minimum_bytes = 1
     }
     hashmap_u16_bool for HashMap< u16, bool > {

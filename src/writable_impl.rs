@@ -375,6 +375,34 @@ impl< C: Context, T: Writable< C > > Writable< C > for Option< T > {
     }
 }
 
+impl< C: Context, T: Writable< C >, E: Writable< C > > Writable< C > for Result< T, E > {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        match *self {
+            Ok( ref value ) => {
+                writer.write_u8( 0 )?;
+                value.write_to( writer )
+            },
+            Err( ref value ) => {
+                writer.write_u8( 1 )?;
+                value.write_to( writer )
+            }
+        }
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        match *self {
+            Ok( ref value ) => {
+                Ok( 1 + Writable::< C >::bytes_needed( value )? )
+            },
+            Err( ref value ) => {
+                Ok( 1 + Writable::< C >::bytes_needed( value )? )
+            }
+        }
+    }
+}
+
 impl< C: Context > Writable< C > for () {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, _: &mut W ) -> Result< (), C::Error > {
