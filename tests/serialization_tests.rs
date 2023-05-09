@@ -503,6 +503,11 @@ struct DerivedStructWithGeneric< T > {
 }
 
 #[derive(PartialEq, Debug, Readable, Writable)]
+struct DerivedStructWithGenericDefault< T = u8 > {
+    inner: T
+}
+
+#[derive(PartialEq, Debug, Readable, Writable)]
 struct DerivedStructWithDefaultOnEof {
     a: u8,
     #[speedy(default_on_eof)]
@@ -1661,6 +1666,18 @@ symmetric_tests! {
         le = [3, 0, 0, 0, 1, 2, 3],
         be = [0, 0, 0, 3, 1, 2, 3],
         minimum_bytes = 4
+    }
+    derived_struct_with_generic_default for DerivedStructWithGenericDefault {
+        in = DerivedStructWithGenericDefault { inner: 1_u8 },
+        le = [1],
+        be = [1],
+        minimum_bytes = 1
+    }
+    derived_struct_with_generic_default_provided for DerivedStructWithGenericDefault<u16> {
+        in = DerivedStructWithGenericDefault { inner: 1_u16 },
+        le = [1, 0],
+        be = [0, 1],
+        minimum_bytes = 2
     }
     derived_recursive_struct_empty for DerivedRecursiveStruct {
         in = DerivedRecursiveStruct { inner: Vec::new() },
