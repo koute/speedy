@@ -1,6 +1,6 @@
 use std::mem;
 use std::borrow::{Cow, ToOwned};
-use std::ops::Range;
+use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::Hash;
 
@@ -351,6 +351,19 @@ impl< C: Context, T: Writable< C > > Writable< C > for Range< T > {
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
         Ok( Writable::< C >::bytes_needed( &self.start )? + Writable::< C >::bytes_needed( &self.end )? )
+    }
+}
+
+impl< C: Context, T: Writable< C > > Writable< C > for RangeInclusive< T > {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        self.start().write_to( writer )?;
+        self.end().write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( Writable::< C >::bytes_needed( self.start() )? + Writable::< C >::bytes_needed( self.end() )? )
     }
 }
 

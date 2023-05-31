@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::ops::Range;
+use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
 use std::num::NonZeroU32;
@@ -1313,6 +1313,12 @@ symmetric_tests! {
     }
     range_u16 for Range< u16 > {
         in = 10..11,
+        le = [10, 0, 11, 0],
+        be = [0, 10, 0, 11],
+        minimum_bytes = 4
+    }
+    range_inc_u16 for RangeInclusive< u16 > {
+        in = 10..=11,
         le = [10, 0, 11, 0],
         be = [0, 10, 0, 11],
         minimum_bytes = 4

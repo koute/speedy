@@ -1,6 +1,6 @@
 use std::mem;
 use std::borrow::{Cow, ToOwned};
-use std::ops::Range;
+use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash};
 
@@ -291,6 +291,20 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Range< T > {
         let start = reader.read_value()?;
         let end = reader.read_value()?;
         Ok( start..end )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <T as Readable< 'a, C >>::minimum_bytes_needed() * 2
+    }
+}
+
+impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for RangeInclusive< T > {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let start = reader.read_value()?;
+        let end = reader.read_value()?;
+        Ok( start..=end )
     }
 
     #[inline]
