@@ -77,6 +77,7 @@ Out-of-box the following types are supported:
 |            `HashSet<T>` |             `{length: u32, values: [T]}` |
 |           `BTreeSet<T>` |             `{length: u32, values: [T]}` |
 |              `Range<T>` |                                 `(T, T)` |
+|     `RangeInclusive<T>` |                                 `(T, T)` |
 |             `Option<T>` |                    `(1_u8, T)` or `0_u8` |
 |          `Result<T, E>` |               `(1_u8, T)` or `(0_u8, E)` |
 |                    `()` |                                  nothing |
