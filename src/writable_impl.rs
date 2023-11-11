@@ -727,6 +727,8 @@ impl_for_array!( 62 );
 impl_for_array!( 63 );
 impl_for_array!( 64 );
 
+impl_for_array!( 321 );
+
 impl< C, T > Writable< C > for Box< T >
     where C: Context,
           T: Writable< C >
