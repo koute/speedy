@@ -639,45 +639,24 @@ impl< C > Writable< C > for std::time::SystemTime where C: Context {
     }
 }
 
-macro_rules! impl_for_array {
-    ($count:tt) => {
-        impl< C, T > Writable< C > for [T; $count] where C: Context, T: Writable< C > {
-            #[inline]
-            fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
-                for item in self {
-                    item.write_to( writer )?;
-                }
-                Ok(())
-            }
-
-            #[inline]
-            fn bytes_needed( &self ) -> Result< usize, C::Error > {
-                let mut size = 0;
-                for item in self {
-                    size += Writable::< C >::bytes_needed( item )?;
-                }
-                Ok( size )
-            }
+impl< C, T, const N: usize > Writable< C > for [T; N] where C: Context, T: Writable< C > {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        for item in self {
+            item.write_to( writer )?;
         }
+        Ok(())
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        let mut size = 0;
+        for item in self {
+            size += Writable::< C >::bytes_needed( item )?;
+        }
+        Ok( size )
     }
 }
-
-impl_for_array!( 1 );
-impl_for_array!( 2 );
-impl_for_array!( 3 );
-impl_for_array!( 4 );
-impl_for_array!( 5 );
-impl_for_array!( 6 );
-impl_for_array!( 7 );
-impl_for_array!( 8 );
-impl_for_array!( 9 );
-impl_for_array!( 10 );
-impl_for_array!( 11 );
-impl_for_array!( 12 );
-impl_for_array!( 13 );
-impl_for_array!( 14 );
-impl_for_array!( 15 );
-impl_for_array!( 16 );
 
 impl< C, T > Writable< C > for Box< T >
     where C: Context,

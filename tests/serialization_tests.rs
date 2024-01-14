@@ -1547,6 +1547,24 @@ symmetric_tests! {
         be = [0, 0, 0, 5, 72, 101, 108, 108, 111],
         minimum_bytes = 4
     }
+    array_primitive_small for [u16; 2] {
+        in = [1, 1024],
+        le = [1, 0, 0, 4],
+        be = [0, 1, 4, 0],
+        minimum_bytes = 4
+    }
+    array_primitive_big for [u8; 32] {
+        in = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41],
+        le = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41],
+        be = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41],
+        minimum_bytes = 32
+    }
+    array_string_small for [String; 2] {
+        in = [String::from("A"), String::from("BB")],
+        le = [1, 0, 0, 0, b'A', 2, 0, 0, 0, b'B', b'B'],
+        be = [0, 0, 0, 1, b'A', 0, 0, 0, 2, b'B', b'B'],
+        minimum_bytes = 8
+    }
     derived_struct for DerivedStruct {
         in = DerivedStruct { a: 1, b: 2, c: 3 },
         le = [1, 2, 0, 3, 0, 0, 0],
@@ -2723,4 +2741,22 @@ fn test_zero_copy_cow_deserialization() {
         Cow::Owned( value ) => assert_eq!( value, &[33, 100] ),
         Cow::Borrowed( _ ) => panic!()
     }
+}
+
+#[test]
+fn test_partial_deserialization_of_arrays_calls_destructors() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new( 0 );
+
+    #[derive(Readable, Writable, PartialEq, Eq, Debug)]
+    struct WithDrop( String );
+    impl Drop for WithDrop {
+        fn drop( &mut self ) {
+            COUNTER.fetch_add( 1, Ordering::SeqCst );
+        }
+    }
+
+    <[WithDrop; 2]>::read_from_stream_unbuffered( &mut &[1, 0, 0, 0, b'A', 1, 0, 0, 0][..] ).unwrap_err();
+    assert_eq!( COUNTER.load( Ordering::SeqCst ), 1 );
 }
