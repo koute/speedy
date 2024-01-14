@@ -2395,7 +2395,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         #[inline(always)]
                         unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
                             unsafe {
-                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
+                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, std::mem::size_of_val(slice) )
                             }
                         }
                     }
@@ -2411,7 +2411,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         #[inline(always)]
                         unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
                             unsafe {
-                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
+                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, std::mem::size_of_val(slice) )
                             }
                         }
                     }
