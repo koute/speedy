@@ -9,10 +9,6 @@ use {
             write_length
         }
     },
-    indexmap::{
-        IndexMap,
-        IndexSet
-    },
     std::{
         hash::{
             BuildHasher,

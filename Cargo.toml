@@ -1,6 +1,6 @@
 [package]
 name = "speedy"
-version = "0.8.6"
+version = "0.8.7"
 authors = ["Jan Bujak <j@exia.io>"]
 repository = "https://github.com/koute/speedy"
 homepage = "https://github.com/koute/speedy"
@@ -13,14 +13,15 @@ description = "A fast binary serialization framework"
 edition = "2018"
 
 [dependencies]
-memoffset = "0.8"
-speedy-derive = { version = "= 0.8.6", path = "speedy-derive", optional = true }
+memoffset = "0.9"
+speedy-derive = { version = "= 0.8.7", path = "speedy-derive", optional = true }
 chrono = { version = "0.4", optional = true }
-glam = { version = ">= 0.15, <= 0.24", optional = true }
+glam = { version = ">= 0.15, <= 0.25", optional = true }
 smallvec = { version = "1", optional = true }
 regex = { version = "1", optional = true, default-features = false }
 uuid = {version = "1", optional = true, default-features = false }
-indexmap = { version = "1", optional = true }
+indexmap_v1 = { package = "indexmap", version = "1", optional = true }
+indexmap_v2 = { package = "indexmap", version = "2", optional = true }
 
 [dev-dependencies]
 quickcheck = "0.9"
@@ -36,6 +37,9 @@ members = [".", "speedy-derive", "static-tests"]
 [features]
 default = ["speedy-derive"]
 external_doc = []
+indexmap_v1 = ["dep:indexmap_v1"]
+indexmap_v2 = ["dep:indexmap_v2"]
+indexmap = ["indexmap_v1"]
 
 [package.metadata.docs.rs]
 features = ["external_doc"]

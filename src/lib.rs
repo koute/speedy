@@ -28,8 +28,11 @@ mod ext_smallvec;
 #[cfg(feature = "regex")]
 mod ext_regex;
 
-#[cfg(feature = "indexmap")]
-mod ext_indexmap;
+#[cfg(feature = "indexmap_v1")]
+mod ext_indexmap_v1;
+
+#[cfg(feature = "indexmap_v2")]
+mod ext_indexmap_v2;
 
 #[cfg(feature = "uuid")]
 mod ext_uuid;

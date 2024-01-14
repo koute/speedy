@@ -3,6 +3,7 @@ use std::borrow::{Cow, ToOwned};
 use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash};
+use core::mem::MaybeUninit;
 
 use crate::readable::Readable;
 use crate::reader::Reader;
@@ -545,58 +546,67 @@ impl< 'a, C > Readable< 'a, C > for std::time::SystemTime where C: Context {
     }
 }
 
-macro_rules! repeat {
-    (1, $expr:expr) => { [$expr] };
-    (2, $expr:expr) => { [$expr, $expr] };
-    (3, $expr:expr) => { [$expr, $expr, $expr] };
-    (4, $expr:expr) => { [$expr, $expr, $expr, $expr] };
-    (5, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr] };
-    (6, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr] };
-    (7, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (8, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (9, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (10, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (11, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (12, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (13, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (14, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (15, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-    (16, $expr:expr) => { [$expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr, $expr] };
-}
-
-macro_rules! impl_for_array {
-    ($count:tt) => {
-        impl< 'a, C, T > Readable< 'a, C > for [T; $count] where C: Context, T: Readable< 'a, C > {
-            #[inline(always)]
-            fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
-                let array = repeat!( $count, reader.read_value()? );
-                Ok( array )
-            }
-
-            #[inline]
-            fn minimum_bytes_needed() -> usize {
-                T::minimum_bytes_needed() * $count
+impl< 'a, C, T, const N: usize > Readable< 'a, C > for [T; N] where C: Context, T: Readable< 'a, C > {
+    #[inline(always)]
+    fn read_from< R >( reader: &mut R ) -> Result< Self, C::Error > where R: Reader< 'a, C > {
+        if T::speedy_is_primitive() {
+            let mut slice: MaybeUninit< [T; N] > = MaybeUninit::uninit();
+            unsafe {
+                reader.read_bytes_into_ptr( slice.as_mut_ptr().cast::< u8 >(), N * core::mem::size_of::< T >() )?;
+                T::speedy_convert_slice_endianness( reader.endianness(), slice.assume_init_mut() );
+                return Ok( slice.assume_init() );
             }
         }
+
+        struct State< 'a, T, const N: usize > {
+            count: usize,
+            slice: &'a mut [MaybeUninit<T>; N]
+        }
+
+        impl< 'a, T, const N: usize > State< 'a, T, N > {
+            fn new( slice: &'a mut MaybeUninit< [T; N] > ) -> Self {
+                let slice: *mut [T; N] = slice.as_mut_ptr();
+                let slice: *mut [MaybeUninit<T>; N] = slice.cast();
+                State {
+                    count: 0,
+                    slice: unsafe { &mut *slice },
+                }
+            }
+        }
+
+        impl< 'a, T, const N: usize > Drop for State< 'a, T, N > {
+            fn drop( &mut self ) {
+                if !core::mem::needs_drop::< T >() {
+                    return;
+                }
+
+                for item in &mut self.slice[ ..self.count ] {
+                    unsafe {
+                        item.assume_init_drop();
+                    }
+                }
+            }
+        }
+
+        let mut slice: MaybeUninit< [T; N] > = MaybeUninit::uninit();
+        let mut state = State::new( &mut slice );
+
+        while state.count < N {
+            state.slice[ state.count ] = MaybeUninit::new( reader.read_value()? );
+            state.count += 1;
+        }
+
+        core::mem::forget( state );
+        unsafe {
+            Ok( slice.assume_init() )
+        }
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        T::minimum_bytes_needed() * N
     }
 }
-
-impl_for_array!( 1 );
-impl_for_array!( 2 );
-impl_for_array!( 3 );
-impl_for_array!( 4 );
-impl_for_array!( 5 );
-impl_for_array!( 6 );
-impl_for_array!( 7 );
-impl_for_array!( 8 );
-impl_for_array!( 9 );
-impl_for_array!( 10 );
-impl_for_array!( 11 );
-impl_for_array!( 12 );
-impl_for_array!( 13 );
-impl_for_array!( 14 );
-impl_for_array!( 15 );
-impl_for_array!( 16 );
 
 impl< 'a, C, T > Readable< 'a, C > for Box< T >
     where C: Context,
