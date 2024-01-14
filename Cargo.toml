@@ -13,7 +13,7 @@ description = "A fast binary serialization framework"
 edition = "2018"
 
 [dependencies]
-memoffset = "0.8"
+memoffset = "0.9"
 speedy-derive = { version = "= 0.8.6", path = "speedy-derive", optional = true }
 chrono = { version = "0.4", optional = true }
 glam = { version = ">= 0.15, <= 0.25", optional = true }
