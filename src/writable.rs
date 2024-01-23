@@ -33,12 +33,12 @@ impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
 
     #[inline]
     fn context( &self ) -> &C {
-        &self.context
+        self.context
     }
 
     #[inline]
     fn context_mut( &mut self ) -> &mut C {
-        &mut self.context
+        self.context
     }
 
     #[inline(always)]

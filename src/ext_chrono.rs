@@ -20,7 +20,7 @@ impl< 'a, C > Readable< 'a, C > for DateTime< Utc >
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let seconds = reader.read_i64()?;
         let subsec_nanos = reader.read_u32()?;
-        Ok( Utc.timestamp( seconds, subsec_nanos ) )
+        Ok( Utc.timestamp_opt( seconds, subsec_nanos ).unwrap() )
     }
 
     #[inline]

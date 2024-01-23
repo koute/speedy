@@ -284,7 +284,7 @@ impl< 'a, C: Context, T: Writable< C > > Writable< C > for &'a [T] where [T]: To
 impl< 'r, C, T > Writable< C > for Cow< 'r, HashSet< T > > where C: Context, T: Writable< C > + Clone + Hash + Eq {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-        (&**self).write_to( writer )
+        (**self).write_to( writer )
     }
 
     #[inline]
@@ -296,7 +296,7 @@ impl< 'r, C, T > Writable< C > for Cow< 'r, HashSet< T > > where C: Context, T: 
 impl< 'r, C, T > Writable< C > for Cow< 'r, BTreeSet< T > > where C: Context, T: Writable< C > + Clone + Ord {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-        (&**self).write_to( writer )
+        (**self).write_to( writer )
     }
 
     #[inline]
@@ -308,7 +308,7 @@ impl< 'r, C, T > Writable< C > for Cow< 'r, BTreeSet< T > > where C: Context, T:
 impl< 'r, C, K, V > Writable< C > for Cow< 'r, HashMap< K, V > > where C: Context, K: Writable< C > + Clone + Hash + Eq, V: Writable< C > + Clone {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-        (&**self).write_to( writer )
+        (**self).write_to( writer )
     }
 
     #[inline]
@@ -320,7 +320,7 @@ impl< 'r, C, K, V > Writable< C > for Cow< 'r, HashMap< K, V > > where C: Contex
 impl< 'r, C, K, V > Writable< C > for Cow< 'r, BTreeMap< K, V > > where C: Context, K: Writable< C > + Clone + Ord, V: Writable< C > + Clone {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
-        (&**self).write_to( writer )
+        (**self).write_to( writer )
     }
 
     #[inline]
@@ -693,13 +693,13 @@ impl< C > Writable< C > for Box< str >
 {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
-        let value: &str = &**self;
+        let value: &str = self;
         value.write_to( writer )
     }
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
-        let value: &str = &**self;
+        let value: &str = self;
         Writable::< C >::bytes_needed( value )
     }
 }

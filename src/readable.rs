@@ -120,7 +120,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
     }
 
     #[inline(always)]
-    fn read_bytes_borrowed_from_reader< 'r >( &'r mut self, length: usize ) -> Option< Result< &'r [u8], C::Error > > {
+    fn read_bytes_borrowed_from_reader( &mut self, length: usize ) -> Option< Result< &[u8], C::Error > > {
         if self.can_read_at_least( length ) == Some( false ) {
             return Some( Err( error_end_of_input() ) );
         }
@@ -250,7 +250,7 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
     }
 
     #[inline(always)]
-    fn read_bytes_borrowed_from_reader< 'reader >( &'reader mut self, length: usize ) -> Option< Result< &'reader [u8], C::Error > > {
+    fn read_bytes_borrowed_from_reader( &mut self, length: usize ) -> Option< Result< &[u8], C::Error > > {
         if self.can_read_at_least( length ) == Some( false ) {
             return Some( Err( error_end_of_input() ) );
         }
@@ -271,12 +271,12 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
 
     #[inline(always)]
     fn context( &self ) -> &C {
-        &self.context
+        self.context
     }
 
     #[inline(always)]
     fn context_mut( &mut self ) -> &mut C {
-        &mut self.context
+        self.context
     }
 }
 
@@ -287,7 +287,7 @@ struct StreamReader< C: Context, S: Read > {
     is_buffering: bool
 }
 
-impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
+impl<C, S > StreamReader< C, S > where C: Context, S: Read {
     #[inline(never)]
     fn read_bytes_slow( &mut self, mut output: &mut [u8] ) -> Result< (), C::Error > {
         if self.is_buffering && output.len() < self.buffer.capacity() {
@@ -314,7 +314,7 @@ impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
             }
         }
 
-        if self.buffer.len() > 0 {
+        if !self.buffer.len() > 0 {
             let length = std::cmp::min( self.buffer.len(), output.len() );
             self.buffer.consume_into( &mut output[ ..length ] );
             output = &mut output[ length.. ];
