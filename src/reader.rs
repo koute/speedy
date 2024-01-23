@@ -147,15 +147,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< u16 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 2 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 2 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -165,15 +165,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< u16 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 2 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 2 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -183,15 +183,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< i16 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 2 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 2 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -201,15 +201,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< i16 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 2 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 2 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -219,15 +219,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< u32 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -237,15 +237,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< u32 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -255,15 +255,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< i32 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -273,15 +273,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< i32 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -291,15 +291,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< u64 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -309,15 +309,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< u64 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -327,15 +327,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< i64 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -345,15 +345,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< i64 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -363,15 +363,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< u128 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 16 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 16 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -381,15 +381,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< u128 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 16 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 16 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -399,15 +399,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< i128 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 16 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 16 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -417,15 +417,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< i128 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 16 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 16 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -435,15 +435,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< f32 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -453,15 +453,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< f32 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 4 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -471,15 +471,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< f64 > = MaybeUninit::uninit();
-        unsafe {
-            self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.read_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -489,15 +489,15 @@ pub trait Reader< 'a, C: Context >: Sized {
         }
 
         let mut value: MaybeUninit< f64 > = MaybeUninit::uninit();
-        unsafe {
-            self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )?;
-            let value = value.assume_init();
+        
+            unsafe { self.peek_bytes_into_ptr( value.as_mut_ptr() as *mut u8, 8 )? };
+            let value = unsafe { value.assume_init() };
             if self.context().endianness().conversion_necessary() {
                 Ok( value.swap_bytes() )
             } else {
                 Ok( value )
             }
-        }
+        
     }
 
     #[inline(always)]
@@ -555,8 +555,8 @@ pub trait Reader< 'a, C: Context >: Sized {
                 unsafe {
                     std::ptr::write( p, value );
                     p = p.add( 1 );
-                    count += 1;
                 }
+                count += 1;
             }
             unsafe {
                 vec.set_len( length );
