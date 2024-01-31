@@ -2,6 +2,7 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::hash::Hash;
 
 use crate::endianness::Endianness;
@@ -609,6 +610,56 @@ impl< C > Writable< C > for std::net::IpAddr where C: Context {
         match self {
             std::net::IpAddr::V4( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 ),
             std::net::IpAddr::V6( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 )
+        }
+    }
+}
+
+impl< C > Writable< C > for SocketAddrV4 where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        self.ip().write_to( writer )?;
+        writer.write_u16( self.port() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 6 )
+    }
+}
+
+impl< C > Writable< C > for SocketAddrV6 where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        self.ip().write_to( writer )?;
+        writer.write_u16( self.port() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 18 )
+    }
+}
+
+impl< C > Writable< C > for SocketAddr where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        match self {
+            SocketAddr::V4( address ) => {
+                writer.write_u8( 0 )?;
+                address.write_to( writer )
+            },
+            SocketAddr::V6( address ) => {
+                writer.write_u8( 1 )?;
+                address.write_to( writer )
+            }
+        }
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        match self {
+            SocketAddr::V4( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 ),
+            SocketAddr::V6( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 )
         }
     }
 }
