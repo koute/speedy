@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::rc::Rc;
+use std::sync::Arc;
 use std::fmt::Debug;
 use std::num::NonZeroU32;
 
@@ -1406,6 +1408,18 @@ symmetric_tests! {
         le = [0, 10, 0],
         be = [0, 0, 10],
         minimum_bytes = 1
+    }
+    rc_u16 for Rc< u16 > {
+        in = Rc::new(10),
+        le = [10, 0],
+        be = [0, 10],
+        minimum_bytes = 2
+    }
+    arc_u16 for Arc< u16 > {
+        in = Arc::new(10),
+        le = [10, 0],
+        be = [0, 10],
+        minimum_bytes = 2
     }
     hashmap_u16_bool for HashMap< u16, bool > {
         in = vec![ (10, true) ].into_iter().collect(),
