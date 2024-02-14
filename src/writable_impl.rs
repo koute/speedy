@@ -2,6 +2,8 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::rc::Rc;
+use std::sync::Arc;
 use std::hash::Hash;
 
 use crate::endianness::Endianness;
@@ -413,6 +415,30 @@ impl< C: Context, T: Writable< C >, E: Writable< C > > Writable< C > for Result<
                 Ok( 1 + Writable::< C >::bytes_needed( value )? )
             }
         }
+    }
+}
+
+impl< C: Context, T: Writable< C > > Writable< C > for Rc< T > {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        (&**self).write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Writable::< C >::bytes_needed( &**self )
+    }
+}
+
+impl< C: Context, T: Writable< C > > Writable< C > for Arc< T > {
+    #[inline]
+    fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
+        (&**self).write_to( writer )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Writable::< C >::bytes_needed( &**self )
     }
 }
 
