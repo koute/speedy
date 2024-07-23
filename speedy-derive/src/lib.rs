@@ -1875,7 +1875,7 @@ fn write_field_body( field: &Field ) -> TokenStream {
 
     let body;
     if let Some( ref write_with ) = field.write_with {
-        body = quote!( #write_with ( #name, _writer_ ) );
+        body = quote!( #write_with ( #name, _writer_ )?; );
     } else {
         body = match field.ty.inner() {
             Ty::String |
