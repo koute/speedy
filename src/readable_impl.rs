@@ -3,6 +3,7 @@ use std::borrow::{Cow, ToOwned};
 use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash};
+use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 use core::mem::MaybeUninit;
 
 use crate::readable::Readable;
@@ -516,6 +517,47 @@ impl< 'a, C > Readable< 'a, C > for std::net::IpAddr where C: Context {
     #[inline]
     fn minimum_bytes_needed() -> usize {
         5
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for SocketAddrV4 where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( SocketAddrV4::new( reader.read_value()?, reader.read_value()? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        6
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for SocketAddrV6 where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( SocketAddrV6::new( reader.read_value()?, reader.read_value()?, 0, 0 ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        18
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for SocketAddr where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let kind = reader.read_u8()?;
+        match kind {
+            0 => Ok( SocketAddr::V4( reader.read_value()? ) ),
+            1 => Ok( SocketAddr::V6( reader.read_value()? ) ),
+            _ => Err( crate::error::error_invalid_enum_variant() )
+        }
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        7
     }
 }
 
