@@ -334,7 +334,7 @@ impl CircularBuffer {
 
         self.buffer[ range_1.clone() ].copy_from_slice( &slice[ ..range_1.len() ] );
         if let Some( range_2 ) = range_2 {
-            self.buffer[ range_2.clone() ].copy_from_slice( &slice[ range_1.len().. ] );
+            self.buffer[ range_2 ].copy_from_slice( &slice[ range_1.len().. ] );
         }
 
         self.length += slice.len();
@@ -506,7 +506,7 @@ quickcheck::quickcheck! {
                 assert_eq!( buffer.len(), control_buffer.len() );
                 assert_eq!( buffer.to_vec(), control_buffer );
 
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let expected = control_buffer.remove( 0 );
                     let mut actual = [!expected];
                     buffer.consume_into( &mut actual );
