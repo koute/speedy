@@ -2,6 +2,8 @@ use std::mem;
 use std::borrow::{Cow, ToOwned};
 use std::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::rc::Rc;
+use std::sync::Arc;
 use std::hash::{BuildHasher, Hash};
 use core::mem::MaybeUninit;
 
@@ -349,6 +351,32 @@ impl< 'a, C: Context, T: Readable< 'a, C >, E: Readable< 'a, C > > Readable< 'a,
     #[inline]
     fn minimum_bytes_needed() -> usize {
         1
+    }
+}
+
+impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Rc< T > {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let value: T = reader.read_value()?;
+        Ok(Rc::new(value))
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <T as Readable< 'a, C >>::minimum_bytes_needed()
+    }
+}
+
+impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Arc< T > {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let value: T = reader.read_value()?;
+        Ok(Arc::new(value))
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        <T as Readable< 'a, C >>::minimum_bytes_needed()
     }
 }
 
