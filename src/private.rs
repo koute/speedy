@@ -1,18 +1,15 @@
 use {
     crate::{
         Context,
-        Error,
         Readable,
         Reader,
         Writable,
         Writer,
-        error::error_expected_constant,
     },
 };
 
-
 #[cfg(any(feature = "std", feature = "alloc"))]
-use crate::error::error_invalid_string_utf8;
+use crate::{Error, error::{error_expected_constant, error_invalid_string_utf8}};
 
 #[cfg(feature = "std")]
 use std::{str, borrow::Cow};

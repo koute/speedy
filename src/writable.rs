@@ -16,6 +16,8 @@ use alloc::vec::Vec;
 use crate::writer::Writer;
 use crate::context::{Context, DefaultContext};
 use crate::endianness::Endianness;
+
+#[cfg(feature = "std")]
 use crate::Error;
 
 use crate::error::{

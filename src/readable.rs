@@ -13,6 +13,8 @@ use core::marker::PhantomData;
 use crate::reader::Reader;
 use crate::context::{Context, DefaultContext};
 use crate::endianness::Endianness;
+
+#[cfg(feature = "std")]
 use crate::Error;
 
 #[cfg(feature = "std")]
