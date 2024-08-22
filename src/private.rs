@@ -6,17 +6,22 @@ use {
         Reader,
         Writable,
         Writer,
-        error::{
-            error_expected_constant,
-            error_invalid_string_utf8
-        }
+        error::error_expected_constant,
     },
-    std::{
-        borrow::{
-            Cow
-        }
-    }
 };
+
+
+#[cfg(any(feature = "std", feature = "alloc"))]
+use crate::error::error_invalid_string_utf8;
+
+#[cfg(feature = "std")]
+use std::{str, borrow::Cow};
+
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+use core::str;
+
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+use alloc::{borrow::Cow, string::String, vec::Vec};
 
 pub use crate::varint::VarInt64;
 pub use crate::error::{
@@ -35,16 +40,18 @@ pub use crate::utils::ZeroCopyable;
 
 pub use memoffset::offset_of;
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 #[inline]
 pub fn vec_to_string< E >( bytes: Vec< u8 > ) -> Result< String, E > where E: From< Error > {
     String::from_utf8( bytes ).map_err( error_invalid_string_utf8 )
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 #[inline]
 pub fn cow_bytes_to_cow_str< E >( bytes: Cow<'_, [u8] > ) -> Result< Cow<'_, str >, E > where E: From< Error > {
     match bytes {
         Cow::Borrowed( bytes ) => {
-            std::str::from_utf8( bytes )
+            str::from_utf8( bytes )
                 .map( Cow::Borrowed )
                 .map_err( error_invalid_str_utf8 )
         },
@@ -78,7 +85,7 @@ pub fn write_length_u32< C, W >( length: usize, writer: &mut W ) -> Result< (), 
     where C: Context,
           W: ?Sized + Writer< C >
 {
-    if length as u64 > std::u32::MAX as u64 {
+    if length as u64 > core::u32::MAX as u64 {
          return Err( error_out_of_range_length() );
     }
 
@@ -90,7 +97,7 @@ pub fn write_length_u16< C, W >( length: usize, writer: &mut W ) -> Result< (), 
     where C: Context,
           W: ?Sized + Writer< C >
 {
-    if length as u64 > std::u16::MAX as u64 {
+    if length as u64 > core::u16::MAX as u64 {
          return Err( error_out_of_range_length() );
     }
 
@@ -102,7 +109,7 @@ pub fn write_length_u8< C, W >( length: usize, writer: &mut W ) -> Result< (), C
     where C: Context,
           W: ?Sized + Writer< C >
 {
-    if length as u64 > std::u8::MAX as u64 {
+    if length as u64 > core::u8::MAX as u64 {
          return Err( error_out_of_range_length() );
     }
 
@@ -135,7 +142,7 @@ pub fn read_length_u64_varint< 'a, C, R >( reader: &mut R ) -> Result< usize, C:
           R: Reader< 'a, C >
 {
     let length: u64 = VarInt64::read_from( reader )?.into();
-    if length > std::usize::MAX as u64 {
+    if length > core::usize::MAX as u64 {
         return Err( error_out_of_range_length() );
     }
 
@@ -148,7 +155,7 @@ pub fn read_length_u64< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error 
           R: Reader< 'a, C >
 {
     let length = reader.read_u64()?;
-    if length > std::usize::MAX as u64 {
+    if length > core::usize::MAX as u64 {
         return Err( error_out_of_range_length() );
     }
 
@@ -232,6 +239,7 @@ pub fn are_lengths_the_same( lhs: usize, rhs: impl IntoLength ) -> bool {
     lhs == rhs.into_length()
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 pub fn read_constant< 'a, C, R >( reader: &mut R, constant: &'static [u8] ) -> Result< (), C::Error >
     where C: Context,
           R: Reader< 'a, C >

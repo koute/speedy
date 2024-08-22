@@ -1,8 +1,5 @@
 use core::mem;
-use std::borrow::{Cow, ToOwned};
 use core::ops::{Range, RangeInclusive};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::hash::Hash;
 
 use crate::endianness::Endianness;
 use crate::writable::Writable;
@@ -12,6 +9,23 @@ use crate::context::Context;
 
 use crate::private::write_length;
 
+#[cfg(feature = "std")]
+use std::{
+    borrow::{Cow, ToOwned},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    hash::Hash,
+};
+
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+use alloc::{
+    borrow::{Cow, ToOwned},
+    boxed::Box,
+    string::String,
+    vec::Vec,
+    collections::{BTreeMap, BTreeSet}
+};
+
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< C, K, V > Writable< C > for BTreeMap< K, V >
     where C: Context,
           K: Writable< C >,
@@ -36,6 +50,7 @@ impl< C, K, V > Writable< C > for BTreeMap< K, V >
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< C, T > Writable< C > for BTreeSet< T >
     where C: Context,
           T: Writable< C >
@@ -59,6 +74,7 @@ impl< C, T > Writable< C > for BTreeSet< T >
     }
 }
 
+#[cfg(feature = "std")]
 impl< C, K, V, S > Writable< C > for HashMap< K, V, S >
     where C: Context,
           K: Writable< C >,
@@ -83,6 +99,7 @@ impl< C, K, V, S > Writable< C > for HashMap< K, V, S >
     }
 }
 
+#[cfg(feature = "std")]
 impl< C, T, S > Writable< C > for HashSet< T, S >
     where C: Context,
           T: Writable< C >
@@ -129,7 +146,7 @@ macro_rules! impl_for_primitive {
             #[inline(always)]
             unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
                 unsafe {
-                    std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * mem::size_of::< Self >() )
+                    core::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * mem::size_of::< Self >() )
                 }
             }
         }
@@ -185,6 +202,7 @@ impl< C: Context > Writable< C > for char {
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< C: Context > Writable< C > for String {
     #[inline]
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
@@ -221,6 +239,7 @@ impl< 'a, C: Context > Writable< C > for &'a str {
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
     #[inline]
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
@@ -257,6 +276,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for [T] {
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where [T]: ToOwned {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -269,6 +289,7 @@ impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where 
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C: Context, T: Writable< C > > Writable< C > for &'a [T] where [T]: ToOwned {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -281,6 +302,7 @@ impl< 'a, C: Context, T: Writable< C > > Writable< C > for &'a [T] where [T]: To
     }
 }
 
+#[cfg(feature = "std")]
 impl< 'r, C, T > Writable< C > for Cow< 'r, HashSet< T > > where C: Context, T: Writable< C > + Clone + Hash + Eq {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -293,6 +315,7 @@ impl< 'r, C, T > Writable< C > for Cow< 'r, HashSet< T > > where C: Context, T: 
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'r, C, T > Writable< C > for Cow< 'r, BTreeSet< T > > where C: Context, T: Writable< C > + Clone + Ord {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -305,6 +328,7 @@ impl< 'r, C, T > Writable< C > for Cow< 'r, BTreeSet< T > > where C: Context, T:
     }
 }
 
+#[cfg(feature = "std")]
 impl< 'r, C, K, V > Writable< C > for Cow< 'r, HashMap< K, V > > where C: Context, K: Writable< C > + Clone + Hash + Eq, V: Writable< C > + Clone {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -317,6 +341,7 @@ impl< 'r, C, K, V > Writable< C > for Cow< 'r, HashMap< K, V > > where C: Contex
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'r, C, K, V > Writable< C > for Cow< 'r, BTreeMap< K, V > > where C: Context, K: Writable< C > + Clone + Ord, V: Writable< C > + Clone {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -329,6 +354,7 @@ impl< 'r, C, K, V > Writable< C > for Cow< 'r, BTreeMap< K, V > > where C: Conte
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< C: Context, T: Writable< C > > Writable< C > for Vec< T > {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -510,7 +536,7 @@ impl< 'a, C, T > Writable< C > for &'a mut T where C: Context, T: Writable< C > 
 
 macro_rules! impl_for_non_zero {
     ($type:ident, $base_type:ty) => {
-        impl< C > Writable< C > for std::num::$type where C: Context {
+        impl< C > Writable< C > for core::num::$type where C: Context {
             #[inline]
             fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
                 self.get().write_to( writer )
@@ -535,10 +561,10 @@ impl_for_non_zero!( NonZeroI64, i64 );
 
 macro_rules! impl_for_atomic {
     ($type:ident, $base_type:ty) => {
-        impl< C: Context > Writable< C > for std::sync::atomic::$type {
+        impl< C: Context > Writable< C > for core::sync::atomic::$type {
             #[inline(always)]
             fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
-                writer.write_value( &self.load( std::sync::atomic::Ordering::SeqCst ) )
+                writer.write_value( &self.load( core::sync::atomic::Ordering::SeqCst ) )
             }
 
             #[inline]
@@ -559,7 +585,7 @@ impl_for_atomic!( AtomicU16, u16 );
 impl_for_atomic!( AtomicU32, u32 );
 impl_for_atomic!( AtomicU64, u64 );
 
-impl< C > Writable< C > for std::net::Ipv4Addr where C: Context {
+impl< C > Writable< C > for core::net::Ipv4Addr where C: Context {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
         let raw: u32 = (*self).into();
@@ -572,7 +598,7 @@ impl< C > Writable< C > for std::net::Ipv4Addr where C: Context {
     }
 }
 
-impl< C > Writable< C > for std::net::Ipv6Addr where C: Context {
+impl< C > Writable< C > for core::net::Ipv6Addr where C: Context {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
         let mut octets = self.octets();
@@ -589,15 +615,15 @@ impl< C > Writable< C > for std::net::Ipv6Addr where C: Context {
     }
 }
 
-impl< C > Writable< C > for std::net::IpAddr where C: Context {
+impl< C > Writable< C > for core::net::IpAddr where C: Context {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
         match self {
-            std::net::IpAddr::V4( address ) => {
+            core::net::IpAddr::V4( address ) => {
                 writer.write_u8( 0 )?;
                 address.write_to( writer )
             },
-            std::net::IpAddr::V6( address ) => {
+            core::net::IpAddr::V6( address ) => {
                 writer.write_u8( 1 )?;
                 address.write_to( writer )
             }
@@ -607,13 +633,13 @@ impl< C > Writable< C > for std::net::IpAddr where C: Context {
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
         match self {
-            std::net::IpAddr::V4( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 ),
-            std::net::IpAddr::V6( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 )
+            core::net::IpAddr::V4( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 ),
+            core::net::IpAddr::V6( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 )
         }
     }
 }
 
-impl< C > Writable< C > for std::time::Duration where C: Context {
+impl< C > Writable< C > for core::time::Duration where C: Context {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
         writer.write_u64( self.as_secs() )?;
@@ -626,6 +652,7 @@ impl< C > Writable< C > for std::time::Duration where C: Context {
     }
 }
 
+#[cfg(feature = "std")]
 impl< C > Writable< C > for std::time::SystemTime where C: Context {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
@@ -658,6 +685,7 @@ impl< C, T, const N: usize > Writable< C > for [T; N] where C: Context, T: Writa
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< C, T > Writable< C > for Box< T >
     where C: Context,
           T: Writable< C >
@@ -673,6 +701,7 @@ impl< C, T > Writable< C > for Box< T >
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< C, T > Writable< C > for Box< [T] >
     where C: Context,
           T: Writable< C >
@@ -688,6 +717,7 @@ impl< C, T > Writable< C > for Box< [T] >
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< C > Writable< C > for Box< str >
     where C: Context
 {

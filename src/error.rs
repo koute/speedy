@@ -5,6 +5,12 @@ use {
     }
 };
 
+#[cfg(feature = "std")]
+use std::string;
+
+#[cfg(feature = "alloc")]
+use alloc::string;
+
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind
@@ -133,13 +139,14 @@ impl IsEof for Error {
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 #[cold]
-pub fn error_invalid_string_utf8< T >( _: std::string::FromUtf8Error ) -> T where T: From< Error > {
+pub fn error_invalid_string_utf8< T >( _: string::FromUtf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
 #[cold]
-pub fn error_invalid_str_utf8< T >( _: std::str::Utf8Error ) -> T where T: From< Error > {
+pub fn error_invalid_str_utf8< T >( _: core::str::Utf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 

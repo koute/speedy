@@ -18,35 +18,35 @@ pub trait Writer< C: Context > {
 
     #[inline(always)]
     fn write_u8( &mut self, value: u8 ) -> Result< (), C::Error > {
-        let slice = unsafe { std::slice::from_raw_parts( &value, 1 ) };
+        let slice = unsafe { core::slice::from_raw_parts( &value, 1 ) };
         self.write_bytes( slice )
     }
 
     #[inline(always)]
     fn write_u16( &mut self, mut value: u16 ) -> Result< (), C::Error > {
         self.context().endianness().swap_u16( &mut value );
-        let slice = unsafe { std::slice::from_raw_parts( &value as *const u16 as *const u8, 2 ) };
+        let slice = unsafe { core::slice::from_raw_parts( &value as *const u16 as *const u8, 2 ) };
         self.write_bytes( slice )
     }
 
     #[inline(always)]
     fn write_u32( &mut self, mut value: u32 ) -> Result< (), C::Error > {
         self.context().endianness().swap_u32( &mut value );
-        let slice = unsafe { std::slice::from_raw_parts( &value as *const u32 as *const u8, 4 ) };
+        let slice = unsafe { core::slice::from_raw_parts( &value as *const u32 as *const u8, 4 ) };
         self.write_bytes( slice )
     }
 
     #[inline(always)]
     fn write_u64( &mut self, mut value: u64 ) -> Result< (), C::Error > {
         self.context().endianness().swap_u64( &mut value );
-        let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 8 ) };
+        let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 8 ) };
         self.write_bytes( slice )
     }
 
     #[inline(always)]
     fn write_u128( &mut self, mut value: u128 ) -> Result< (), C::Error > {
         self.context().endianness().swap_u128( &mut value );
-        let slice = unsafe { std::slice::from_raw_parts( &value as *const u128 as *const u8, 16 ) };
+        let slice = unsafe { core::slice::from_raw_parts( &value as *const u128 as *const u8, 16 ) };
         self.write_bytes( slice )
     }
 

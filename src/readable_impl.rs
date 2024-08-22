@@ -1,8 +1,5 @@
 use core::mem;
-use std::borrow::{Cow, ToOwned};
 use core::ops::{Range, RangeInclusive};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::hash::{BuildHasher, Hash};
 use core::mem::MaybeUninit;
 
 use crate::readable::Readable;
@@ -12,6 +9,23 @@ use crate::context::Context;
 use crate::utils::SwapBytes;
 use crate::endianness::Endianness;
 
+#[cfg(feature = "std")]
+use std::{
+    borrow::{Cow, ToOwned},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    hash::{BuildHasher, Hash},
+};
+
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+use alloc::{
+    borrow::{Cow, ToOwned},
+    boxed::Box,
+    string::String,
+    vec::Vec,
+    collections::{BTreeMap, BTreeSet}
+};
+
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
     where C: Context,
           K: Readable< 'a, C > + Ord,
@@ -29,6 +43,7 @@ impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C, T > Readable< 'a, C > for BTreeSet< T >
     where C: Context,
           T: Readable< 'a, C > + Ord
@@ -45,6 +60,7 @@ impl< 'a, C, T > Readable< 'a, C > for BTreeSet< T >
     }
 }
 
+#[cfg(feature = "std")]
 impl< 'a, C, K, V, S > Readable< 'a, C > for HashMap< K, V, S >
     where C: Context,
           K: Readable< 'a, C > + Eq + Hash,
@@ -63,6 +79,7 @@ impl< 'a, C, K, V, S > Readable< 'a, C > for HashMap< K, V, S >
     }
 }
 
+#[cfg(feature = "std")]
 impl< 'a, C, T, S > Readable< 'a, C > for HashSet< T, S >
     where C: Context,
           T: Readable< 'a, C > + Eq + Hash,
@@ -101,7 +118,7 @@ impl< 'a, C: Context > Readable< 'a, C > for char {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = reader.read_u32()?;
-        std::char::from_u32( value ).ok_or_else( crate::error::error_out_of_range_char )
+        core::char::from_u32( value ).ok_or_else( crate::error::error_out_of_range_char )
     }
 
     #[inline]
@@ -133,7 +150,7 @@ macro_rules! impl_for_primitive {
             #[inline]
             unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
                 unsafe {
-                    std::slice::from_raw_parts( slice.as_ptr() as *const $type, slice.len() / mem::size_of::< Self >() )
+                    core::slice::from_raw_parts( slice.as_ptr() as *const $type, slice.len() / mem::size_of::< Self >() )
                 }
             }
 
@@ -141,7 +158,7 @@ macro_rules! impl_for_primitive {
             #[inline(always)]
             unsafe fn speedy_flip_endianness( itself: *mut Self ) {
                 unsafe {
-                    std::ptr::write_unaligned( itself, std::ptr::read_unaligned( itself ).swap_bytes() );
+                    core::ptr::write_unaligned( itself, core::ptr::read_unaligned( itself ).swap_bytes() );
                 }
             }
 
@@ -171,7 +188,7 @@ impl< 'a, C: Context > Readable< 'a, C > for usize {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = u64::read_from( reader )?;
-        if value > std::usize::MAX as u64 {
+        if value > core::usize::MAX as u64 {
             return Err( crate::error::error_too_big_usize_for_this_architecture() );
         }
         Ok( value as usize )
@@ -183,6 +200,7 @@ impl< 'a, C: Context > Readable< 'a, C > for usize {
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C: Context > Readable< 'a, C > for String {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -197,6 +215,7 @@ impl< 'a, C: Context > Readable< 'a, C > for String {
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -212,6 +231,7 @@ impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -225,6 +245,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] > where [T]: ToOwned< Owned = Vec< T > > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -238,6 +259,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] 
     }
 }
 
+#[cfg(feature = "std")]
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, HashSet< T > > where T: Readable< 'a, C > + Clone + Hash + Eq {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -250,6 +272,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, Hash
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, BTreeSet< T > > where T: Readable< 'a, C > + Clone + Ord {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -262,6 +285,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, BTre
     }
 }
 
+#[cfg(feature = "std")]
 impl< 'a, C: Context, K: Readable< 'a, C >, V: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, HashMap< K, V > > where K: Readable< 'a, C > + Clone + Hash + Eq, V: Readable< 'a, C > + Clone {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -274,6 +298,7 @@ impl< 'a, C: Context, K: Readable< 'a, C >, V: Readable< 'a, C > > Readable< 'a,
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C: Context, K: Readable< 'a, C >, V: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, BTreeMap< K, V > > where K: Readable< 'a, C > + Clone + Ord, V: Readable< 'a, C > + Clone {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -420,11 +445,11 @@ impl< 'a, C: Context > Readable< 'a, C > for Endianness {
 
 macro_rules! impl_for_non_zero {
     ($type:ident, $base_type:ty) => {
-        impl< 'a, C: Context > Readable< 'a, C > for std::num::$type {
+        impl< 'a, C: Context > Readable< 'a, C > for core::num::$type {
             #[inline]
             fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
                 let value: $base_type = reader.read_value()?;
-                std::num::$type::new( value ).ok_or_else( crate::error::error_zero_non_zero )
+                core::num::$type::new( value ).ok_or_else( crate::error::error_zero_non_zero )
             }
 
             #[inline]
@@ -446,7 +471,7 @@ impl_for_non_zero!( NonZeroI64, i64 );
 
 macro_rules! impl_for_atomic {
     ($type:ident, $base_type:ty) => {
-        impl< 'a, C: Context > Readable< 'a, C > for std::sync::atomic::$type {
+        impl< 'a, C: Context > Readable< 'a, C > for core::sync::atomic::$type {
             #[inline(always)]
             fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
                 let value: $base_type = reader.read_value()?;
@@ -471,7 +496,7 @@ impl_for_atomic!( AtomicU16, u16 );
 impl_for_atomic!( AtomicU32, u32 );
 impl_for_atomic!( AtomicU64, u64 );
 
-impl< 'a, C > Readable< 'a, C > for std::net::Ipv4Addr where C: Context {
+impl< 'a, C > Readable< 'a, C > for core::net::Ipv4Addr where C: Context {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = reader.read_u32()?;
@@ -484,7 +509,7 @@ impl< 'a, C > Readable< 'a, C > for std::net::Ipv4Addr where C: Context {
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for std::net::Ipv6Addr where C: Context {
+impl< 'a, C > Readable< 'a, C > for core::net::Ipv6Addr where C: Context {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let mut octets = [0; 16];
@@ -502,13 +527,13 @@ impl< 'a, C > Readable< 'a, C > for std::net::Ipv6Addr where C: Context {
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for std::net::IpAddr where C: Context {
+impl< 'a, C > Readable< 'a, C > for core::net::IpAddr where C: Context {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let kind = reader.read_u8()?;
         match kind {
-            0 => Ok( std::net::IpAddr::V4( reader.read_value()? ) ),
-            1 => Ok( std::net::IpAddr::V6( reader.read_value()? ) ),
+            0 => Ok( core::net::IpAddr::V4( reader.read_value()? ) ),
+            1 => Ok( core::net::IpAddr::V6( reader.read_value()? ) ),
             _ => Err( crate::error::error_invalid_enum_variant() )
         }
     }
@@ -519,12 +544,12 @@ impl< 'a, C > Readable< 'a, C > for std::net::IpAddr where C: Context {
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for std::time::Duration where C: Context {
+impl< 'a, C > Readable< 'a, C > for core::time::Duration where C: Context {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let secs = reader.read_u64()?;
         let nanos = reader.read_u32()?;
-        Ok( std::time::Duration::new( secs, nanos ) )
+        Ok( core::time::Duration::new( secs, nanos ) )
     }
 
     #[inline]
@@ -533,6 +558,7 @@ impl< 'a, C > Readable< 'a, C > for std::time::Duration where C: Context {
     }
 }
 
+#[cfg(feature = "std")]
 impl< 'a, C > Readable< 'a, C > for std::time::SystemTime where C: Context {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -608,6 +634,7 @@ impl< 'a, C, T, const N: usize > Readable< 'a, C > for [T; N] where C: Context, 
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C, T > Readable< 'a, C > for Box< T >
     where C: Context,
           T: Readable< 'a, C >
@@ -623,6 +650,7 @@ impl< 'a, C, T > Readable< 'a, C > for Box< T >
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C, T > Readable< 'a, C > for Box< [T] >
     where C: Context,
           T: Readable< 'a, C >
@@ -639,6 +667,7 @@ impl< 'a, C, T > Readable< 'a, C > for Box< [T] >
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl< 'a, C > Readable< 'a, C > for Box< str >
     where C: Context
 {

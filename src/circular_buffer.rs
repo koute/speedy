@@ -353,7 +353,7 @@ impl CircularBuffer {
 
     #[inline(always)]
     pub fn consume_into( &mut self, buffer: &mut [u8] ) {
-        let length = std::cmp::min( self.length, buffer.len() );
+        let length = core::cmp::min( self.length, buffer.len() );
         if self.position + length < self.buffer.len() {
             buffer[ ..length ].copy_from_slice( &self.buffer[ self.position..self.position + length ] );
             self.position += length;

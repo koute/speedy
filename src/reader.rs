@@ -1,5 +1,4 @@
 use core::mem::{self, MaybeUninit};
-use std::borrow::Cow;
 use core::iter::FromIterator;
 
 use crate::endianness::Endianness;
@@ -11,8 +10,19 @@ use crate::error::error_end_of_input;
 use crate::error::IsEof;
 use crate::utils::SwapBytes;
 
+
+#[cfg(feature = "std")]
+use std::borrow::{Cow, ToOwned};
+
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::String,
+    vec::Vec,
+};
+
 struct RawCopyIter< T > {
-    pointer: std::ptr::NonNull< T >,
+    pointer: core::ptr::NonNull< T >,
     end: *const T
 }
 
@@ -25,8 +35,8 @@ impl< T > Iterator for RawCopyIter< T > {
         } else {
             unsafe {
                 let old = self.pointer.as_ptr();
-                self.pointer = std::ptr::NonNull::new_unchecked( old.add( 1 ) );
-                Some( std::ptr::read_unaligned( old ) )
+                self.pointer = core::ptr::NonNull::new_unchecked( old.add( 1 ) );
+                Some( core::ptr::read_unaligned( old ) )
             }
         }
     }
@@ -42,10 +52,10 @@ impl< T > ExactSizeIterator for RawCopyIter< T > {
     #[inline(always)]
     fn len(&self) -> usize {
         let bytesize = self.end as usize - self.pointer.as_ptr() as usize;
-        bytesize / std::mem::size_of::< T >()
+        bytesize / core::mem::size_of::< T >()
     }
 }
-impl< T > std::iter::FusedIterator for RawCopyIter< T > {}
+impl< T > core::iter::FusedIterator for RawCopyIter< T > {}
 
 pub trait Reader< 'a, C: Context >: Sized {
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error >;
@@ -56,14 +66,14 @@ pub trait Reader< 'a, C: Context >: Sized {
     #[inline(always)]
     unsafe fn read_bytes_into_ptr( &mut self, output: *mut u8, length: usize ) -> Result< (), C::Error > {
         unsafe {
-            self.read_bytes( std::slice::from_raw_parts_mut( output, length ) )
+            self.read_bytes( core::slice::from_raw_parts_mut( output, length ) )
         }
     }
 
     #[inline(always)]
     unsafe fn peek_bytes_into_ptr( &mut self, output: *mut u8, length: usize ) -> Result< (), C::Error > {
         unsafe {
-            self.peek_bytes( std::slice::from_raw_parts_mut( output, length ) )
+            self.peek_bytes( core::slice::from_raw_parts_mut( output, length ) )
         }
     }
 
@@ -510,6 +520,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         self.context().endianness()
     }
 
+    #[cfg(any(feature = "std", feature = "alloc"))]
     #[inline]
     fn read_vec< T >( &mut self, length: usize ) -> Result< Vec< T >, C::Error >
         where T: Readable< 'a, C >
@@ -522,7 +533,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         let mut vec = Vec::with_capacity( length );
         if T::speedy_is_primitive() {
             unsafe {
-                self.read_bytes_into_ptr( vec.as_mut_ptr() as *mut u8, vec.capacity() * std::mem::size_of::< T >() )?;
+                self.read_bytes_into_ptr( vec.as_mut_ptr() as *mut u8, vec.capacity() * core::mem::size_of::< T >() )?;
                 vec.set_len( length );
             }
 
@@ -535,7 +546,7 @@ pub trait Reader< 'a, C: Context >: Sized {
                     vec.set_len( length );
                 }
 
-                std::mem::drop( vec );
+                core::mem::drop( vec );
             }
 
             let mut p = vec.as_mut_ptr();
@@ -553,7 +564,7 @@ pub trait Reader< 'a, C: Context >: Sized {
                     }
                 };
                 unsafe {
-                    std::ptr::write( p, value );
+                    core::ptr::write( p, value );
                     p = p.add( 1 );
                     count += 1;
                 }
@@ -566,6 +577,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         Ok( vec )
     }
 
+    #[cfg(any(feature = "std", feature = "alloc"))]
     #[inline]
     fn read_vec_until_eof< T >( &mut self ) -> Result< Vec< T >, C::Error >
         where T: Readable< 'a, C >
@@ -584,6 +596,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         Ok( vec )
     }
 
+    #[cfg(any(feature = "std", feature = "alloc"))]
     #[inline]
     fn read_cow< T >( &mut self, length: usize ) -> Result< Cow< 'a, [T] >, C::Error >
         where T: Readable< 'a, C >,
@@ -600,7 +613,7 @@ pub trait Reader< 'a, C: Context >: Sized {
                 } else {
                     let mut vec: Vec< T > = Vec::with_capacity( length );
                     unsafe {
-                        std::ptr::copy_nonoverlapping( bytes.as_ptr(), vec.as_mut_ptr() as *mut u8, bytes.len() );
+                        core::ptr::copy_nonoverlapping( bytes.as_ptr(), vec.as_mut_ptr() as *mut u8, bytes.len() );
                         vec.set_len( length );
                     }
                     return Ok( Cow::Owned( vec ) );
@@ -611,6 +624,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         Ok( Cow::Owned( self.read_vec( length )? ) )
     }
 
+    #[cfg(any(feature = "std", feature = "alloc"))]
     #[inline]
     fn read_cow_until_eof< T >( &mut self ) -> Result< Cow< 'a, [T] >, C::Error >
         where T: Readable< 'a, C >,
@@ -620,6 +634,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         Ok( Cow::Owned( self.read_vec_until_eof()? ) )
     }
 
+    #[cfg(any(feature = "std", feature = "alloc"))]
     #[inline]
     fn read_string( &mut self, length: usize ) -> Result< String, C::Error > {
         let bytes = self.read_vec( length )?;
@@ -632,7 +647,7 @@ pub trait Reader< 'a, C: Context >: Sized {
               T: Readable< 'a, C >
     {
         if T::speedy_is_primitive() && (mem::size_of::< T >() == 1 || !self.endianness().conversion_necessary()) {
-            let bytesize = length.checked_mul( std::mem::size_of::< T >() ).ok_or_else( || {
+            let bytesize = length.checked_mul( core::mem::size_of::< T >() ).ok_or_else( || {
                 crate::error::error_too_big_usize_for_this_architecture() // TODO: Use different error maybe?
             })?;
 
@@ -640,7 +655,7 @@ pub trait Reader< 'a, C: Context >: Sized {
                 let bytes = bytes?;
                 unsafe {
                     let pointer = bytes.as_ptr().cast::< T >();
-                    return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut T ), end: pointer.add( length ) }.collect() );
+                    return Ok( RawCopyIter { pointer: core::ptr::NonNull::new_unchecked( pointer as *mut T ), end: pointer.add( length ) }.collect() );
                 }
             }
         }
@@ -658,7 +673,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         struct Pair< K, V >( K, V );
 
         if K::speedy_is_primitive() && V::speedy_is_primitive() && ((mem::size_of::< K >() == 1 && mem::size_of::< V >() == 1) || !self.endianness().conversion_necessary()) {
-            let bytesize = length.checked_mul( std::mem::size_of::< Pair< K, V > >() ).ok_or_else( || {
+            let bytesize = length.checked_mul( core::mem::size_of::< Pair< K, V > >() ).ok_or_else( || {
                 crate::error::error_too_big_usize_for_this_architecture()
             })?;
 
@@ -666,7 +681,7 @@ pub trait Reader< 'a, C: Context >: Sized {
                 let bytes = bytes?;
                 unsafe {
                     let pointer = bytes.as_ptr().cast::< Pair< K, V > >();
-                    return Ok( RawCopyIter { pointer: std::ptr::NonNull::new_unchecked( pointer as *mut Pair< K, V > ), end: pointer.add( length ) }.map( |pair| (pair.0, pair.1) ).collect() );
+                    return Ok( RawCopyIter { pointer: core::ptr::NonNull::new_unchecked( pointer as *mut Pair< K, V > ), end: pointer.add( length ) }.map( |pair| (pair.0, pair.1) ).collect() );
                 }
             }
         }
@@ -679,7 +694,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         where U: FromIterator< T >,
               T: Readable< 'a, C >
     {
-        std::iter::from_fn( move || {
+        core::iter::from_fn( move || {
             match self.read_value::< T >() {
                 Ok( value ) => Some( Ok( value ) ),
                 Err( error ) if error.is_eof() => None,

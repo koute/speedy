@@ -1,3 +1,4 @@
+#[cfg(feature = "std")]
 use std::io::{
     self,
     Write
@@ -8,6 +9,9 @@ use std::fs::File;
 
 #[cfg(feature = "std")]
 use std::path::Path;
+
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
+use alloc::vec::Vec;
 
 use crate::writer::Writer;
 use crate::context::{Context, DefaultContext};
@@ -50,11 +54,14 @@ impl< 'a, C: Context > Writer< C > for BufferCollector< 'a, C > {
     }
 }
 
+
+#[cfg(feature = "std")]
 struct WritingCollector< C: Context, T: Write > {
     context: C,
     writer: T
 }
 
+#[cfg(feature = "std")]
 impl< C: Context, T: Write > Writer< C > for WritingCollector< C, T > {
     #[inline]
     fn write_bytes( &mut self, slice: &[u8] ) -> Result< (), C::Error > {
@@ -140,10 +147,12 @@ pub trait Writable< C: Context > {
         self.write_to_buffer_with_ctx( Default::default(), buffer )
     }
 
+    #[cfg(any(feature = "std", feature = "alloc"))]
     fn write_to_vec( &self ) -> Result< Vec< u8 >, C::Error > where Self: DefaultContext< Context = C >, C: Default {
         self.write_to_vec_with_ctx( Default::default() )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn write_to_stream< S: Write >( &self, stream: S ) -> Result< (), C::Error > where Self: DefaultContext< Context = C >, C: Default {
         self.write_to_stream_with_ctx( Default::default(), stream )
@@ -175,11 +184,13 @@ pub trait Writable< C: Context > {
         Ok(())
     }
 
+    #[cfg(any(feature = "std", feature = "alloc"))]
     #[inline]
     fn write_to_vec_with_ctx( &self, mut context: C ) -> Result< Vec< u8 >, C::Error > {
         self.write_to_vec_with_ctx_mut( &mut context )
     }
 
+    #[cfg(any(feature = "std", feature = "alloc"))]
     #[inline]
     fn write_to_vec_with_ctx_mut( &self, context: &mut C ) -> Result< Vec< u8 >, C::Error > {
         let capacity = self.bytes_needed()?;
@@ -205,6 +216,7 @@ pub trait Writable< C: Context > {
         Ok( vec )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn write_to_stream_with_ctx< S: Write >( &self, context: C, stream: S ) -> Result< (), C::Error > {
         let mut writer = WritingCollector {
