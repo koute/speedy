@@ -1,5 +1,5 @@
 use {
-    std::{
+    core::{
         ops::{
             Range
         }

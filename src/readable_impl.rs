@@ -1,6 +1,6 @@
-use std::mem;
+use core::mem;
 use std::borrow::{Cow, ToOwned};
-use std::ops::{Range, RangeInclusive};
+use core::ops::{Range, RangeInclusive};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash};
 use core::mem::MaybeUninit;

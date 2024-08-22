@@ -3,7 +3,10 @@ use std::io::{
     Write
 };
 
+#[cfg(feature = "std")]
 use std::fs::File;
+
+#[cfg(feature = "std")]
 use std::path::Path;
 
 use crate::writer::Writer;
@@ -146,6 +149,7 @@ pub trait Writable< C: Context > {
         self.write_to_stream_with_ctx( Default::default(), stream )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn write_to_file( &self, path: impl AsRef< Path > ) -> Result< (), C::Error > where Self: DefaultContext< Context = C >, C: Default {
         self.write_to_file_with_ctx( Default::default(), path )
@@ -211,6 +215,7 @@ pub trait Writable< C: Context > {
         self.write_to( &mut writer )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn write_to_file_with_ctx( &self, context: C, path: impl AsRef< Path > ) -> Result< (), C::Error > {
         let stream = File::create( path ).map_err( |error| {

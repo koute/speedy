@@ -2,7 +2,10 @@ use std::io::{
     Read
 };
 
+#[cfg(feature = "std")]
 use std::fs::File;
+
+#[cfg(feature = "std")]
 use std::path::Path;
 use std::marker::PhantomData;
 
@@ -58,7 +61,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
             return Err( error_end_of_input() );
         }
 
-        unsafe { 
+        unsafe {
             std::ptr::copy_nonoverlapping( self.ptr, output, length );
             self.ptr = self.ptr.add( length );
         }
@@ -470,6 +473,7 @@ pub trait Readable< 'a, C: Context >: Sized {
         Self::read_from_stream_buffered_with_ctx( Default::default(), stream )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn read_from_file( path: impl AsRef< Path > ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
         Self::read_from_file_with_ctx( Default::default(), path )
@@ -528,6 +532,7 @@ pub trait Readable< 'a, C: Context >: Sized {
         StreamReader::deserialize( context, stream, true )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn read_from_file_with_ctx( context: C, path: impl AsRef< Path > ) -> Result< Self, C::Error > {
         let stream = File::open( path ).map_err( |error| {

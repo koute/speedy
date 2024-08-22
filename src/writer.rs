@@ -1,4 +1,4 @@
-use std::mem;
+use core::mem;
 
 use crate::context::Context;
 use crate::endianness::Endianness;
@@ -81,7 +81,7 @@ pub trait Writer< C: Context > {
     }
 
     #[inline(always)]
-    fn write_f64( &mut self, value: f64 ) -> Result< (), C::Error > {        
+    fn write_f64( &mut self, value: f64 ) -> Result< (), C::Error > {
         self.write_u64( value.to_bits() )
     }
 

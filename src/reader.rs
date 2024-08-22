@@ -1,6 +1,6 @@
-use std::mem::{self, MaybeUninit};
+use core::mem::{self, MaybeUninit};
 use std::borrow::Cow;
-use std::iter::FromIterator;
+use core::iter::FromIterator;
 
 use crate::endianness::Endianness;
 use crate::readable::Readable;
