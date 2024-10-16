@@ -553,7 +553,7 @@ pub trait Reader< 'a, C: Context >: Sized {
             let e = unsafe { p.add( length ) };
 
             // We deliberately have a separate counter instead
-            // of substracting pointers as this optimizes better.
+            // of subtracting pointers as this optimizes better.
             let mut count = 0;
             while p < e {
                 let value = match self.read_value() {
