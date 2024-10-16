@@ -16,7 +16,7 @@ edition = "2018"
 memoffset = "0.9"
 speedy-derive = { version = "= 0.8.7", path = "speedy-derive", optional = true }
 chrono = { version = "0.4", optional = true }
-glam = { version = ">= 0.15, <= 0.28", optional = true }
+glam = { version = ">= 0.15, <= 0.29", optional = true }
 smallvec = { version = "1", optional = true }
 regex = { version = "1", optional = true, default-features = false }
 uuid = {version = "1", optional = true, default-features = false }
