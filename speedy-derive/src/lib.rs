@@ -963,6 +963,7 @@ impl< T > Opt< T > {
     }
 }
 
+#[allow(dead_code)]
 enum Ty {
     String,
     Vec( syn::Type ),
