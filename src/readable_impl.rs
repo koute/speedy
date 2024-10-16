@@ -11,12 +11,11 @@ use crate::endianness::Endianness;
 
 #[cfg(feature = "std")]
 use std::{
-    borrow::{Cow, ToOwned},
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     hash::{BuildHasher, Hash},
 };
 
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
+#[cfg(feature = "alloc")]
 use alloc::{
     borrow::{Cow, ToOwned},
     boxed::Box,
@@ -25,7 +24,7 @@ use alloc::{
     collections::{BTreeMap, BTreeSet}
 };
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
     where C: Context,
           K: Readable< 'a, C > + Ord,
@@ -43,7 +42,7 @@ impl< 'a, C, K, V > Readable< 'a, C > for BTreeMap< K, V >
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C, T > Readable< 'a, C > for BTreeSet< T >
     where C: Context,
           T: Readable< 'a, C > + Ord
@@ -200,7 +199,7 @@ impl< 'a, C: Context > Readable< 'a, C > for usize {
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C: Context > Readable< 'a, C > for String {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -215,7 +214,7 @@ impl< 'a, C: Context > Readable< 'a, C > for String {
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -231,7 +230,7 @@ impl< 'a, C: Context > Readable< 'a, C > for Cow< 'a, str > {
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -245,7 +244,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Vec< T > {
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, [T] > where [T]: ToOwned< Owned = Vec< T > > {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -272,7 +271,7 @@ impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, Hash
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C: Context, T: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, BTreeSet< T > > where T: Readable< 'a, C > + Clone + Ord {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -298,7 +297,7 @@ impl< 'a, C: Context, K: Readable< 'a, C >, V: Readable< 'a, C > > Readable< 'a,
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C: Context, K: Readable< 'a, C >, V: Readable< 'a, C > > Readable< 'a, C > for Cow< 'a, BTreeMap< K, V > > where K: Readable< 'a, C > + Clone + Ord, V: Readable< 'a, C > + Clone {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
@@ -648,7 +647,7 @@ impl< 'a, C, T, const N: usize > Readable< 'a, C > for [T; N] where C: Context, 
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C, T > Readable< 'a, C > for Box< T >
     where C: Context,
           T: Readable< 'a, C >
@@ -664,7 +663,7 @@ impl< 'a, C, T > Readable< 'a, C > for Box< T >
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C, T > Readable< 'a, C > for Box< [T] >
     where C: Context,
           T: Readable< 'a, C >
@@ -681,7 +680,7 @@ impl< 'a, C, T > Readable< 'a, C > for Box< [T] >
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C > Readable< 'a, C > for Box< str >
     where C: Context
 {

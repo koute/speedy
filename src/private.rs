@@ -8,16 +8,10 @@ use {
     },
 };
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 use crate::{Error, error::{error_expected_constant, error_invalid_string_utf8}};
 
-#[cfg(feature = "std")]
-use std::{str, borrow::Cow};
-
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-use core::str;
-
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
+#[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, string::String, vec::Vec};
 
 pub use crate::varint::VarInt64;
@@ -37,18 +31,18 @@ pub use crate::utils::ZeroCopyable;
 
 pub use memoffset::offset_of;
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 #[inline]
 pub fn vec_to_string< E >( bytes: Vec< u8 > ) -> Result< String, E > where E: From< Error > {
     String::from_utf8( bytes ).map_err( error_invalid_string_utf8 )
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 #[inline]
 pub fn cow_bytes_to_cow_str< E >( bytes: Cow<'_, [u8] > ) -> Result< Cow<'_, str >, E > where E: From< Error > {
     match bytes {
         Cow::Borrowed( bytes ) => {
-            str::from_utf8( bytes )
+            core::str::from_utf8( bytes )
                 .map( Cow::Borrowed )
                 .map_err( error_invalid_str_utf8 )
         },
@@ -236,7 +230,7 @@ pub fn are_lengths_the_same( lhs: usize, rhs: impl IntoLength ) -> bool {
     lhs == rhs.into_length()
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 pub fn read_constant< 'a, C, R >( reader: &mut R, constant: &'static [u8] ) -> Result< (), C::Error >
     where C: Context,
           R: Reader< 'a, C >

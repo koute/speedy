@@ -10,7 +10,7 @@ use std::fs::File;
 #[cfg(feature = "std")]
 use std::path::Path;
 
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 use crate::writer::Writer;
@@ -149,7 +149,7 @@ pub trait Writable< C: Context > {
         self.write_to_buffer_with_ctx( Default::default(), buffer )
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn write_to_vec( &self ) -> Result< Vec< u8 >, C::Error > where Self: DefaultContext< Context = C >, C: Default {
         self.write_to_vec_with_ctx( Default::default() )
     }
@@ -186,13 +186,13 @@ pub trait Writable< C: Context > {
         Ok(())
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn write_to_vec_with_ctx( &self, mut context: C ) -> Result< Vec< u8 >, C::Error > {
         self.write_to_vec_with_ctx_mut( &mut context )
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn write_to_vec_with_ctx_mut( &self, context: &mut C ) -> Result< Vec< u8 >, C::Error > {
         let capacity = self.bytes_needed()?;

@@ -2,8 +2,9 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(all(not(test), not(feature = "std")), no_std)]
 
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-extern crate alloc;
+#[doc(hidden)]
+#[cfg(feature = "alloc")]
+pub extern crate alloc;
 
 mod error;
 #[macro_use]

@@ -1522,11 +1522,11 @@ fn read_field_body( field: &Field ) -> TokenStream {
         if let Some( ref read_length_body ) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
-                _reader_.read_collection( _length_ ).map( std::borrow::Cow::Owned )
+                _reader_.read_collection( _length_ ).map( speedy::alloc::borrow::Cow::Owned )
             }}
         } else {
             quote! {{
-                _reader_.read_collection_until_eof().map( std::borrow::Cow::Owned )
+                _reader_.read_collection_until_eof().map( speedy::alloc::borrow::Cow::Owned )
             }}
         }
     };
@@ -1535,11 +1535,11 @@ fn read_field_body( field: &Field ) -> TokenStream {
         if let Some( ref read_length_body ) = read_length_body {
             quote! {{
                 let _length_ = #read_length_body;
-                _reader_.read_key_value_collection( _length_ ).map( std::borrow::Cow::Owned )
+                _reader_.read_key_value_collection( _length_ ).map( speedy::alloc::borrow::Cow::Owned )
             }}
         } else {
             quote! {{
-                _reader_.read_collection_until_eof().map( std::borrow::Cow::Owned )
+                _reader_.read_collection_until_eof().map( speedy::alloc::borrow::Cow::Owned )
             }}
         }
     };

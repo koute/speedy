@@ -10,11 +10,7 @@ use crate::error::error_end_of_input;
 use crate::error::IsEof;
 use crate::utils::SwapBytes;
 
-
-#[cfg(feature = "std")]
-use std::borrow::{Cow, ToOwned};
-
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
+#[cfg(feature = "alloc")]
 use alloc::{
     borrow::{Cow, ToOwned},
     string::String,
@@ -520,7 +516,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         self.context().endianness()
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn read_vec< T >( &mut self, length: usize ) -> Result< Vec< T >, C::Error >
         where T: Readable< 'a, C >
@@ -577,7 +573,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         Ok( vec )
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn read_vec_until_eof< T >( &mut self ) -> Result< Vec< T >, C::Error >
         where T: Readable< 'a, C >
@@ -596,7 +592,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         Ok( vec )
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn read_cow< T >( &mut self, length: usize ) -> Result< Cow< 'a, [T] >, C::Error >
         where T: Readable< 'a, C >,
@@ -624,7 +620,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         Ok( Cow::Owned( self.read_vec( length )? ) )
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn read_cow_until_eof< T >( &mut self ) -> Result< Cow< 'a, [T] >, C::Error >
         where T: Readable< 'a, C >,
@@ -634,7 +630,7 @@ pub trait Reader< 'a, C: Context >: Sized {
         Ok( Cow::Owned( self.read_vec_until_eof()? ) )
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn read_string( &mut self, length: usize ) -> Result< String, C::Error > {
         let bytes = self.read_vec( length )?;

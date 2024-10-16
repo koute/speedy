@@ -1,9 +1,3 @@
-#[cfg(feature = "std")]
-use std::{fmt, io, string};
-
-#[cfg(feature = "alloc")]
-use alloc::{fmt, string};
-
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind
@@ -40,7 +34,7 @@ pub enum ErrorKind {
     EndiannessMismatch,
 
     #[cfg(feature = "std")]
-    IoError( io::Error )
+    IoError( std::io::Error )
 }
 
 impl Error {
@@ -50,17 +44,17 @@ impl Error {
     }
 
     #[cfg(feature = "std")]
-    pub fn custom( message: impl fmt::Display ) -> Self {
+    pub fn custom( message: impl core::fmt::Display ) -> Self {
         // The LLVM optimizer doesn't like us adding a new variant,
         // so instead we reuse the `IoError` one.
         Error {
-            kind: ErrorKind::IoError( io::Error::new( io::ErrorKind::Other, message.to_string() ) )
+            kind: ErrorKind::IoError( std::io::Error::new( std::io::ErrorKind::Other, message.to_string() ) )
         }
     }
 
     #[cfg(feature = "std")]
     #[inline]
-    pub(crate) fn from_io_error( error: io::Error ) -> Self {
+    pub(crate) fn from_io_error( error: std::io::Error ) -> Self {
         Error {
             kind: ErrorKind::IoError( error )
         }
@@ -68,7 +62,7 @@ impl Error {
 }
 
 #[cfg(feature = "std")]
-impl From< Error > for io::Error {
+impl From< Error > for std::io::Error {
     fn from( error: Error ) -> Self {
         if let ErrorKind::IoError( error ) = error.kind {
             return error;
@@ -76,12 +70,12 @@ impl From< Error > for io::Error {
 
         let is_eof = error.is_eof();
         let kind = if is_eof {
-            io::ErrorKind::UnexpectedEof
+            std::io::ErrorKind::UnexpectedEof
         } else {
-            io::ErrorKind::InvalidData
+            std::io::ErrorKind::InvalidData
         };
 
-        io::Error::new( kind, format!( "{}", error ) )
+        std::io::Error::new( kind, format!( "{}", error ) )
     }
 }
 
@@ -90,9 +84,9 @@ pub fn get_error_kind( error: &Error ) -> &ErrorKind {
     &error.kind
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
-impl fmt::Display for Error {
-    fn fmt( &self, fmt: &mut fmt::Formatter<'_> ) -> fmt::Result {
+#[cfg(feature = "alloc")]
+impl core::fmt::Display for Error {
+    fn fmt( &self, fmt: &mut core::fmt::Formatter<'_> ) -> core::fmt::Result {
         match self.kind {
             ErrorKind::InvalidChar => write!( fmt, "out of range char" ),
             ErrorKind::InvalidEnumVariant => write!( fmt, "invalid enum variant" ),
@@ -144,9 +138,9 @@ impl IsEof for Error {
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 #[cold]
-pub fn error_invalid_string_utf8< T >( _: string::FromUtf8Error ) -> T where T: From< Error > {
+pub fn error_invalid_string_utf8< T >( _: alloc::string::FromUtf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
@@ -211,7 +205,7 @@ pub fn error_invalid_system_time< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidSystemTime ) )
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 #[cold]
 pub fn error_expected_constant< T >( constant: &'static [u8] ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::ExpectedConstant { constant } ) )

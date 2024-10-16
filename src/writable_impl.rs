@@ -11,12 +11,11 @@ use crate::private::write_length;
 
 #[cfg(feature = "std")]
 use std::{
-    borrow::{Cow, ToOwned},
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     hash::Hash,
 };
 
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
+#[cfg(feature = "alloc")]
 use alloc::{
     borrow::{Cow, ToOwned},
     boxed::Box,
@@ -25,7 +24,7 @@ use alloc::{
     collections::{BTreeMap, BTreeSet}
 };
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< C, K, V > Writable< C > for BTreeMap< K, V >
     where C: Context,
           K: Writable< C >,
@@ -50,7 +49,7 @@ impl< C, K, V > Writable< C > for BTreeMap< K, V >
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< C, T > Writable< C > for BTreeSet< T >
     where C: Context,
           T: Writable< C >
@@ -202,7 +201,7 @@ impl< C: Context > Writable< C > for char {
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< C: Context > Writable< C > for String {
     #[inline]
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
@@ -239,7 +238,7 @@ impl< 'a, C: Context > Writable< C > for &'a str {
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'r, C: Context > Writable< C > for Cow< 'r, str > {
     #[inline]
     fn write_to< T: ?Sized + Writer< C > >( &self, writer: &mut T ) -> Result< (), C::Error > {
@@ -276,7 +275,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for [T] {
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where [T]: ToOwned {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -289,7 +288,7 @@ impl< 'r, C: Context, T: Writable< C > > Writable< C > for Cow< 'r, [T] > where 
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'a, C: Context, T: Writable< C > > Writable< C > for &'a [T] where [T]: ToOwned {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -315,7 +314,7 @@ impl< 'r, C, T > Writable< C > for Cow< 'r, HashSet< T > > where C: Context, T: 
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'r, C, T > Writable< C > for Cow< 'r, BTreeSet< T > > where C: Context, T: Writable< C > + Clone + Ord {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -341,7 +340,7 @@ impl< 'r, C, K, V > Writable< C > for Cow< 'r, HashMap< K, V > > where C: Contex
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< 'r, C, K, V > Writable< C > for Cow< 'r, BTreeMap< K, V > > where C: Context, K: Writable< C > + Clone + Ord, V: Writable< C > + Clone {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -354,7 +353,7 @@ impl< 'r, C, K, V > Writable< C > for Cow< 'r, BTreeMap< K, V > > where C: Conte
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< C: Context, T: Writable< C > > Writable< C > for Vec< T > {
     #[inline]
     fn write_to< W: ?Sized + Writer< C > >( &self, writer: &mut W ) -> Result< (), C::Error > {
@@ -699,7 +698,7 @@ impl< C, T, const N: usize > Writable< C > for [T; N] where C: Context, T: Writa
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< C, T > Writable< C > for Box< T >
     where C: Context,
           T: Writable< C >
@@ -715,7 +714,7 @@ impl< C, T > Writable< C > for Box< T >
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< C, T > Writable< C > for Box< [T] >
     where C: Context,
           T: Writable< C >
@@ -731,7 +730,7 @@ impl< C, T > Writable< C > for Box< [T] >
     }
 }
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 impl< C > Writable< C > for Box< str >
     where C: Context
 {

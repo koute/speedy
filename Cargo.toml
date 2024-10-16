@@ -40,7 +40,7 @@ external_doc = []
 indexmap_v1 = ["dep:indexmap_v1"]
 indexmap_v2 = ["dep:indexmap_v2"]
 indexmap = ["indexmap_v1"]
-std = []
+std = ["alloc"]
 alloc = []
 
 [package.metadata.docs.rs]
