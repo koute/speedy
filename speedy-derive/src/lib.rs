@@ -1402,7 +1402,7 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
     quote! {
         match #body {
             Ok( value ) => value,
-            Err( ref error ) if speedy::IsEof::is_eof( error ) => std::default::Default::default(),
+            Err( ref error ) if speedy::IsEof::is_eof( error ) => core::default::Default::default(),
             Err( error ) => return Err( error )
         }
     }
@@ -1411,7 +1411,7 @@ fn default_on_eof_body( body: TokenStream ) -> TokenStream {
 fn read_field_body( field: &Field ) -> TokenStream {
     if field.skip {
         return quote! {
-            std::default::Default::default()
+            core::default::Default::default()
         };
     }
 
@@ -1562,7 +1562,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
             quote! {{
                 let _length_ = #read_length_body;
                 match _reader_.read_bytes_borrowed( _length_ ) {
-                    Some( Ok( bytes ) ) => std::str::from_utf8( bytes ).map_err( speedy::private::error_invalid_str_utf8 ),
+                    Some( Ok( bytes ) ) => core::str::from_utf8( bytes ).map_err( speedy::private::error_invalid_str_utf8 ),
                     Some( Err( error ) ) => Err( error ),
                     None => Err( speedy::private::error_unsized() )
                 }
@@ -1570,7 +1570,7 @@ fn read_field_body( field: &Field ) -> TokenStream {
         } else {
             quote! {{
                 match _reader_.read_bytes_borrowed_until_eof() {
-                    Some( bytes ) => std::str::from_utf8( bytes ).map_err( speedy::private::error_invalid_str_utf8 ),
+                    Some( bytes ) => core::str::from_utf8( bytes ).map_err( speedy::private::error_invalid_str_utf8 ),
                     None => Err( speedy::private::error_unsized() )
                 }
             }}
@@ -1582,27 +1582,27 @@ fn read_field_body( field: &Field ) -> TokenStream {
         if let Some( ref read_length_body ) = read_length_body {
             inner = quote! {{
                 let _length_ = #read_length_body;
-                _length_.checked_mul( std::mem::size_of::< #inner_ty >() )
+                _length_.checked_mul( core::mem::size_of::< #inner_ty >() )
                     .ok_or_else( speedy::private::error_out_of_range_length )
                     .and_then( |bytelength| {
                         _reader_.read_bytes_borrowed( bytelength )
                             .ok_or_else( speedy::private::error_unsized )
                             .and_then( |error| error )
                     })
-                    .map( |slice| unsafe { std::slice::from_raw_parts( slice.as_ptr() as *const #inner_ty, _length_ ) } )
+                    .map( |slice| unsafe { core::slice::from_raw_parts( slice.as_ptr() as *const #inner_ty, _length_ ) } )
             }}
         } else {
             inner = quote! {{
                 _reader_.read_bytes_borrowed_until_eof()
                     .ok_or_else( speedy::private::error_unsized )
                     .map( |slice| unsafe {
-                        std::slice::from_raw_parts( slice.as_ptr() as *const #inner_ty, slice.len() / std::mem::size_of::< #inner_ty >() )
+                        core::slice::from_raw_parts( slice.as_ptr() as *const #inner_ty, slice.len() / core::mem::size_of::< #inner_ty >() )
                     })
             }}
         }
 
         quote! {{
-            if std::mem::size_of::< #inner_ty >() != 1 && _reader_.endianness().conversion_necessary() {
+            if core::mem::size_of::< #inner_ty >() != 1 && _reader_.endianness().conversion_necessary() {
                 Err( speedy::private::error_endianness_mismatch() )
             } else {
                 #inner
@@ -1872,11 +1872,11 @@ impl< 'a > Enum< 'a > {
         let tag_type = attrs.tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE );
         let max = match tag_type {
             BasicType::U7 => 0b01111111 as u64,
-            BasicType::U8 => std::u8::MAX as u64,
-            BasicType::U16 => std::u16::MAX as u64,
-            BasicType::U32 => std::u32::MAX as u64,
-            BasicType::U64 => std::u64::MAX,
-            BasicType::VarInt64 => std::u64::MAX
+            BasicType::U8 => core::u8::MAX as u64,
+            BasicType::U16 => core::u16::MAX as u64,
+            BasicType::U32 => core::u32::MAX as u64,
+            BasicType::U64 => core::u64::MAX,
+            BasicType::VarInt64 => core::u64::MAX
         };
 
         let mut previous_tag = None;
@@ -2056,7 +2056,7 @@ fn min< I >( values: I ) -> TokenStream where I: IntoIterator< Item = TokenStrea
     } else {
         quote! {{
             let mut out = 0;
-            #(out = std::cmp::min( out, #iter );)*
+            #(out = core::cmp::min( out, #iter );)*
             out
         }}
     }
@@ -2088,7 +2088,7 @@ fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool
         }
 
         fields_size.push( quote! {
-            std::mem::size_of::< #ty >()
+            core::mem::size_of::< #ty >()
         });
 
         let name = field.name();
@@ -2098,7 +2098,7 @@ fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool
     }
 
     is_primitive.push( quote! {
-        && (#(#fields_size)*) == std::mem::size_of::< Self >()
+        && (#(#fields_size)*) == core::mem::size_of::< Self >()
     });
 
     if check_order {
@@ -2183,13 +2183,13 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     #[inline]
                     unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
                         let slice = <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_slice_from_bytes( slice );
-                        std::slice::from_raw_parts( slice.as_ptr() as *const Self, slice.len() )
+                        core::slice::from_raw_parts( slice.as_ptr() as *const Self, slice.len() )
                     }
 
                     #[inline(always)]
                     fn speedy_convert_slice_endianness( endianness: speedy::Endianness, slice: &mut [Self] ) {
                         unsafe {
-                            let slice = std::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut #field_ty, slice.len() );
+                            let slice = core::slice::from_raw_parts_mut( slice.as_mut_ptr() as *mut #field_ty, slice.len() );
                             <#field_ty as speedy::Readable< 'a_, C_ >>::speedy_convert_slice_endianness( endianness, slice )
                         }
                     }
@@ -2204,7 +2204,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     body_flip_endianness.push( quote! {
                         unsafe {
                             <#ty as speedy::Readable< 'a_, C_ >>::speedy_flip_endianness(
-                                std::ptr::addr_of_mut!( (*itself).#name )
+                                core::ptr::addr_of_mut!( (*itself).#name )
                             );
                         }
                     });
@@ -2219,7 +2219,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                     #[inline]
                     unsafe fn speedy_slice_from_bytes( slice: &[u8] ) -> &[Self] {
                         unsafe {
-                            std::slice::from_raw_parts( slice.as_ptr() as *const Self, slice.len() / std::mem::size_of::< Self >() )
+                            core::slice::from_raw_parts( slice.as_ptr() as *const Self, slice.len() / core::mem::size_of::< Self >() )
                         }
                     }
 
@@ -2316,7 +2316,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                 if !enumeration.peek_tag {
                     quote! { (#minimum_bytes_needed_body) + #tag_size }
                 } else {
-                    quote! { std::cmp::max( #minimum_bytes_needed_body, #tag_size ) }
+                    quote! { core::cmp::max( #minimum_bytes_needed_body, #tag_size ) }
                 };
 
             (reader_body, minimum_bytes_needed_body, quote! {}, quote! {})
@@ -2331,7 +2331,7 @@ fn impl_readable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let output = quote! {
         impl< 'a_, #impl_params C_: speedy::Context > speedy::Readable< 'a_, C_ > for #name #ty_params #where_clause {
             #[inline]
-            fn read_from< R_: speedy::Reader< 'a_, C_ > >( _reader_: &mut R_ ) -> std::result::Result< Self, C_::Error > {
+            fn read_from< R_: speedy::Reader< 'a_, C_ > >( _reader_: &mut R_ ) -> core::result::Result< Self, C_::Error > {
                 #reader_body
             }
 
@@ -2395,7 +2395,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         #[inline(always)]
                         unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
                             unsafe {
-                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
+                                core::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * core::mem::size_of::< Self >() )
                             }
                         }
                     }
@@ -2411,7 +2411,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
                         #[inline(always)]
                         unsafe fn speedy_slice_as_bytes( slice: &[Self] ) -> &[u8] where Self: Sized {
                             unsafe {
-                                std::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * std::mem::size_of::< Self >() )
+                                core::slice::from_raw_parts( slice.as_ptr() as *const u8, slice.len() * core::mem::size_of::< Self >() )
                             }
                         }
                     }
@@ -2473,7 +2473,7 @@ fn impl_writable( input: syn::DeriveInput ) -> Result< TokenStream, syn::Error >
     let output = quote! {
         impl< #impl_params C_: speedy::Context > speedy::Writable< C_ > for #name #ty_params #where_clause {
             #[inline]
-            fn write_to< T_: ?Sized + speedy::Writer< C_ > >( &self, _writer_: &mut T_ ) -> std::result::Result< (), C_::Error > {
+            fn write_to< T_: ?Sized + speedy::Writer< C_ > >( &self, _writer_: &mut T_ ) -> core::result::Result< (), C_::Error > {
                 #writer_body
                 Ok(())
             }
