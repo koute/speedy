@@ -486,14 +486,28 @@ macro_rules! impl_for_atomic {
     }
 }
 
+#[cfg(target_has_atomic = "8")]
 impl_for_atomic!( AtomicI8, i8 );
+
+#[cfg(target_has_atomic = "16")]
 impl_for_atomic!( AtomicI16, i16 );
+
+#[cfg(target_has_atomic = "32")]
 impl_for_atomic!( AtomicI32, i32 );
+
+#[cfg(target_has_atomic = "64")]
 impl_for_atomic!( AtomicI64, i64 );
 
+#[cfg(target_has_atomic = "8")]
 impl_for_atomic!( AtomicU8, u8 );
+
+#[cfg(target_has_atomic = "16")]
 impl_for_atomic!( AtomicU16, u16 );
+
+#[cfg(target_has_atomic = "32")]
 impl_for_atomic!( AtomicU32, u32 );
+
+#[cfg(target_has_atomic = "64")]
 impl_for_atomic!( AtomicU64, u64 );
 
 impl< 'a, C > Readable< 'a, C > for core::net::Ipv4Addr where C: Context {
