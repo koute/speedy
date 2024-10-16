@@ -12,7 +12,7 @@ macro_rules! unsafe_is_length {
             // It actually *does* affect optimization in practice
             // allowing LLVM to assume the length won't overflow
             // in certain cases.
-            unsafe { std::hint::unreachable_unchecked() }
+            unsafe { core::hint::unreachable_unchecked() }
         }
     }
 }

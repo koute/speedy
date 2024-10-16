@@ -1,15 +1,23 @@
+#[cfg(feature = "std")]
 use std::io::{
     Read
 };
 
+#[cfg(feature = "std")]
 use std::fs::File;
+
+#[cfg(feature = "std")]
 use std::path::Path;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 use crate::reader::Reader;
 use crate::context::{Context, DefaultContext};
 use crate::endianness::Endianness;
+
+#[cfg(feature = "std")]
 use crate::Error;
+
+#[cfg(feature = "std")]
 use crate::circular_buffer::CircularBuffer;
 
 use crate::error::{
@@ -45,7 +53,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
         }
 
         unsafe {
-            std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
+            core::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
             self.ptr = self.ptr.add( length );
         }
 
@@ -58,8 +66,8 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
             return Err( error_end_of_input() );
         }
 
-        unsafe { 
-            std::ptr::copy_nonoverlapping( self.ptr, output, length );
+        unsafe {
+            core::ptr::copy_nonoverlapping( self.ptr, output, length );
             self.ptr = self.ptr.add( length );
         }
 
@@ -74,7 +82,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
         }
 
         unsafe {
-            std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
+            core::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
         }
 
         Ok(())
@@ -87,7 +95,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
         }
 
         unsafe {
-            std::ptr::copy_nonoverlapping( self.ptr, output, length );
+            core::ptr::copy_nonoverlapping( self.ptr, output, length );
         }
         Ok(())
     }
@@ -112,7 +120,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
 
         let slice;
         unsafe {
-            slice = std::slice::from_raw_parts( self.ptr, length );
+            slice = core::slice::from_raw_parts( self.ptr, length );
             self.ptr = self.ptr.add( length );
         }
 
@@ -127,7 +135,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
 
         let slice;
         unsafe {
-            slice = std::slice::from_raw_parts( self.ptr, length );
+            slice = core::slice::from_raw_parts( self.ptr, length );
             self.ptr = self.ptr.add( length );
         }
 
@@ -139,7 +147,7 @@ impl< 'a, C: Context > Reader< 'a, C > for BufferReader< 'a, C > {
         let length = self.end as usize - self.ptr as usize;
         let slice;
         unsafe {
-            slice = std::slice::from_raw_parts( self.ptr, length );
+            slice = core::slice::from_raw_parts( self.ptr, length );
             self.ptr = self.ptr.add( length );
         }
 
@@ -190,7 +198,7 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
         }
 
         unsafe {
-            std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
+            core::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
             self.ptr = self.ptr.add( length );
         }
 
@@ -204,7 +212,7 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
         }
 
         unsafe {
-            std::ptr::copy_nonoverlapping( self.ptr, output, length );
+            core::ptr::copy_nonoverlapping( self.ptr, output, length );
             self.ptr = self.ptr.add( length );
         }
 
@@ -219,7 +227,7 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
         }
 
         unsafe {
-            std::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
+            core::ptr::copy_nonoverlapping( self.ptr, output.as_mut_ptr(), length );
         }
 
         Ok(())
@@ -232,7 +240,7 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
         }
 
         unsafe {
-            std::ptr::copy_nonoverlapping( self.ptr, output, length );
+            core::ptr::copy_nonoverlapping( self.ptr, output, length );
         }
         Ok(())
     }
@@ -257,7 +265,7 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
 
         let slice;
         unsafe {
-            slice = std::slice::from_raw_parts( self.ptr, length );
+            slice = core::slice::from_raw_parts( self.ptr, length );
             self.ptr = self.ptr.add( length );
         }
 
@@ -280,6 +288,7 @@ impl< 'ctx, 'r, 'a, C: Context > Reader< 'r, C > for CopyingBufferReader< 'ctx, 
     }
 }
 
+#[cfg(feature = "std")]
 struct StreamReader< C: Context, S: Read > {
     context: C,
     reader: S,
@@ -287,6 +296,7 @@ struct StreamReader< C: Context, S: Read > {
     is_buffering: bool
 }
 
+#[cfg(feature = "std")]
 impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
     #[inline(never)]
     fn read_bytes_slow( &mut self, mut output: &mut [u8] ) -> Result< (), C::Error > {
@@ -315,7 +325,7 @@ impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
         }
 
         if self.buffer.len() > 0 {
-            let length = std::cmp::min( self.buffer.len(), output.len() );
+            let length = core::cmp::min( self.buffer.len(), output.len() );
             self.buffer.consume_into( &mut output[ ..length ] );
             output = &mut output[ length.. ];
         }
@@ -331,6 +341,7 @@ impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
     }
 }
 
+#[cfg(feature = "std")]
 impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
     #[inline(always)]
     fn read_bytes( &mut self, output: &mut [u8] ) -> Result< (), C::Error > {
@@ -348,7 +359,7 @@ impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
             while self.buffer.len() < output.len() {
                 let mut chunk_size = output.len() - self.buffer.len();
                 if self.is_buffering {
-                    chunk_size = std::cmp::max( chunk_size, self.buffer.capacity() - self.buffer.len() );
+                    chunk_size = core::cmp::max( chunk_size, self.buffer.capacity() - self.buffer.len() );
                 }
 
                 let bytes_written = self.buffer.try_append_with( chunk_size, |chunk| {
@@ -385,6 +396,7 @@ impl< 'a, C: Context, S: Read > Reader< 'a, C > for StreamReader< C, S > {
     }
 }
 
+#[cfg(feature = "std")]
 impl< C: Context, S: Read > StreamReader< C, S > {
     #[inline]
     fn deserialize< 'a, T: Readable< 'a, C > >( context: C, reader: S, is_buffering: bool ) -> Result< T, C::Error > {
@@ -452,6 +464,7 @@ pub trait Readable< 'a, C: Context >: Sized {
     ///
     /// Use [`read_from_stream_buffered`](Readable::read_from_stream_buffered) if you need
     /// to read from a stream and you don't care about not overreading.
+    #[cfg(feature = "std")]
     #[inline]
     fn read_from_stream_unbuffered( stream: impl Read ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
         Self::read_from_stream_unbuffered_with_ctx( Default::default(), stream )
@@ -465,11 +478,13 @@ pub trait Readable< 'a, C: Context >: Sized {
     ///
     /// Use the slower [`read_from_stream_unbuffered`](Readable::read_from_stream_unbuffered) if you want
     /// to avoid overreading.
+    #[cfg(feature = "std")]
     #[inline]
     fn read_from_stream_buffered( stream: impl Read ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
         Self::read_from_stream_buffered_with_ctx( Default::default(), stream )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn read_from_file( path: impl AsRef< Path > ) -> Result< Self, C::Error > where Self: DefaultContext< Context = C >, C: Default {
         Self::read_from_file_with_ctx( Default::default(), path )
@@ -518,16 +533,19 @@ pub trait Readable< 'a, C: Context >: Sized {
         (value, bytes_read)
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn read_from_stream_unbuffered_with_ctx< S: Read >( context: C, stream: S ) -> Result< Self, C::Error > {
         StreamReader::deserialize( context, stream, false )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn read_from_stream_buffered_with_ctx< S: Read >( context: C, stream: S ) -> Result< Self, C::Error > {
         StreamReader::deserialize( context, stream, true )
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn read_from_file_with_ctx( context: C, path: impl AsRef< Path > ) -> Result< Self, C::Error > {
         let stream = File::open( path ).map_err( |error| {

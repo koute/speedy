@@ -35,11 +35,13 @@ panic = "abort"
 members = [".", "speedy-derive", "static-tests"]
 
 [features]
-default = ["speedy-derive"]
+default = ["speedy-derive", "std"]
 external_doc = []
 indexmap_v1 = ["dep:indexmap_v1"]
 indexmap_v2 = ["dep:indexmap_v2"]
 indexmap = ["indexmap_v1"]
+std = []
+alloc = []
 
 [package.metadata.docs.rs]
 features = ["external_doc"]

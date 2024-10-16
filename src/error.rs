@@ -1,9 +1,8 @@
-use {
-    std::{
-        fmt,
-        io
-    }
-};
+#[cfg(feature = "std")]
+use std::{fmt, io, string};
+
+#[cfg(feature = "alloc")]
+use alloc::{fmt, string};
 
 #[derive(Debug)]
 pub struct Error {
@@ -39,6 +38,8 @@ pub enum ErrorKind {
 
     Unsized,
     EndiannessMismatch,
+
+    #[cfg(feature = "std")]
     IoError( io::Error )
 }
 
@@ -48,6 +49,7 @@ impl Error {
         Error { kind }
     }
 
+    #[cfg(feature = "std")]
     pub fn custom( message: impl fmt::Display ) -> Self {
         // The LLVM optimizer doesn't like us adding a new variant,
         // so instead we reuse the `IoError` one.
@@ -56,6 +58,7 @@ impl Error {
         }
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     pub(crate) fn from_io_error( error: io::Error ) -> Self {
         Error {
@@ -64,6 +67,7 @@ impl Error {
     }
 }
 
+#[cfg(feature = "std")]
 impl From< Error > for io::Error {
     fn from( error: Error ) -> Self {
         if let ErrorKind::IoError( error ) = error.kind {
@@ -86,6 +90,7 @@ pub fn get_error_kind( error: &Error ) -> &ErrorKind {
     &error.kind
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 impl fmt::Display for Error {
     fn fmt( &self, fmt: &mut fmt::Formatter<'_> ) -> fmt::Result {
         match self.kind {
@@ -104,11 +109,14 @@ impl fmt::Display for Error {
             ErrorKind::ExpectedConstant { constant } => write!( fmt, "expected a predefined {} bytes(s) long constant", constant.len() ),
             ErrorKind::Unsized => write!( fmt, "type is unsized hence requires zero-copy deserialization; use `read_from_buffer` or similar to deserialize it" ),
             ErrorKind::EndiannessMismatch => write!( fmt, "endianness mismatch" ),
-            ErrorKind::IoError( ref error ) => write!( fmt, "{}", error )
+
+            #[cfg(feature = "std")]
+            ErrorKind::IoError( ref error ) => write!( fmt, "{}", error ),
         }
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for Error {
     fn source( &self ) -> Option< &(dyn std::error::Error + 'static) > {
         match self.kind {
@@ -127,19 +135,23 @@ impl IsEof for Error {
         match self.kind {
             ErrorKind::UnexpectedEndOfInput |
             ErrorKind::UnexpectedEndOfOutputBuffer => true,
+
+            #[cfg(feature = "std")]
             ErrorKind::IoError( ref error ) => error.kind() == std::io::ErrorKind::UnexpectedEof,
+
             _ => false
         }
     }
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 #[cold]
-pub fn error_invalid_string_utf8< T >( _: std::string::FromUtf8Error ) -> T where T: From< Error > {
+pub fn error_invalid_string_utf8< T >( _: string::FromUtf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
 #[cold]
-pub fn error_invalid_str_utf8< T >( _: std::str::Utf8Error ) -> T where T: From< Error > {
+pub fn error_invalid_str_utf8< T >( _: core::str::Utf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
@@ -193,11 +205,13 @@ pub fn error_zero_non_zero< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::ZeroNonZero ) )
 }
 
+#[cfg(feature = "std")]
 #[cold]
 pub fn error_invalid_system_time< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidSystemTime ) )
 }
 
+#[cfg(any(feature = "std", feature = "alloc"))]
 #[cold]
 pub fn error_expected_constant< T >( constant: &'static [u8] ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::ExpectedConstant { constant } ) )
