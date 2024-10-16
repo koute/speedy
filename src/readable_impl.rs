@@ -187,7 +187,7 @@ impl< 'a, C: Context > Readable< 'a, C > for usize {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let value = u64::read_from( reader )?;
-        if value > core::usize::MAX as u64 {
+        if value > usize::MAX as u64 {
             return Err( crate::error::error_too_big_usize_for_this_architecture() );
         }
         Ok( value as usize )

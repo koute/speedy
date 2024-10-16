@@ -76,7 +76,7 @@ pub fn write_length_u32< C, W >( length: usize, writer: &mut W ) -> Result< (), 
     where C: Context,
           W: ?Sized + Writer< C >
 {
-    if length as u64 > core::u32::MAX as u64 {
+    if length as u64 > u32::MAX as u64 {
          return Err( error_out_of_range_length() );
     }
 
@@ -88,7 +88,7 @@ pub fn write_length_u16< C, W >( length: usize, writer: &mut W ) -> Result< (), 
     where C: Context,
           W: ?Sized + Writer< C >
 {
-    if length as u64 > core::u16::MAX as u64 {
+    if length as u64 > u16::MAX as u64 {
          return Err( error_out_of_range_length() );
     }
 
@@ -100,7 +100,7 @@ pub fn write_length_u8< C, W >( length: usize, writer: &mut W ) -> Result< (), C
     where C: Context,
           W: ?Sized + Writer< C >
 {
-    if length as u64 > core::u8::MAX as u64 {
+    if length as u64 > u8::MAX as u64 {
          return Err( error_out_of_range_length() );
     }
 
@@ -133,7 +133,7 @@ pub fn read_length_u64_varint< 'a, C, R >( reader: &mut R ) -> Result< usize, C:
           R: Reader< 'a, C >
 {
     let length: u64 = VarInt64::read_from( reader )?.into();
-    if length > core::usize::MAX as u64 {
+    if length > usize::MAX as u64 {
         return Err( error_out_of_range_length() );
     }
 
@@ -146,7 +146,7 @@ pub fn read_length_u64< 'a, C, R >( reader: &mut R ) -> Result< usize, C::Error 
           R: Reader< 'a, C >
 {
     let length = reader.read_u64()?;
-    if length > core::usize::MAX as u64 {
+    if length > usize::MAX as u64 {
         return Err( error_out_of_range_length() );
     }
 

@@ -1,7 +1,6 @@
 #![recursion_limit="128"]
 
 use std::collections::HashMap;
-use std::u32;
 
 extern crate proc_macro;
 extern crate proc_macro2;
@@ -1863,11 +1862,11 @@ impl< 'a > Enum< 'a > {
         let tag_type = attrs.tag_type.unwrap_or( DEFAULT_ENUM_TAG_TYPE );
         let max = match tag_type {
             BasicType::U7 => 0b01111111 as u64,
-            BasicType::U8 => core::u8::MAX as u64,
-            BasicType::U16 => core::u16::MAX as u64,
-            BasicType::U32 => core::u32::MAX as u64,
-            BasicType::U64 => core::u64::MAX,
-            BasicType::VarInt64 => core::u64::MAX
+            BasicType::U8 => u8::MAX as u64,
+            BasicType::U16 => u16::MAX as u64,
+            BasicType::U32 => u32::MAX as u64,
+            BasicType::U64 => u64::MAX,
+            BasicType::VarInt64 => u64::MAX
         };
 
         let mut previous_tag = None;
