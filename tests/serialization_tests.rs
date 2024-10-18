@@ -2315,6 +2315,13 @@ symmetric_tests! {
         be = [0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 222],
         minimum_bytes = 12
     }
+
+    chrono_duration for chrono::Duration {
+        in = chrono::Duration::new(321, 169).unwrap(),
+        le = [65, 1, 0, 0, 0, 0, 0, 0, 169, 0, 0, 0],
+        be = [0, 0, 0, 0, 0, 0, 1, 65, 0, 0, 0, 169],
+        minimum_bytes = 12
+    }
 }
 
 #[cfg(feature = "smallvec")]
