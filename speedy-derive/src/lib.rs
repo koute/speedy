@@ -52,6 +52,9 @@ mod kw {
     syn::custom_keyword!( varint );
     syn::custom_keyword!( unsafe_is_primitive );
     syn::custom_keyword!( always );
+    syn::custom_keyword!( read_with );
+    syn::custom_keyword!( write_with );
+    syn::custom_keyword!( with );
 
     syn::custom_keyword!( u7 );
     syn::custom_keyword!( u8 );
@@ -746,7 +749,9 @@ struct Field< 'a > {
     ty: Opt< Ty >,
     skip: bool,
     varint: bool,
-    constant_prefix: Option< syn::LitByteStr >
+    constant_prefix: Option< syn::LitByteStr >,
+    read_with: Option< syn::Path >,
+    write_with: Option< syn::Path >
 }
 
 impl< 'a > Field< 'a > {
@@ -756,7 +761,9 @@ impl< 'a > Field< 'a > {
         self.length_type.is_none() &&
         self.skip == false &&
         self.varint == false &&
-        self.constant_prefix.is_none()
+        self.constant_prefix.is_none() &&
+        self.read_with.is_none() &&
+        self.write_with.is_none()
     }
 
     fn is_simple( &self ) -> bool {
@@ -848,6 +855,18 @@ enum FieldAttribute {
     },
     VarInt {
         key_span: Span
+    },
+    ReadWith {
+        key_span: Span,
+        fn_path: syn::Path
+    },
+    WriteWith {
+        key_span: Span,
+        fn_path: syn::Path
+    },
+    With {
+        key_span: Span,
+        base_path: syn::Path // #[speedy(read_with = "$base_path::read", write_with = "$base_path::write")]
     }
 }
 
@@ -941,7 +960,31 @@ impl syn::parse::Parse for FieldAttribute {
             FieldAttribute::VarInt {
                 key_span: key_token.span()
             }
-        } else {
+        } else if lookahead.peek( kw::read_with ) {
+            let key_token = input.parse::< kw::read_with >()?;
+            let _: Token![=] = input.parse()?;
+            let fn_path: syn::Path = input.parse()?;
+            FieldAttribute::ReadWith {
+                key_span: key_token.span(),
+                fn_path
+            }
+        } else if lookahead.peek( kw::write_with ) {
+            let key_token = input.parse::< kw::write_with >()?;
+            let _: Token![=] = input.parse()?;
+            let fn_path: syn::Path = input.parse()?;
+            FieldAttribute::WriteWith {
+                key_span: key_token.span(),
+                fn_path
+            }
+        } else if lookahead.peek( kw::with ) {
+            let key_token = input.parse::< kw::with >()?;
+            let _: Token![=] = input.parse()?;
+            let base_path: syn::Path = input.parse()?;
+            FieldAttribute::With {
+                key_span: key_token.span(),
+                base_path
+            }
+        }else {
             return Err( lookahead.error() )
         };
 
@@ -1197,6 +1240,9 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
             let mut skip = false;
             let mut varint = false;
             let mut constant_prefix = None;
+            let mut read_with = None;
+            let mut write_with = None;
+            let mut used_with = false;
             for attr in parse_attributes::< FieldAttribute >( &field.attrs )? {
                 match attr {
                     FieldAttribute::DefaultOnEof { key_span } => {
@@ -1244,6 +1290,47 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                         }
 
                         varint = true;
+                    },
+                    FieldAttribute::ReadWith { key_span, fn_path } => {
+                        if read_with.is_some() {
+                            let message = if used_with {
+                                "Cannot combine 'read_with' with 'with'"
+                            } else {
+                                "Duplicate 'read_with'"
+                            };
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+
+                        read_with = Some( fn_path );
+                    },
+                    FieldAttribute::WriteWith { key_span, fn_path } => {
+                        if write_with.is_some() {
+                            let message = if used_with {
+                                "Cannot combine 'write_with' with 'with'"
+                            } else {
+                                "Duplicate 'write_with'"
+                            };
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+                        write_with = Some( fn_path );
+                    },
+                    FieldAttribute::With { key_span, base_path } => {
+                        if used_with {
+                            let message = "Duplicate 'with'";
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+                        if read_with.is_some() {
+                            let message = "Cannot combine 'read_with' with 'with'";
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+                        if write_with.is_some() {
+                            let message = "Cannot combine 'write_with' with 'with'";
+                            return Err( syn::Error::new( key_span, message ) );
+                        }
+
+                        read_with = Some( parse_quote!( #base_path :: read ) );
+                        write_with = Some( parse_quote!( #base_path :: write ) );
+                        used_with = true;
                     }
                 }
             }
@@ -1382,7 +1469,9 @@ fn get_fields< 'a, I: IntoIterator< Item = &'a syn::Field > + 'a >( fields: I ) 
                 ty,
                 skip,
                 varint,
-                constant_prefix
+                constant_prefix,
+                read_with,
+                write_with
             })
         });
 
@@ -1632,30 +1721,35 @@ fn read_field_body( field: &Field ) -> TokenStream {
             })
         }};
 
-    let body = match field.ty.inner() {
-        Ty::String => read_string(),
-        Ty::Vec( .. ) => read_vec(),
-        Ty::CowSlice( .. ) => read_cow_slice(),
-        Ty::CowStr( .. ) => read_cow_str(),
-        Ty::HashMap( .. ) |
-        Ty::BTreeMap( .. )  => read_key_value_collection(),
-        Ty::HashSet( .. ) |
-        Ty::BTreeSet( .. ) => read_collection(),
-        Ty::CowHashMap( .. ) |
-        Ty::CowBTreeMap( .. ) => read_cow_key_value_collection(),
-        Ty::CowHashSet( .. ) |
-        Ty::CowBTreeSet( .. ) => read_cow_collection(),
-        Ty::RefSliceU8( .. ) => read_ref_slice_u8(),
-        Ty::RefSlice( _, inner_ty ) => read_ref_slice( inner_ty ),
-        Ty::RefStr( .. ) => read_ref_str(),
-        Ty::Array( _, length ) => read_array( *length ),
-        Ty::Primitive( .. ) if field.varint => read_u64_varint(),
-        Ty::Primitive( .. ) |
-        Ty::Ty( .. ) => {
-            assert!( field.length.is_none() );
-            quote! { _reader_.read_value() }
+    let body;
+    if let Some( ref read_with ) = field.read_with {
+        body = quote! { #read_with( _reader_ ) };
+    } else {
+        body = match field.ty.inner() {
+            Ty::String => read_string(),
+            Ty::Vec( .. ) => read_vec(),
+            Ty::CowSlice( .. ) => read_cow_slice(),
+            Ty::CowStr( .. ) => read_cow_str(),
+            Ty::HashMap( .. ) |
+            Ty::BTreeMap( .. )  => read_key_value_collection(),
+            Ty::HashSet( .. ) |
+            Ty::BTreeSet( .. ) => read_collection(),
+            Ty::CowHashMap( .. ) |
+            Ty::CowBTreeMap( .. ) => read_cow_key_value_collection(),
+            Ty::CowHashSet( .. ) |
+            Ty::CowBTreeSet( .. ) => read_cow_collection(),
+            Ty::RefSliceU8( .. ) => read_ref_slice_u8(),
+            Ty::RefSlice( _, inner_ty ) => read_ref_slice( inner_ty ),
+            Ty::RefStr( .. ) => read_ref_str(),
+            Ty::Array( _, length ) => read_array( *length ),
+            Ty::Primitive( .. ) if field.varint => read_u64_varint(),
+            Ty::Primitive( .. ) |
+            Ty::Ty( .. ) => {
+                assert!( field.length.is_none() );
+                quote! { _reader_.read_value() }
+            }
         }
-    };
+    }
 
     let body = match field.ty {
         Opt::Plain( _ ) => body,
@@ -1770,32 +1864,37 @@ fn write_field_body( field: &Field ) -> TokenStream {
             }
         }};
 
-    let body = match field.ty.inner() {
-        Ty::String |
-        Ty::CowStr( .. ) |
-        Ty::RefStr( .. )
+    let body;
+    if let Some( ref write_with ) = field.write_with {
+        body = quote!( #write_with ( #name, _writer_ )?; );
+    } else {
+        body = match field.ty.inner() {
+            Ty::String |
+            Ty::CowStr( .. ) |
+            Ty::RefStr( .. )
             => write_str(),
-        Ty::Vec( .. ) |
-        Ty::CowSlice( .. ) |
-        Ty::RefSliceU8( .. ) |
-        Ty::RefSlice( .. )
+            Ty::Vec( .. ) |
+            Ty::CowSlice( .. ) |
+            Ty::RefSliceU8( .. ) |
+            Ty::RefSlice( .. )
             => write_slice(),
-        Ty::HashMap( .. ) |
-        Ty::HashSet( .. ) |
-        Ty::BTreeMap( .. ) |
-        Ty::BTreeSet( .. ) |
-        Ty::CowHashMap( .. ) |
-        Ty::CowHashSet( .. ) |
-        Ty::CowBTreeMap( .. ) |
-        Ty::CowBTreeSet( .. ) => write_collection(),
-        Ty::Array( .. ) => write_array(),
-        Ty::Primitive( .. ) if field.varint => write_u64_varint(),
-        Ty::Primitive( .. ) |
-        Ty::Ty( .. ) => {
-            assert!( field.length.is_none() );
-            quote! { _writer_.write_value( #name )?; }
-        }
-    };
+            Ty::HashMap( .. ) |
+            Ty::HashSet( .. ) |
+            Ty::BTreeMap( .. ) |
+            Ty::BTreeSet( .. ) |
+            Ty::CowHashMap( .. ) |
+            Ty::CowHashSet( .. ) |
+            Ty::CowBTreeMap( .. ) |
+            Ty::CowBTreeSet( .. ) => write_collection(),
+            Ty::Array( .. ) => write_array(),
+            Ty::Primitive( .. ) if field.varint => write_u64_varint(),
+            Ty::Primitive( .. ) |
+            Ty::Ty( .. ) => {
+                assert!( field.length.is_none() );
+                quote! { _writer_.write_value( #name )?; }
+            }
+        };
+    }
 
     let body = match field.ty {
         Opt::Plain( _ ) => body,
@@ -1970,7 +2069,7 @@ impl< 'a > Enum< 'a > {
 }
 
 fn get_minimum_bytes( field: &Field ) -> Option< TokenStream > {
-    if field.default_on_eof || field.length.is_some() || field.skip {
+    if field.default_on_eof || field.length.is_some() || field.skip || field.read_with.is_some() || field.write_with.is_some() {
         None
     } else {
         let mut length = match field.ty {
@@ -2068,14 +2167,25 @@ fn generate_is_primitive( fields: &[Field], is_writable: bool, check_order: bool
         }
 
         let ty = &field.raw_ty;
+        // NOTE(with-attribute):
+        //   For now, `with`-attributes will forcefully make
+        //   the return value of `speedy_is_primitive` false.
         if is_writable {
-            is_primitive.push( quote! {
-                <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
-            });
+            if field.write_with.is_some() {
+                return quote! { false };
+            } else {
+                is_primitive.push( quote! {
+                    <#ty as speedy::Writable< C_ >>::speedy_is_primitive()
+                });
+            }
         } else {
-            is_primitive.push( quote! {
-                <#ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
-            });
+            if field.read_with.is_some() {
+                return quote! { false };
+            } else {
+                is_primitive.push( quote! {
+                    <#ty as speedy::Readable< 'a_, C_ >>::speedy_is_primitive()
+                });
+            }
         }
 
         fields_size.push( quote! {

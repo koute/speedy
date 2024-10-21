@@ -171,6 +171,26 @@ to the default value for its type and the EOF will be ignored.
 Specifies a static string of bytes which will be written or has to be present
 when reading before a given field.
 
+### `#[speedy(read_with = $path)]`
+
+Specifies a path to a function that can read this field, overriding the generated implementation.
+The function's signature should be 
+`fn<'a, C: speedy::Context, R: speedy::Reader<'a, C>>(reader: &mut R) -> Result<$ty, C::Error>`,
+where `$ty` is the type to be read.
+
+### `#[speedy(write_with = $path)]`
+
+Specifies a path to a function that can read this field, overriding the generated implementation.
+The function's signature should be
+`fn<C: speedy::Context, W: ?Sized + speedy::Writer<C>>(value: $ty, writer: &mut W) -> Result<(), C::Error>`,
+where `$ty` is the type to be written.
+
+### `#[speedy(with = $path)]`
+
+Effectively shorthand for `#[speedy(read_with = $path::read, write_with = $path::write)]` (see above).
+
+Cannot be combined with `read_with` nor `write_with`.
+
 ## Enum attributes
 
 ### `#[speedy(tag_type = $ty)]`
