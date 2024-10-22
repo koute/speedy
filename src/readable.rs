@@ -300,7 +300,7 @@ struct StreamReader< C: Context, S: Read > {
 impl< 'a, C, S > StreamReader< C, S > where C: Context, S: Read {
     #[inline(never)]
     fn read_bytes_slow( &mut self, mut output: &mut [u8] ) -> Result< (), C::Error > {
-        if self.is_buffering && output.len() < self.buffer.capacity() {
+        if self.is_buffering {
             let reader = &mut self.reader;
             while self.buffer.len() < self.buffer.capacity() {
                 let bytes_written = self.buffer.try_append_with( self.buffer.capacity() - self.buffer.len(), |chunk| {
