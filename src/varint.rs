@@ -115,7 +115,7 @@ macro_rules! impl_read {
             ($count:expr) => {{
                 let mut value: u64 = 0;
                 {
-                    let slice = unsafe { std::slice::from_raw_parts_mut( &mut value as *mut u64 as *mut u8, $count ) };
+                    let slice = unsafe { core::slice::from_raw_parts_mut( &mut value as *mut u64 as *mut u8, $count ) };
                     $reader.$read_bytes( slice )?;
                 }
                 value = value.to_le();
@@ -138,7 +138,7 @@ macro_rules! impl_read {
                     unreachable!()
                 } else {
                     unsafe {
-                        std::hint::unreachable_unchecked();
+                        core::hint::unreachable_unchecked();
                     }
                 }
             }
@@ -217,49 +217,49 @@ impl< C: Context > Writable< C > for VarInt64 {
             1 => {
                 writer.write_u8( 0b10000000 | (value >> 8) as u8 )?;
                 value = value.to_le();
-                let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 1 ) };
+                let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 1 ) };
                 writer.write_bytes( slice )
             },
             2 => {
                 writer.write_u8( 0b11000000 | (value >> 16) as u8 )?;
                 value = value.to_le();
-                let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 2 ) };
+                let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 2 ) };
                 writer.write_bytes( slice )
             },
             3 => {
                 writer.write_u8( 0b11100000 | (value >> 24) as u8 )?;
                 value = value.to_le();
-                let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 3 ) };
+                let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 3 ) };
                 writer.write_bytes( slice )
             },
             4 => {
                 writer.write_u8( 0b11110000 | (value >> 32) as u8 )?;
                 value = value.to_le();
-                let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 4 ) };
+                let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 4 ) };
                 writer.write_bytes( slice )
             },
             5 => {
                 writer.write_u8( 0b11111000 | (value >> 40) as u8 )?;
                 value = value.to_le();
-                let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 5 ) };
+                let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 5 ) };
                 writer.write_bytes( slice )
             },
             6 => {
                 writer.write_u8( 0b11111100 | (value >> 48) as u8 )?;
                 value = value.to_le();
-                let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 6 ) };
+                let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 6 ) };
                 writer.write_bytes( slice )
             },
             7 => {
                 writer.write_u8( 0b11111110 | (value >> 56) as u8 )?;
                 value = value.to_le();
-                let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 7 ) };
+                let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 7 ) };
                 writer.write_bytes( slice )
             },
             8 => {
                 writer.write_u8( 0b11111111 )?;
                 value = value.to_le();
-                let slice = unsafe { std::slice::from_raw_parts( &value as *const u64 as *const u8, 8 ) };
+                let slice = unsafe { core::slice::from_raw_parts( &value as *const u64 as *const u8, 8 ) };
                 writer.write_bytes( slice )
             },
             _ => {
@@ -267,7 +267,7 @@ impl< C: Context > Writable< C > for VarInt64 {
                     unreachable!()
                 } else {
                     unsafe {
-                        std::hint::unreachable_unchecked();
+                        core::hint::unreachable_unchecked();
                     }
                 }
             }

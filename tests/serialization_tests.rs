@@ -1,9 +1,11 @@
-use std::borrow::Cow;
-use std::ops::{Range, RangeInclusive};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fmt::Debug;
-use std::num::NonZeroU32;
-use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
+extern crate alloc;
+
+use alloc::borrow::Cow;
+use core::ops::{Range, RangeInclusive};
+use alloc::collections::{BTreeMap, BTreeSet};
+use std::collections::{HashMap, HashSet};
+use core::fmt::Debug;
+use core::num::NonZeroU32;
 
 #[allow(unused_imports)]
 use speedy::{Readable, Writable, Endianness};
@@ -64,6 +66,7 @@ macro_rules! symmetric_tests {
                 assert_eq!( <$type as Readable< Endianness >>::minimum_bytes_needed(), $minimum_bytes );
             }
 
+            #[cfg(feature = "std")]
             #[cfg(not(miri))]
             #[test]
             fn write_to_file_le() {
@@ -74,6 +77,7 @@ macro_rules! symmetric_tests {
                 assert_eq!( std::fs::read( &path ).unwrap(), $le_bytes );
             }
 
+            #[cfg(feature = "std")]
             #[cfg(not(miri))]
             #[test]
             fn write_to_file_be() {
@@ -237,6 +241,7 @@ macro_rules! symmetric_tests {
                 assert_eq!( original, deserialized );
             }
 
+            #[cfg(feature = "std")]
             #[test]
             fn read_from_stream_unbuffered_only_reads_what_is_necessary() {
                 let original: $type = $value;
@@ -250,6 +255,7 @@ macro_rules! symmetric_tests {
                 assert_eq!( cursor.position(), message_length as u64 );
             }
 
+            #[cfg(feature = "std")]
             #[test]
             fn read_from_stream_buffered_reads_as_much_as_possible() {
                 let original: $type = $value;
@@ -271,6 +277,7 @@ macro_rules! symmetric_tests {
                 }
             }
 
+            #[cfg(feature = "std")]
             #[cfg(not(miri))]
             #[test]
             fn round_trip_file_le() {
@@ -282,6 +289,7 @@ macro_rules! symmetric_tests {
                 assert_eq!( original, deserialized );
             }
 
+            #[cfg(feature = "std")]
             #[cfg(not(miri))]
             #[test]
             fn round_trip_file_be() {
@@ -805,9 +813,11 @@ struct DerivedStructWithTwoDifferentCows< 'a > {
 #[derive(Readable, Writable)]
 struct DerivedTupleStructWithGenericVec< T >( Vec< T > );
 
+#[cfg(feature = "std")]
 #[derive(Readable, Writable)]
 struct DerivedTupleStructWithGenericHashMap< K, V >( HashMap< K, V > ) where K: std::hash::Hash + Eq;
 
+#[cfg(feature = "std")]
 #[derive(Readable, Writable)]
 struct DerivedTupleStructWithGenericHashSet< T >( HashSet< T > ) where T: std::hash::Hash + Eq;
 
@@ -817,9 +827,11 @@ struct DerivedTupleStructWithGenericBTreeMap< K, V >( BTreeMap< K, V > ) where K
 #[derive(Readable, Writable)]
 struct DerivedTupleStructWithGenericBTreeSet< T >( BTreeSet< T > ) where T: Ord;
 
+#[cfg(feature = "std")]
 #[derive(Readable, Writable)]
 struct DerivedTupleStructWithGenericCowHashMap< 'a, K, V >( Cow< 'a, HashMap< K, V > > ) where K: std::hash::Hash + Eq + Clone, V: Clone;
 
+#[cfg(feature = "std")]
 #[derive(Readable, Writable)]
 struct DerivedTupleStructWithGenericCowHashSet< 'a, T >( Cow< 'a, HashSet< T > > ) where T: std::hash::Hash + Eq + Clone;
 
@@ -832,7 +844,7 @@ struct DerivedTupleStructWithGenericCowBTreeSet< 'a, T >( Cow< 'a, BTreeSet< T >
 macro_rules! atomic_wrapper {
     ($name:ident, $base_ty:ident) => {
         #[derive(Debug, Readable, Writable)]
-        struct $name( std::sync::atomic::$name );
+        struct $name( core::sync::atomic::$name );
 
         impl $name {
             pub fn new( value: $base_ty ) -> Self {
@@ -842,8 +854,8 @@ macro_rules! atomic_wrapper {
 
         impl PartialEq for $name {
             fn eq( &self, rhs: &$name ) -> bool {
-                self.0.load( std::sync::atomic::Ordering::SeqCst ) ==
-                rhs.0.load( std::sync::atomic::Ordering::SeqCst )
+                self.0.load( core::sync::atomic::Ordering::SeqCst ) ==
+                rhs.0.load( core::sync::atomic::Ordering::SeqCst )
             }
         }
     }
@@ -1408,36 +1420,6 @@ symmetric_tests! {
         be = [0, 0, 10],
         minimum_bytes = 1
     }
-    hashmap_u16_bool for HashMap< u16, bool > {
-        in = vec![ (10, true) ].into_iter().collect(),
-        le = [1, 0, 0, 0, 10, 0, 1],
-        be = [0, 0, 0, 1, 0, 10, 1],
-        minimum_bytes = 4
-    }
-    hashmap_u16_u8 for HashMap< u16, u8 > {
-        in = vec![ (10, 1) ].into_iter().collect(),
-        le = [1, 0, 0, 0, 10, 0, 1],
-        be = [0, 0, 0, 1, 0, 10, 1],
-        minimum_bytes = 4
-    }
-    cow_hashmap_u16_u8 for Cow< HashMap< u16, u8 > > {
-        in = Cow::Owned( vec![ (10, 1) ].into_iter().collect() ),
-        le = [1, 0, 0, 0, 10, 0, 1],
-        be = [0, 0, 0, 1, 0, 10, 1],
-        minimum_bytes = 4
-    }
-    hashset for HashSet< u16 > {
-        in = vec![ 10 ].into_iter().collect(),
-        le = [1, 0, 0, 0, 10, 0],
-        be = [0, 0, 0, 1, 0, 10],
-        minimum_bytes = 4
-    }
-    cow_hashset for Cow< HashSet< u16 > > {
-        in = Cow::Owned( vec![ 10 ].into_iter().collect() ),
-        le = [1, 0, 0, 0, 10, 0],
-        be = [0, 0, 0, 1, 0, 10],
-        minimum_bytes = 4
-    }
     btreemap_u16_bool for BTreeMap< u16, bool > {
         in = vec![ (10, true), (20, false) ].into_iter().collect(),
         le = [2, 0, 0, 0, 10, 0, 1, 20, 0, 0],
@@ -1474,32 +1456,56 @@ symmetric_tests! {
         be = [0, 0, 0x59, 0xb9],
         minimum_bytes = 4
     }
-    ipv4 for std::net::Ipv4Addr {
-        in = std::net::Ipv4Addr::new( 127, 0, 0, 1 ),
+    ipv4 for core::net::Ipv4Addr {
+        in = core::net::Ipv4Addr::new( 127, 0, 0, 1 ),
         le = [1, 0, 0, 127],
         be = [127, 0, 0, 1],
         minimum_bytes = 4
     }
-    ipv6 for std::net::Ipv6Addr {
-        in = std::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ),
+    ipv6 for core::net::Ipv6Addr {
+        in = core::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ),
         le = [0x00, 0xa1, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x15, 0x20, 0x07, 0x01, 0x20],
         be = [0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00],
         minimum_bytes = 16
     }
-    ipaddr_v4 for std::net::IpAddr {
-        in = std::net::IpAddr::V4( std::net::Ipv4Addr::new( 127, 0, 0, 1 ) ),
+    ipaddr_v4 for core::net::IpAddr {
+        in = core::net::IpAddr::V4( core::net::Ipv4Addr::new( 127, 0, 0, 1 ) ),
         le = [0, 1, 0, 0, 127],
         be = [0, 127, 0, 0, 1],
         minimum_bytes = 5
     }
-    ipaddr_v6 for std::net::IpAddr {
-        in = std::net::IpAddr::V6( std::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ) ),
+    ipaddr_v6 for core::net::IpAddr {
+        in = core::net::IpAddr::V6( core::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ) ),
         le = [1, 0x00, 0xa1, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x15, 0x20, 0x07, 0x01, 0x20],
         be = [1, 0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00],
         minimum_bytes = 5
     }
-    duration for std::time::Duration {
-        in = std::time::Duration::new( 1, 2 ),
+    socket_addr_v4 for core::net::SocketAddrV4 {
+        in = core::net::SocketAddrV4::new( core::net::Ipv4Addr::new( 127, 0, 0, 1 ), 33 ),
+        le = [1, 0, 0, 127, 33, 0],
+        be = [127, 0, 0, 1, 0, 33],
+        minimum_bytes = 6
+    }
+    socket_addr_v6 for core::net::SocketAddrV6 {
+        in = core::net::SocketAddrV6::new( core::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ), 33, 0, 0 ),
+        le = [0x00, 0xa1, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x15, 0x20, 0x07, 0x01, 0x20, 33, 0],
+        be = [0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00, 0, 33],
+        minimum_bytes = 18
+    }
+    socket_addr_ipv4 for core::net::SocketAddr {
+        in = core::net::SocketAddr::V4( core::net::SocketAddrV4::new( core::net::Ipv4Addr::new( 127, 0, 0, 1 ), 33 ) ),
+        le = [0, 1, 0, 0, 127, 33, 0],
+        be = [0, 127, 0, 0, 1, 0, 33],
+        minimum_bytes = 7
+    }
+    socket_addr_ipv6 for core::net::SocketAddr {
+        in = core::net::SocketAddr::V6( core::net::SocketAddrV6::new( core::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ), 33, 0, 0 ) ),
+        le = [1, 0x00, 0xa1, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x15, 0x20, 0x07, 0x01, 0x20, 33, 0],
+        be = [1, 0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00, 0, 33],
+        minimum_bytes = 7
+    }
+    duration for core::time::Duration {
+        in = core::time::Duration::new( 1, 2 ),
         le = [
             1, 0, 0, 0, 0, 0, 0, 0,
             2, 0, 0, 0
@@ -1507,18 +1513,6 @@ symmetric_tests! {
         be = [
             0, 0, 0, 0, 0, 0, 0, 1,
             0, 0, 0, 2
-        ],
-        minimum_bytes = 12
-    }
-    system_time for std::time::SystemTime {
-        in = std::time::SystemTime::UNIX_EPOCH,
-        le = [
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0
-        ],
-        be = [
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0
         ],
         minimum_bytes = 12
     }
@@ -1985,6 +1979,52 @@ symmetric_tests! {
         le = [0b10000000, 0b10000000],
         be = [0b10000000, 0b10000000],
         minimum_bytes = 1
+    }
+}
+
+#[cfg(feature = "std")]
+symmetric_tests! {
+    system_time for std::time::SystemTime {
+        in = std::time::SystemTime::UNIX_EPOCH,
+        le = [
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0
+        ],
+        be = [
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0
+        ],
+        minimum_bytes = 12
+    }
+    hashmap_u16_bool for HashMap< u16, bool > {
+        in = vec![ (10, true) ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1],
+        minimum_bytes = 4
+    }
+    hashmap_u16_u8 for HashMap< u16, u8 > {
+        in = vec![ (10, 1) ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1],
+        minimum_bytes = 4
+    }
+    cow_hashmap_u16_u8 for Cow< HashMap< u16, u8 > > {
+        in = Cow::Owned( vec![ (10, 1) ].into_iter().collect() ),
+        le = [1, 0, 0, 0, 10, 0, 1],
+        be = [0, 0, 0, 1, 0, 10, 1],
+        minimum_bytes = 4
+    }
+    hashset for HashSet< u16 > {
+        in = vec![ 10 ].into_iter().collect(),
+        le = [1, 0, 0, 0, 10, 0],
+        be = [0, 0, 0, 1, 0, 10],
+        minimum_bytes = 4
+    }
+    cow_hashset for Cow< HashSet< u16 > > {
+        in = Cow::Owned( vec![ 10 ].into_iter().collect() ),
+        le = [1, 0, 0, 0, 10, 0],
+        be = [0, 0, 0, 1, 0, 10],
+        minimum_bytes = 4
     }
 }
 
@@ -2678,9 +2718,10 @@ assert_impl!( ForcedPrimitive, speedy::private::ZeroCopyable< OtherEndian, () > 
 assert_impl!( &'static [ForcedPrimitive], speedy::Readable< 'static, NativeEndian > );
 assert_impl!( &'static [ForcedPrimitive], speedy::Readable< 'static, OtherEndian > );
 
+#[cfg(feature = "std")]
 #[test]
 fn test_incomplete_read_into_vec_triggers_drop_for_already_read_items() {
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use core::sync::atomic::{AtomicU64, Ordering};
 
     static COUNTER: AtomicU64 = AtomicU64::new( 0 );
 
@@ -2699,9 +2740,10 @@ fn test_incomplete_read_into_vec_triggers_drop_for_already_read_items() {
     assert_eq!( COUNTER.load( Ordering::SeqCst ), 2 );
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn test_incomplete_read_into_vec_does_not_trigger_drop_for_already_read_items_if_they_are_primitive() {
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use core::sync::atomic::{AtomicU64, Ordering};
 
     static COUNTER: AtomicU64 = AtomicU64::new( 0 );
 
@@ -2736,7 +2778,7 @@ fn test_zero_copy_cow_deserialization() {
         Cow::Borrowed( value ) => assert_eq!( value, &[33, 100] )
     }
 
-    std::mem::drop( input );
+    core::mem::drop( input );
 
     match value_owned {
         Cow::Owned( value ) => assert_eq!( value, &[33, 100] ),
@@ -2744,9 +2786,10 @@ fn test_zero_copy_cow_deserialization() {
     }
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn test_partial_deserialization_of_arrays_calls_destructors() {
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use core::sync::atomic::{AtomicU64, Ordering};
 
     static COUNTER: AtomicU64 = AtomicU64::new( 0 );
 

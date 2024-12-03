@@ -1,10 +1,3 @@
-use {
-    std::{
-        fmt,
-        io
-    }
-};
-
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind
@@ -39,7 +32,9 @@ pub enum ErrorKind {
 
     Unsized,
     EndiannessMismatch,
-    IoError( io::Error )
+
+    #[cfg(feature = "std")]
+    IoError( std::io::Error )
 }
 
 impl Error {
@@ -48,23 +43,26 @@ impl Error {
         Error { kind }
     }
 
-    pub fn custom( message: impl fmt::Display ) -> Self {
+    #[cfg(feature = "std")]
+    pub fn custom( message: impl core::fmt::Display ) -> Self {
         // The LLVM optimizer doesn't like us adding a new variant,
         // so instead we reuse the `IoError` one.
         Error {
-            kind: ErrorKind::IoError( io::Error::new( io::ErrorKind::Other, message.to_string() ) )
+            kind: ErrorKind::IoError( std::io::Error::new( std::io::ErrorKind::Other, message.to_string() ) )
         }
     }
 
+    #[cfg(feature = "std")]
     #[inline]
-    pub(crate) fn from_io_error( error: io::Error ) -> Self {
+    pub(crate) fn from_io_error( error: std::io::Error ) -> Self {
         Error {
             kind: ErrorKind::IoError( error )
         }
     }
 }
 
-impl From< Error > for io::Error {
+#[cfg(feature = "std")]
+impl From< Error > for std::io::Error {
     fn from( error: Error ) -> Self {
         if let ErrorKind::IoError( error ) = error.kind {
             return error;
@@ -72,12 +70,12 @@ impl From< Error > for io::Error {
 
         let is_eof = error.is_eof();
         let kind = if is_eof {
-            io::ErrorKind::UnexpectedEof
+            std::io::ErrorKind::UnexpectedEof
         } else {
-            io::ErrorKind::InvalidData
+            std::io::ErrorKind::InvalidData
         };
 
-        io::Error::new( kind, format!( "{}", error ) )
+        std::io::Error::new( kind, format!( "{}", error ) )
     }
 }
 
@@ -86,8 +84,9 @@ pub fn get_error_kind( error: &Error ) -> &ErrorKind {
     &error.kind
 }
 
-impl fmt::Display for Error {
-    fn fmt( &self, fmt: &mut fmt::Formatter<'_> ) -> fmt::Result {
+#[cfg(feature = "alloc")]
+impl core::fmt::Display for Error {
+    fn fmt( &self, fmt: &mut core::fmt::Formatter<'_> ) -> core::fmt::Result {
         match self.kind {
             ErrorKind::InvalidChar => write!( fmt, "out of range char" ),
             ErrorKind::InvalidEnumVariant => write!( fmt, "invalid enum variant" ),
@@ -104,11 +103,14 @@ impl fmt::Display for Error {
             ErrorKind::ExpectedConstant { constant } => write!( fmt, "expected a predefined {} bytes(s) long constant", constant.len() ),
             ErrorKind::Unsized => write!( fmt, "type is unsized hence requires zero-copy deserialization; use `read_from_buffer` or similar to deserialize it" ),
             ErrorKind::EndiannessMismatch => write!( fmt, "endianness mismatch" ),
-            ErrorKind::IoError( ref error ) => write!( fmt, "{}", error )
+
+            #[cfg(feature = "std")]
+            ErrorKind::IoError( ref error ) => write!( fmt, "{}", error ),
         }
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for Error {
     fn source( &self ) -> Option< &(dyn std::error::Error + 'static) > {
         match self.kind {
@@ -127,19 +129,23 @@ impl IsEof for Error {
         match self.kind {
             ErrorKind::UnexpectedEndOfInput |
             ErrorKind::UnexpectedEndOfOutputBuffer => true,
+
+            #[cfg(feature = "std")]
             ErrorKind::IoError( ref error ) => error.kind() == std::io::ErrorKind::UnexpectedEof,
+
             _ => false
         }
     }
 }
 
+#[cfg(feature = "alloc")]
 #[cold]
-pub fn error_invalid_string_utf8< T >( _: std::string::FromUtf8Error ) -> T where T: From< Error > {
+pub fn error_invalid_string_utf8< T >( _: alloc::string::FromUtf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
 #[cold]
-pub fn error_invalid_str_utf8< T >( _: std::str::Utf8Error ) -> T where T: From< Error > {
+pub fn error_invalid_str_utf8< T >( _: core::str::Utf8Error ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidUtf8 ) )
 }
 
@@ -193,11 +199,13 @@ pub fn error_zero_non_zero< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::ZeroNonZero ) )
 }
 
+#[cfg(feature = "std")]
 #[cold]
 pub fn error_invalid_system_time< T >() -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::InvalidSystemTime ) )
 }
 
+#[cfg(feature = "alloc")]
 #[cold]
 pub fn error_expected_constant< T >( constant: &'static [u8] ) -> T where T: From< Error > {
     T::from( Error::new( ErrorKind::ExpectedConstant { constant } ) )

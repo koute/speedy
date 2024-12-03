@@ -1,5 +1,10 @@
 #![cfg_attr(feature = "external_doc", doc = include_str!("../README.md"))]
 #![forbid(unsafe_op_in_unsafe_fn)]
+#![cfg_attr(all(not(test), not(feature = "std")), no_std)]
+
+#[doc(hidden)]
+#[cfg(feature = "alloc")]
+pub extern crate alloc;
 
 mod error;
 #[macro_use]
@@ -14,6 +19,8 @@ mod writer;
 mod context;
 mod endianness;
 mod varint;
+
+#[cfg(feature = "std")]
 mod circular_buffer;
 
 #[cfg(feature = "chrono")]
@@ -101,6 +108,7 @@ mod tests {
         assert_eq!( data, vec![ 1, 2, 3 ] );
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn simple_read_from_stream_unbuffered() {
         let data = vec![ 1, 2, 3 ];
@@ -109,6 +117,7 @@ mod tests {
         assert_eq!( value, SimpleStruct { a: 1, b: 2, c: 3 } );
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn simple_read_from_stream_buffered() {
         let data = vec![ 1, 2, 3 ];
@@ -154,6 +163,7 @@ mod tests {
         assert_eq!( value, 2 );
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn read_from_stream_unbuffered_with_default_ctx() {
         let data = vec![ 2, 0 ];
@@ -161,6 +171,7 @@ mod tests {
         assert_eq!( value, 2 );
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn read_from_stream_buffered_with_default_ctx() {
         let data = vec![ 2, 0 ];
@@ -181,6 +192,7 @@ mod tests {
         assert_eq!( buffer, [2, 0] );
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn write_to_stream_with_default_ctx() {
         let mut buffer = [0, 0];
@@ -212,6 +224,7 @@ mod tests {
         assert_eq!( original, deserialized );
     }
 
+    #[cfg(feature = "std")]
     #[cfg(not(miri))]
     #[test]
     fn read_big_vector_of_vectors_from_stream_buffered() {
