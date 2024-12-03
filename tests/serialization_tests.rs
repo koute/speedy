@@ -1480,6 +1480,30 @@ symmetric_tests! {
         be = [1, 0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00],
         minimum_bytes = 5
     }
+    socket_addr_v4 for core::net::SocketAddrV4 {
+        in = core::net::SocketAddrV4::new( core::net::Ipv4Addr::new( 127, 0, 0, 1 ), 33 ),
+        le = [1, 0, 0, 127, 33, 0],
+        be = [127, 0, 0, 1, 0, 33],
+        minimum_bytes = 6
+    }
+    socket_addr_v6 for core::net::SocketAddrV6 {
+        in = core::net::SocketAddrV6::new( core::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ), 33, 0, 0 ),
+        le = [0x00, 0xa1, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x15, 0x20, 0x07, 0x01, 0x20, 33, 0],
+        be = [0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00, 0, 33],
+        minimum_bytes = 18
+    }
+    socket_addr_ipv4 for core::net::SocketAddr {
+        in = core::net::SocketAddr::V4( core::net::SocketAddrV4::new( core::net::Ipv4Addr::new( 127, 0, 0, 1 ), 33 ) ),
+        le = [0, 1, 0, 0, 127, 33, 0],
+        be = [0, 127, 0, 0, 1, 0, 33],
+        minimum_bytes = 7
+    }
+    socket_addr_ipv6 for core::net::SocketAddr {
+        in = core::net::SocketAddr::V6( core::net::SocketAddrV6::new( core::net::Ipv6Addr::new( 0x2001, 0x720, 0x1500, 0x1, 0, 0, 0, 0xa100 ), 33, 0, 0 ) ),
+        le = [1, 0x00, 0xa1, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x15, 0x20, 0x07, 0x01, 0x20, 33, 0],
+        be = [1, 0x20, 0x01, 0x07, 0x20, 0x15, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0xa1, 0x00, 0, 33],
+        minimum_bytes = 7
+    }
     duration for core::time::Duration {
         in = core::time::Duration::new( 1, 2 ),
         le = [

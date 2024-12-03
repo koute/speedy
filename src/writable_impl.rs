@@ -652,7 +652,57 @@ impl< C > Writable< C > for core::net::IpAddr where C: Context {
     }
 }
 
-impl< C > Writable< C > for core::time::Duration where C: Context {
+impl< C > Writable< C > for core::net::SocketAddrV4 where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        self.ip().write_to( writer )?;
+        writer.write_u16( self.port() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 6 )
+    }
+}
+
+impl< C > Writable< C > for core::net::SocketAddrV6 where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        self.ip().write_to( writer )?;
+        writer.write_u16( self.port() )
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        Ok( 18 )
+    }
+}
+
+impl< C > Writable< C > for core::net::SocketAddr where C: Context {
+    #[inline]
+    fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
+        match self {
+            core::net::SocketAddr::V4( address ) => {
+                writer.write_u8( 0 )?;
+                address.write_to( writer )
+            },
+            core::net::SocketAddr::V6( address ) => {
+                writer.write_u8( 1 )?;
+                address.write_to( writer )
+            }
+        }
+    }
+
+    #[inline]
+    fn bytes_needed( &self ) -> Result< usize, C::Error > {
+        match self {
+            core::net::SocketAddr::V4( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 ),
+            core::net::SocketAddr::V6( address ) => Writable::< C >::bytes_needed( address ).map( |count| count + 1 )
+        }
+    }
+}
+
+impl< C > Writable< C > for std::time::Duration where C: Context {
     #[inline]
     fn write_to< W >( &self, writer: &mut W ) -> Result< (), C::Error > where W: ?Sized + Writer< C > {
         writer.write_u64( self.as_secs() )?;

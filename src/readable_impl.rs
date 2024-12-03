@@ -557,7 +557,48 @@ impl< 'a, C > Readable< 'a, C > for core::net::IpAddr where C: Context {
     }
 }
 
-impl< 'a, C > Readable< 'a, C > for core::time::Duration where C: Context {
+impl< 'a, C > Readable< 'a, C > for core::net::SocketAddrV4 where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( core::net::SocketAddrV4::new( reader.read_value()?, reader.read_value()? ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        6
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for core::net::SocketAddrV6 where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        Ok( core::net::SocketAddrV6::new( reader.read_value()?, reader.read_value()?, 0, 0 ) )
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        18
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for core::net::SocketAddr where C: Context {
+    #[inline]
+    fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
+        let kind = reader.read_u8()?;
+        match kind {
+            0 => Ok( core::net::SocketAddr::V4( reader.read_value()? ) ),
+            1 => Ok( core::net::SocketAddr::V6( reader.read_value()? ) ),
+            _ => Err( crate::error::error_invalid_enum_variant() )
+        }
+    }
+
+    #[inline]
+    fn minimum_bytes_needed() -> usize {
+        7
+    }
+}
+
+impl< 'a, C > Readable< 'a, C > for std::time::Duration where C: Context {
     #[inline]
     fn read_from< R: Reader< 'a, C > >( reader: &mut R ) -> Result< Self, C::Error > {
         let secs = reader.read_u64()?;
