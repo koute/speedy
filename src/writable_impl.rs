@@ -260,7 +260,7 @@ impl< C: Context, T: Writable< C > > Writable< C > for [T] {
 
     #[inline]
     fn bytes_needed( &self ) -> Result< usize, C::Error > {
-        if core::mem::size_of::<T>() > 0 {
+        if mem::size_of::<T>() > 0 {
             unsafe_is_length!( self.len() );
         }
 
