@@ -1,3 +1,4 @@
+// Assumes each item occupies at least 1 byte, so do not use for ZST's.
 macro_rules! unsafe_is_length {
     ($expr:expr) => {
         if $expr as u64 >= 0x7FFFFFFF_FFFFFFFF {
